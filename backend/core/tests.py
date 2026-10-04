@@ -217,7 +217,7 @@ class FoundationTests(TestCase):
 from concurrent.futures import ThreadPoolExecutor
 from unittest import skipUnless
 from django.test import TransactionTestCase
-from django.db import close_old_connections
+from django.db import close_old_connections, connections
 from .models import AuditHead, LocalCounter
 
 @skipUnless(connection.vendor == 'postgresql', 'PostgreSQL concurrency checks')
@@ -241,7 +241,7 @@ class PostgreSQLConcurrencyTests(TransactionTestCase):
             except ValidationError:
                 return 'conflict'
             finally:
-                close_old_connections()
+                connections.close_all()
         with ThreadPoolExecutor(max_workers=2) as executor:
             results = list(executor.map(edit, ['Scope A','Scope B']))
         self.assertCountEqual(results, ['saved','conflict'])
@@ -255,7 +255,7 @@ class PostgreSQLConcurrencyTests(TransactionTestCase):
                 project = create_project(User.objects.get(pk=associate_id), Customer.objects.get(pk=customer_id), location, User.objects.get(pk=associate_id), User.objects.get(pk=reviewer_id))
                 return project.code
             finally:
-                close_old_connections()
+                connections.close_all()
         with ThreadPoolExecutor(max_workers=2) as executor:
             codes = list(executor.map(create, ['2 Test Street','3 Test Street']))
         self.assertEqual(len(set(codes)), 2)
