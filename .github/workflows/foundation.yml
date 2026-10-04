@@ -1,0 +1,53 @@
+name: Foundation checks
+on:
+  push:
+    paths: ['backend/**', 'frontend/**', '.github/workflows/foundation.yml']
+  pull_request:
+    paths: ['backend/**', 'frontend/**', '.github/workflows/foundation.yml']
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: gecc
+          POSTGRES_USER: gecc
+          POSTGRES_PASSWORD: ci-only-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U gecc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      GECC_DEV: '1'
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGDATABASE: gecc
+      PGUSER: gecc
+      PGPASSWORD: ci-only-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.lock.txt
+      - run: python backend/manage.py check
+      - run: python backend/manage.py makemigrations --check --dry-run
+      - run: python backend/manage.py test core
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
