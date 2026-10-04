@@ -1,0 +1,54 @@
+Project map
+Area	Scope
+Project objective	Build a sales back-office system for Go Ecco Climate Control that captures project data once and generates consistent operational, financial, and signature documents.
+System of record	Relational database; Google Sheets, PDFs, emails, and exports are outputs only.
+Core record	One Master Sales Record per project, with immutable approved versions and controlled revisions.
+Users and permissions	Sales Associates, Sales Manager, Comptroller, Installation Manager, Technicians, Accounts Payable Associate, Database Administrator, and other contractors.
+Customer and project management	Customers, multiple contacts, project locations, duplicate detection, project identification codes, assignments, status, and search.
+Sales workflow	Draft Master Sales Record → approval → document generation → contract signature → invoice signature → installation → certificate signature → payment verification → completion.
+Document generation	Invoice, contract, certificate, commission reports, accounting reports, and other approved outputs generated from controlled records.
+Signature process	Ordered electronic signatures, authentication, reminders, expiration after 75 days, signed PDFs, and signature audit certificates.
+Installation	Installation task creation, three-day waiting rule, approved scope execution, equipment serial numbers, materials used, completion notes, and proposed scope changes.
+Payments and receivables	Cashier’s checks and bank wires, payment verification, project allocation, credits, refunds, adjustments, and accounts receivable.
+Costs and profitability	Equipment, materials, dealer fees, lead costs, technician costs, Damon and Jerry deductions, gross profit, net profit, and commission calculations.
+Contractor compensation	Fixed compensation, variable commissions, biweekly commission reports, approvals, distribution, retention, and annual summaries.
+Accounts payable	Separate payables for equipment, dealer fees, and materials, created when the certificate is signed.
+Inventory and assets	FIFO inventory, serial-number tracking, vehicles, computers, offices, straight-line depreciation, loans, and fixed-asset reporting.
+Financial reporting	Balance sheet, cash-flow statement, statement of operations, AR/AP, inventory, depreciation, loans, retained earnings, profitability, and working-capital reports.
+Accounting foundation	Internal double-entry ledger with cash-basis reporting, period close, adjustment entries, and locked published periods.
+Audit and security	Authentication, least-privilege access, access logging, append-only tamper-evident audit chain, restricted audit-log access, and permanent retention.
+Dashboard and search	Role-specific activity dashboard, exception dashboard, project search, overdue tasks, expiring signatures, payment issues, profitability warnings, and required actions.
+Implementation sequence	Sprint 00 baseline; Sprints 01–16 covering database, permissions, audit, customer/project data, Master Sales Record, workflow, documents, signatures, payments, commissions, assets, reporting, dashboard, notifications, testing, deployment, and operations.
+Initial issue register
+ID	Issue	Status	Impact / required resolution
+IR-001	Master Sales Record approval authority conflicts. The baseline generally states that the Sales Manager or Comptroller approves it, while one baseline section says the Installation Manager may approve. Later Sprint 05 material reinforces Sales Manager or Comptroller approval.	Partially resolved	Treat Sales Manager or Comptroller as the governing approval authority unless an explicitly approved later decision changes it. Record this as a formal clarification.
+IR-002	Single source of truth versus post-approval operational updates. Technicians may update serial numbers, materials, and completion data after approval, while approved records are described as immutable.	Open	Define which fields may be appended or changed operationally, when a new Master Sales Record version is required, and how the current version is determined.
+IR-003	Historical calculation reproducibility is undecided. Sprint 01 leaves open whether calculated financial values and calculation snapshots are stored.	Open	Decide whether prices, costs, gross profit, commissions, and reports store immutable calculation snapshots in addition to formulas and source data.
+IR-004	Minimum chart of accounts is undecided. The system requires double-entry accounting but does not yet define the initial chart of accounts.	Open	Establish accounts for cash, revenue, AR, AP, inventory, fixed assets, depreciation, loans, equity, commissions, and adjustments.
+IR-005	Cash-basis reporting and AR/AP structures need a formal accounting treatment. The system tracks receivables and payables while financial reporting is cash-basis.	Open	Define recognition, posting, and reporting rules for unpaid invoices, unpaid vendor balances, inventory, adjustments, and period close.
+IR-006	Payment verification evidence and authority are incomplete. Cashier’s checks require bank confirmation; wires require a reference number or proof of receipt.	Open	Specify who verifies payments, what evidence is acceptable, whether verification can be reversed, and which audit events are required.
+IR-007	Three-day installation rule is ambiguous. The requirement says installation cannot occur earlier than three days after the customer signs both contract and invoice.	Open	Define calendar versus business days, the precise start timestamp, treatment of weekends and holidays, and the authorized exception process.
+IR-008	Fixed deductions and fixed compensation may be conceptually inconsistent. Lead, Damon, and Jerry costs are deducted from every project whether or not they participated, while fixed compensation is paid to them once per completed project.	Open	Confirm whether these are universal project cost allocations, payments to named contractors, or both; define eligibility, inactive-contractor handling, and reporting treatment.
+IR-009	Cost-entry permissions require field-level clarification. Several roles may enter different cost types, and the Installation Manager may approve installation-related costs.	Open	Define permissions for entering, editing, approving, and revising each cost field, especially technician cost, materials, and post-payroll corrections.
+IR-010	Document templates and signature placement are not yet supplied. The contract and certificate PDFs, invoice layout, logo, state artwork, and exact signature locations remain open implementation inputs.	Open dependency	Sprint 07 cannot be finalized until the templates, artwork, field mapping, and signature-placement rules are available and approved.
+IR-011	Project identification-code rules need normalization. The intended format is clear, but the HTML bundle contains malformed escaping and formatting around the code specification.	Open	Confirm exact syntax, initials validation, sequence reservation, concurrency behavior, cancellation behavior, and duplicate-location handling.
+IR-012	Cancellation and reopening rules are incomplete. The system prevents reuse of cancelled project codes and supports reopening approved records, but the full cancellation lifecycle is not defined.	Open	Define who may cancel, at which states, whether cancellation requires approval, what happens to documents and payments, and whether a cancelled project can ever be reactivated.
+IR-013	Financial-period timing needs operational rules. Reports are prepared on the fifth calendar day of the following month.	Open	Define timezone, treatment when the fifth falls on a weekend or holiday, late entries, approval deadlines, and adjustment-period behavior.
+IR-014	Contractor/employee terminology is inconsistent. The baseline states all workers are independent contractors, but several entities and report descriptions use “employee or contractor” and “payroll.”	Open	Adopt controlled terminology and determine whether “payroll” means contractor-payment processing only or supports employees in a future phase.
+IR-015	Data migration is not yet specified. Existing spreadsheet data may contain duplicates and inconsistent values.	Open dependency	Define migration staging, matching rules, data cleansing, conflict resolution, historical-version treatment, and acceptance criteria before Sprint 16.
+IR-016	Requirements are distributed across a very large concatenated bundle. The HTML file contains multiple sprint documents and repeated carried-forward requirements.	Process risk	Maintain a controlled requirements index showing the authoritative version of each rule, its originating sprint, later superseding decisions, and unresolved conflicts.
+Immediate baseline decisions to carry forward
+For the next Sprint document, I would treat these as currently authoritative:
+
+The relational database is the system of record.
+The Master Sales Record is the project source of truth.
+Approved records cannot be silently overwritten.
+Revisions create new versions and preserve prior versions.
+Sales Manager or Comptroller approval governs the Master Sales Record unless an explicitly approved later decision changes that rule.
+Contract and invoice GECC signatures come from the Sales Manager or Comptroller.
+The Installation Manager signs certificates; the Comptroller is a substitute only when the Installation Manager is unavailable and the reason is recorded.
+Payment verification is required before completion.
+Commissions are earned only after project completion.
+Financial periods are locked after publication and corrected through formal adjustments.
+Audit records are append-only, tamper-evident, and permanently retained.
+This establishes the working project map and prevents the main contradictions from being carried silently into the next Sprint or final documents.
