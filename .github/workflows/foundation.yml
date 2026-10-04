@@ -29,7 +29,7 @@ jobs:
       PGDATABASE: gecc
       PGUSER: gecc
       PGPASSWORD: ci-only-password
-      GECC_PDF_TEMPLATE_DIR: ${{ runner.temp }}/gecc-test-templates
+      GECC_PDF_TEMPLATE_DIR: /tmp/gecc-test-templates
       GECC_SYNTHETIC_TEMPLATES: '1'
     steps:
       - uses: actions/checkout@v4
@@ -64,7 +64,7 @@ jobs:
       - run: npm run test:screen
         working-directory: frontend
         env:
-          GECC_PDF_TEMPLATE_DIR: ${{ runner.temp }}/gecc-test-templates
+          GECC_PDF_TEMPLATE_DIR: /tmp/gecc-test-templates
           GECC_SYNTHETIC_TEMPLATES: '1'
           GECC_SCREENSHOTS: ${{ runner.temp }}/gecc-screen-review
       - uses: actions/upload-artifact@v4
