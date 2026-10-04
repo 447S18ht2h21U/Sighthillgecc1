@@ -131,3 +131,20 @@ class Document(Entity):
         super().save(*args, **kwargs)
     def delete(self, *args, **kwargs):
         raise ValidationError('Generated documents cannot be deleted.')
+
+
+class SigningPlan(Entity):
+    """Immutable recipient/routing review; never evidence of sending or signing."""
+    msr = models.ForeignKey(MSR, on_delete=models.PROTECT, related_name='signing_plans')
+    group = models.CharField(max_length=32)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    review = models.JSONField()
+    digest = models.CharField(max_length=64)
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['msr', 'group', 'digest'], name='signing_review_unique')]
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Signing reviews are immutable.')
+        super().save(*args, **kwargs)
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Signing reviews cannot be deleted.')

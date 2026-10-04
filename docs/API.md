@@ -28,3 +28,12 @@ All business endpoints require an authenticated session. Mutations also require 
 Customer/project/account/audit lists use pages of 50. Customer/project lists support scoped `?search=` text lookup. PostgreSQL full-text search and indexed operational filtering are later work. For `edit`, send the complete commercial snapshot; omissions are allowed in a draft but will prevent submission. Snapshot keys are validated and unknown fields rejected. Currency values are decimal strings. Quantities are positive decimal strings. Submission requires explicit equipment/material lists; an empty list records that no items apply.
 
 Stale edits return a validation error with `conflict`; reload before retrying. Duplicate creation warnings return `duplicate_warning`; resubmit with an explicit `duplicate_reason` only after reviewing the match. Document preparation and its audit/outbox record commit atomically. No external delivery, signing, or payment action is executed by the outbox in this slice.
+
+
+## Signing reviews (local, no external delivery)
+
+- `GET /api/projects/{id}/signing-candidates/?group=COMMERCIAL` returns active role-compatible GECC accounts to assigned Sales Managers/Comptroller. Groups: `COMMERCIAL`, `COMPLETION_FINANCED`, `COMPLETION_NON_FINANCED`.
+- `POST /api/msrs/{id}/signing-reviews/` accepts `group`, `customer_name`, `customer_email`, `gecc_signer` (account UUID), `authority_note`, and `substitute_reason` (required for Comptroller certificate substitution). Current approved, active project only; source PDFs must exist. Returns 201 for a new immutable review or 200 for an identical existing review. No signature request is sent.
+- `GET /api/projects/{id}/signing-reviews/` returns scoped immutable review history, source hashes, recipient/tab metadata, and computed release checks. Historical reviews survive commercial revisions. Status is `PREPARED`, `REVIEW_REQUIRED`, `SUPERSEDED`, or `CANCELLED`; `provider_status` is null and `send_available` is always false in this slice.
+
+The `envelope_preview` contains no PDF bytes. It is not a complete send payload, and no endpoint exports it to Docusign. Commercial PDFs remain unsigned preparation copies. Explicit release gates must produce signer-ready PDFs and verify work completion/cancellation details before any external invitation.
