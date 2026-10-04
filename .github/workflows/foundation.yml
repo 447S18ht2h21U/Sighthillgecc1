@@ -60,7 +60,7 @@ jobs:
       - run: pip install -r backend/requirements.lock.txt
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
-      - run: python backend/tools/create_test_templates.py --output "${{ runner.temp }}/gecc-test-templates"
+      - run: python backend/tools/create_test_templates.py --output /tmp/gecc-test-templates
       - run: npm run test:screen
         working-directory: frontend
         env:
