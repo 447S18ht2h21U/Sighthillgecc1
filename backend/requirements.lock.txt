@@ -5,3 +5,7 @@ psycopg-binary==3.3.6
 asgiref==3.12.1
 sqlparse==0.6.0
 typing-extensions==4.16.0
+pypdf==6.10.0
+reportlab==4.4.9
+pillow==12.3.0
+charset-normalizer==3.4.4

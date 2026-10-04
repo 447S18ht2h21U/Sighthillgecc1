@@ -5,7 +5,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.middleware.csrf import get_token
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
@@ -15,7 +15,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
-from .models import Customer, Contact, Project, MSR, User, Role, AuditEvent
+from .models import Customer, Contact, Project, MSR, User, Role, AuditEvent, Document
 from .services import EDITORS, create_project, transition, revise, audit, change_project_state
 from .rules import PAYMENT_OPTIONS, SIGNATURE_WORKFLOWS
 
@@ -155,6 +155,12 @@ class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(ProjectSerializer(project).data)
 
     @action(detail=True, methods=['get'])
+    def documents(self, request, pk=None):
+        project = self.get_object()
+        documents = Document.objects.select_related('msr').defer('content', 'values').filter(msr__project=project).order_by('-created_at')
+        return Response(DocumentSerializer(documents, many=True).data)
+
+    @action(detail=True, methods=['get'])
     def history(self, request, pk=None):
         project = self.get_object()
         return Response(MSRSerializer(project.versions.order_by('number'), many=True).data)
@@ -163,6 +169,16 @@ class MSRViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = MSRSerializer
     def get_queryset(self):
         return MSR.objects.filter(project__in=project_scope(self.request.user)).order_by('-created_at')
+    @action(detail=True, methods=['post'], url_path='documents')
+    def prepare_document(self, request, pk=None):
+        from .documents import generate
+        item = self.get_object()
+        kind = request.data.get('kind')
+        if not isinstance(kind, str):
+            raise ValidationError('Document type is required.')
+        document, created = generate(request.user, item.id, kind)
+        return Response(DocumentSerializer(document).data, status=201 if created else 200)
+
     @action(detail=True, methods=['post'], url_path='transition')
     def change(self, request, pk=None):
         item = self.get_object()
@@ -289,3 +305,40 @@ class AccountViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             user = serializer.save()
             audit(self.request.user, 'account.updated', user.id, {'role': user.role, 'active': user.is_active})
+
+
+class DocumentSerializer(serializers.ModelSerializer):
+    msr_version = serializers.IntegerField(source='msr.number', read_only=True)
+    download_url = serializers.SerializerMethodField()
+    class Meta:
+        model = Document
+        fields = ['id', 'msr', 'msr_version', 'kind', 'status', 'filename', 'created_at', 'created_by', 'template_sha256', 'snapshot_sha256', 'pdf_sha256', 'renderer_version', 'download_url']
+    def get_download_url(self, obj):
+        return f'/api/documents/{obj.id}/download/'
+
+class DocumentViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = DocumentSerializer
+    pagination_class = Page
+    def get_queryset(self):
+        qs = Document.objects.select_related('msr').defer('content', 'values').filter(msr__project__in=project_scope(self.request.user)).order_by('-created_at')
+        msr_id = self.request.query_params.get('msr')
+        if msr_id:
+            from uuid import UUID
+            try:
+                UUID(msr_id)
+            except ValueError:
+                raise ValidationError('Invalid MSR identifier.')
+            qs = qs.filter(msr_id=msr_id)
+        return qs
+    @action(detail=True, methods=['get'])
+    def download(self, request, pk=None):
+        import hashlib
+        document = self.get_object()
+        content = bytes(document.content)
+        if hashlib.sha256(content).hexdigest() != document.pdf_sha256:
+            raise ValidationError('Document integrity check failed.')
+        response = HttpResponse(content, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{document.filename}"'
+        response['Cache-Control'] = 'private, no-store'
+        response['X-Content-Type-Options'] = 'nosniff'
+        return response

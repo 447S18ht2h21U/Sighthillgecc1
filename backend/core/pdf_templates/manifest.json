@@ -1,0 +1,122 @@
+{
+  "GECC-Completion-Certificate-Financed-Interactive.pdf": {
+    "sha256": "2ecfa888e61681a910fa981edc36cee1d5d1b2b7ca7c7de61c927caf06986935",
+    "pages": 1,
+    "fields": [
+      "completion_date",
+      "customer_printed_name",
+      "customer_signature",
+      "customer_signed_date",
+      "gecc_representative_name",
+      "gecc_role",
+      "gecc_signature",
+      "gecc_signed_date",
+      "gecc_substitute_reason",
+      "msr_version",
+      "project_address",
+      "project_city",
+      "project_code",
+      "project_state",
+      "project_zip"
+    ],
+    "native_signature_fields": [
+      "customer_signature",
+      "gecc_signature"
+    ]
+  },
+  "GECC-Completion-Certificate-Non-Financed-Interactive.pdf": {
+    "sha256": "df53a166d1d886ea0a91c7a4c9788327a4e1bc9766925c28983d2fa6fe6e9ed0",
+    "pages": 1,
+    "fields": [
+      "completion_date",
+      "completion_exceptions",
+      "customer_printed_name",
+      "customer_signature",
+      "customer_signed_date",
+      "gecc_representative_name",
+      "gecc_role",
+      "gecc_signature",
+      "gecc_signed_date",
+      "gecc_substitute_reason",
+      "msr_version",
+      "project_address",
+      "project_city",
+      "project_code",
+      "project_state",
+      "project_zip"
+    ],
+    "native_signature_fields": [
+      "customer_signature",
+      "gecc_signature"
+    ]
+  },
+  "GECC-HVAC-Invoice-Interactive.pdf": {
+    "sha256": "6caa42c282d1449e49b553c45b51aaee5e3982d14b53d4180784321ae2d27d8c",
+    "pages": 1,
+    "fields": [
+      "customer_email",
+      "customer_name",
+      "customer_payment_initials",
+      "customer_phone",
+      "customer_printed_name",
+      "customer_signature",
+      "customer_signed_date",
+      "gecc_representative_name",
+      "gecc_role",
+      "gecc_signature",
+      "gecc_signed_date",
+      "invoice_date",
+      "invoice_number",
+      "invoice_total",
+      "line_1_amount",
+      "line_1_description",
+      "line_2_amount",
+      "line_2_description",
+      "line_3_amount",
+      "line_3_description",
+      "line_4_amount",
+      "line_4_description",
+      "line_5_amount",
+      "line_5_description",
+      "line_6_amount",
+      "line_6_description",
+      "line_7_amount",
+      "line_7_description",
+      "msr_version",
+      "other_charges",
+      "payment_option",
+      "project_address",
+      "project_code",
+      "sales_tax",
+      "subtotal"
+    ],
+    "native_signature_fields": [
+      "customer_signature",
+      "gecc_signature"
+    ]
+  },
+  "GECC-Project-SOW-Agreement-Interactive.pdf": {
+    "sha256": "d15eef2d9aee9952ddd63e410488e15576964072c68bf60c1cc5f0ec242a03a2",
+    "pages": 3,
+    "fields": [
+      "cancellation_deadline",
+      "customer_name",
+      "customer_printed_name",
+      "customer_signature",
+      "customer_signed_date",
+      "financing_type",
+      "gecc_representative_name",
+      "gecc_role",
+      "gecc_signature",
+      "gecc_signed_date",
+      "msr_version",
+      "payment_option",
+      "project_address",
+      "project_code"
+    ],
+    "native_signature_fields": [
+      "customer_signature",
+      "gecc_signature"
+    ]
+  }
+}
