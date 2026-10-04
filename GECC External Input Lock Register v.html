@@ -1,0 +1,174 @@
+GECC External Input Lock Register v1.0
+Approval date: October 3, 2026
+Status: External-input baseline established
+Purpose: Record the templates, artwork, financial rules, payment controls, and migration inputs required for implementation.
+1. Inputs received and locked
+Input ID	External input	Source	Status	Locked use
+EXT-001	GECC Project SOW Agreement	MARYLAND-PROJECT-SOW-20261001 — 3-page PDF	Locked as supplied; production use subject to issue resolution	Contract template and source of contract terms
+EXT-002	GECC Completion Certificate	Completion Certificate PDF supplied in the attached document set	Locked as supplied	Completion-certificate template
+EXT-003	GECC HVAC Invoice	HVAC Invoice PDF supplied in the attached document set	Locked as supplied; production use subject to issue resolution	Invoice template
+EXT-004	GECC logo	Base64 logo asset supplied in BASE64 STRINGS for LOGO.pdf	Locked	Primary GECC logo asset
+EXT-005	Maryland license artwork	Artwork displayed in the supplied contract, invoice, and completion-certificate templates	Locked as embedded artwork; standalone source file not supplied	Maryland-specific document header artwork
+EXT-006	GECC business identity	20906 Frederick Road, Suite A 1010, Germantown, MD 20876; goeccoclimatecontrol@gmail.com; license number 11738; Class 01-Master	Locked as displayed; business owner must confirm before production	Header, footer, licensing, and contact fields
+The original supplied files should be stored in the controlled repository without alteration. Any production-ready revision must receive a new input ID and version number.
+________________________________________
+2. Template field mapping
+2.1 Project SOW Agreement
+The system shall populate the SOW template from the approved Master Sales Record.
+Template content	System source
+Customer name	Customer legal or billing name
+Customer signature name and date	Signature workflow
+Project location	Project location record
+HVAC equipment and related services	Approved scope and equipment fields
+Payment timing selection	Approved payment-plan field
+Invoice amount	Approved invoice total
+Customer address	Customer billing or project address
+State-specific license information	Location-state configuration
+Contract version	Master Sales Record version
+Contract generation date	System-generated document metadata
+The SOW includes the following contract terms that must be represented in the data model:
+•	Exclusive contractor appointment.
+•	Rescission period.
+•	Financing-related payment language.
+•	Deposit or full-payment selection.
+•	Accepted payment methods.
+•	Late-payment remedies.
+•	Cancellation process.
+•	Cancellation fees.
+•	Equipment and labor warranties.
+•	Customer acknowledgements.
+•	Maryland license and consumer notice.
+2.2 HVAC Invoice
+The invoice template includes:
+•	Customer name.
+•	Customer address.
+•	Customer phone.
+•	Customer email.
+•	Invoice date.
+•	Invoice number.
+•	Description of work and equipment.
+•	Line-item prices.
+•	Subtotal.
+•	Sales tax.
+•	Other charges.
+•	Total.
+•	Warranty statement.
+•	Payment-timing choice.
+•	Customer initials.
+•	Accepted payment methods.
+•	Reference to the Project Scope of Work Agreement.
+2.3 Completion Certificate
+The completion certificate includes:
+•	Completion date.
+•	Customer name.
+•	Customer signature.
+•	Customer address.
+•	Project-related funding acknowledgement.
+•	Customer authority confirmation.
+•	Permit and inspection acknowledgement.
+•	Contractor-selection acknowledgement.
+•	GECC and participating-company disclaimers.
+•	Maryland governing-law language.
+•	Severability language.
+•	GECC logo and Maryland license artwork.
+The certificate must not be presented for signature until the installation workflow confirms that the work is complete.
+________________________________________
+3. External-input contradictions requiring controlled resolution
+The templates are locked as source documents, but the following conflicts must be resolved before production document generation.
+Issue ID	Conflict	Effect	Required resolution
+EXT-ISSUE-001	The approved baseline specifies a three-calendar-day installation waiting period. The SOW specifies a three-business-day rescission period and the Maryland notice refers to three days after signing.	Installation eligibility and contract cancellation dates may differ.	Retain both as separate controls: the contract rescission period governs cancellation rights; the system installation gate must be the later of the approved baseline waiting date and the applicable contract/legal rescission date. Obtain formal legal/business-owner confirmation before release.
+EXT-ISSUE-002	The SOW says a 50% deposit is due upon signing the Project SOW and after the rescission period. The invoice says the 50% deposit is due upon start of installation.	Contract and invoice could state different payment due dates.	Select one authoritative payment rule and update either the SOW, invoice, or both before production use.
+EXT-ISSUE-003	The baseline requires payment verification before project completion. The invoice permits a 50% deposit and a remaining 50% balance at completion.	The system must support partial payment and staged verification.	Add payment-plan fields for deposit amount, balance amount, due event, payment status, and verification status.
+EXT-ISSUE-004	The invoice states a 10-year equipment warranty and 1-year work warranty. The SOW states manufacturer equipment warranty and a 1-year GECC labor warranty.	The invoice may overstate or simplify warranty obligations.	Confirm that the 10-year equipment warranty applies to all equipment or only qualifying equipment, and align the invoice wording with the approved SOW.
+EXT-ISSUE-005	The Completion Certificate refers to a financing application, funding request, lending partner, and contractor relationship. The SOW describes GECC as the contracting party and financing facilitator.	The document set uses different transaction models and defined terms.	Confirm whether the certificate is used only for financed projects or for all projects. Add a project financing-type field and conditional document generation.
+EXT-ISSUE-006	The SOW contains legal remedies, cancellation penalties, title-retention language, and a payment non-dispute acknowledgement.	These terms require controlled legal ownership and should not be changed by ordinary users.	Store the clauses as controlled template content and require legal/business-owner approval for any edit.
+EXT-ISSUE-007	The supplied logo PDF contains a Base64 asset, while the templates contain rendered GECC and Maryland license artwork.	Reproduction may produce inconsistent image quality or missing artwork.	Store the original Base64 asset and extract or obtain standalone Maryland artwork before final production packaging.
+These issues are not silently resolved by the system. They require formal decisions and must be added to the decision log before the affected templates are marked production-ready.
+________________________________________
+4. External inputs not yet received
+Input ID	Required input	Status	Required action
+EXT-007	Initial chart of accounts	Not received	Comptroller to provide account numbers, names, types, normal balances, and reporting classifications.
+EXT-008	Commission formulas	Not received	Sales Manager and Comptroller to provide rates, eligibility, calculation basis, deductions, rounding, and approval rules.
+EXT-009	Cost formulas	Not received	Comptroller to define equipment, materials, dealer fees, lead costs, technician costs, fixed deductions, and profitability calculations.
+EXT-010	Payment-verification procedure	Not received	Comptroller to define acceptable evidence, verification authority, partial payments, reversals, refunds, and bank-wire controls.
+EXT-011	Data-migration source files	Not received	Database Administrator to receive legacy spreadsheets, field definitions, historical documents, and reconciliation totals.
+EXT-012	Standalone Maryland license artwork	Not received as a separate source file	Business owner to supply the original artwork or approve extraction from the supplied templates.
+________________________________________
+5. Required financial input format
+The initial chart of accounts must include at least:
+Account category	Required examples
+Cash	Operating cash, deposit account
+Revenue	HVAC installation revenue, service revenue
+Accounts receivable	Customer receivables, financing receivables
+Accounts payable	Equipment, materials, dealer fees, contractor obligations
+Inventory	HVAC equipment, materials
+Cost of sales	Equipment, materials, installation labor, technician costs
+Operating expenses	Lead costs, administrative costs, commissions
+Fixed assets	Vehicles, computers, office equipment
+Accumulated depreciation	Separate accumulated-depreciation accounts
+Loans	Principal and interest accounts
+Equity	Owner equity and retained earnings
+Adjustments	Period corrections and approved accounting adjustments
+The Comptroller must approve the account list before financial reporting is enabled.
+________________________________________
+6. Required commission and cost input format
+The formulas must define:
+•	Commission recipient.
+•	Commission eligibility state.
+•	Calculation basis.
+•	Revenue fields included.
+•	Cost fields deducted.
+•	Fixed deductions.
+•	Fixed compensation.
+•	Treatment of discounts, taxes, refunds, and credits.
+•	Rounding rules.
+•	Recalculation rules.
+•	Historical calculation-snapshot requirements.
+•	Approval authority.
+•	Correction and adjustment process.
+No commission or profitability calculation should be released using undocumented assumptions.
+________________________________________
+7. Required payment-verification procedure
+The procedure must specify:
+1.	Accepted payment methods.
+2.	Required evidence for each method.
+3.	Who may enter payment evidence.
+4.	Who may verify payment.
+5.	Partial-payment handling.
+6.	Deposit handling.
+7.	Balance-due events.
+8.	Failed or rejected payment handling.
+9.	Reversals and refunds.
+10.	Bank-wire reference requirements.
+11.	Cashier’s-check confirmation requirements.
+12.	Required audit events.
+13.	Completion-blocking rules.
+The invoice currently identifies cashier’s checks, money orders, and bank transfers as accepted methods. The payment procedure must confirm whether all three remain approved for operational use.
+________________________________________
+8. Required migration input format
+The migration package must include:
+•	Customer records.
+•	Customer contacts.
+•	Project records.
+•	Project locations.
+•	Historical prices and costs.
+•	Existing project codes.
+•	Payment history.
+•	Existing documents.
+•	Current project status.
+•	Legacy field definitions.
+•	Duplicate-resolution rules.
+•	Reconciliation totals.
+•	Source-file ownership and dates.
+Migration files must be provided in their original form and must not be manually altered before staging.
+________________________________________
+9. Lock decision
+The following external inputs are now locked for configuration control:
+•	GECC Project SOW Agreement.
+•	GECC Completion Certificate.
+•	GECC HVAC Invoice.
+•	GECC logo Base64 asset.
+•	Embedded Maryland license artwork.
+•	GECC business identity and license information as displayed in the templates.
+The templates are locked as supplied but not all production-ready. Production activation is blocked for the affected document workflows until EXT-ISSUE-001 through EXT-ISSUE-005 are formally resolved.
+The next required action is to obtain the chart of accounts, formulas, payment-verification procedure, migration files, and decisions on the template conflicts.
