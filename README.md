@@ -69,7 +69,7 @@ The GitHub workflow uses PostgreSQL 17 to exercise database triggers, concurrent
 
 This is development software, not a deployed production service. Production login is intentionally unavailable until the Cognito identity adapter and SMS MFA are implemented. Local credentials are never a substitute for that adapter.
 
-Docusign envelopes and role enforcement, Google Drive/Gmail/S3 adapters, installation scheduling and deposit verification, financial calculations/ledger, reports, outbox delivery workers, AWS infrastructure, external audit anchors, and recovery drills are subsequent slices. The application cannot yet mark a project Completed or send signature invitations. Completion certificates are unsigned preparation copies, with completion and signature dates unset. Installation Managers' operational views and cancellation requests follow in the installation slice.
+Docusign account connection, signer-ready document release, provider status reconciliation, Google Drive/Gmail/S3 adapters, installation scheduling and deposit verification, financial calculations/ledger, reports, outbox delivery workers, AWS infrastructure, external audit anchors, and recovery drills are subsequent slices. The application cannot yet mark a project Completed or send signature invitations. Completion certificates are unsigned preparation copies, with completion and signature dates unset. Installation Managers' operational views and cancellation requests follow in the installation slice.
 
 The daily backup/retention requirements and RPO/RTO targets are design requirements, not claims established by this foundation build. No AWS resources are provisioned here.
 
@@ -95,3 +95,16 @@ npm run test:screen
 ```
 
 CI creates synthetic templates with matching fields, runs this screen review, and saves synthetic screenshots/PDFs as a workflow artifact, alongside the PostgreSQL API checks and frontend build. No production records or credentials are used.
+
+
+## Signing recipient review
+
+After preparing the PDFs, the assigned Sales Manager or Comptroller can save a recipient review in the Signing review section. A commercial review bundles the contract and invoice into one routing plan: the customer signs both documents in routing order 1, and GECC signs both in routing order 2. GECC may be the assigned Sales Manager or an active Comptroller. Financed and non-financed certificate reviews match the approved financing selection and route to the Installation Manager first, then the customer. A Comptroller substitution requires a recorded Installation Manager unavailability reason.
+
+Customer signer name, email, and the preparer's identity/authority review are captured explicitly. GECC identity comes from an active role-compatible account with a full name and email. Reviews pin immutable source document IDs, hashes, and the approved MSR. Duplicate reviews return the existing record; changed recipients create a new record. New reviews or approved MSRs supersede earlier reviews, and cancellation or changed signer accounts block release. Database guards prevent editing or deleting review evidence, which is committed atomically with the audit/outbox event.
+
+This slice creates **local metadata previews**, not Docusign envelopes. The previews map separate signature, printed-name, signed-date, and invoice payment-initial widgets to each recipient using explicit document/page coordinates. Automatic PDF field transformation is disabled because it assigns transformed fields to one recipient. The preview requests draft status and 75-day unsigned-request expiration; the actual initial-send time is not fabricated. Preparation PDF bytes are deliberately absent. No external API call, invitation, completed signature, installation eligibility, or provider status is asserted by this feature.
+
+Before live signing: connect the Docusign account using OAuth, implement immutable signer-ready PDFs (including verified project-specific cancellation and completion data), verify tab rendering in a sandbox draft, build explicit release/send authorization, and implement authenticated/idempotent provider status reconciliation and signed document/certificate retention. Signer-ready PDFs must populate the actual reviewed signer name instead of the commercial customer name currently printed on preparation copies. A completed-work record and operational access for the Installation Manager are also required before releasing a completion certificate. The disabled Send for signatures button lists these release blockers.
+
+API semantics were checked against Docusign's [envelopes reference](https://developers.docusign.com/docs/esign-rest-api/reference/envelopes/envelopes/), [PDF transformation rules](https://developers.docusign.com/docs/esign-rest-api/esign101/concepts/tabs/pdf-transform/), [tab placement](https://www.docusign.com/blog/developers/select-the-right-tab-placement-strategy-for-your-docusign-integration), and [expiration guidance](https://www.docusign.com/blog/developers/dsdev-trenches-reminders-expirations). The metadata is a preview and must pass sandbox validation before use.

@@ -12,5 +12,5 @@ class Command(BaseCommand):
         validate_password(password)
         for username, role, initials in [('sales', Role.SALES_ASSOCIATE, 'SA'), ('manager', Role.SALES_MANAGER, 'SM'), ('comptroller', Role.COMPTROLLER, 'CP')]:
             if not User.objects.filter(username=username).exists():
-                User.objects.create_user(username=username, email=f'{username}@example.invalid', role=role, initials=initials, password=password)
+                User.objects.create_user(username=username, email=f'{username}@example.invalid', role=role, initials=initials, first_name='Demo', last_name=username.title(), password=password)
                 self.stdout.write(f'Created {username}')
