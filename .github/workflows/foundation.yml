@@ -29,12 +29,15 @@ jobs:
       PGDATABASE: gecc
       PGUSER: gecc
       PGPASSWORD: ci-only-password
+      GECC_PDF_TEMPLATE_DIR: ${{ runner.temp }}/gecc-test-templates
+      GECC_SYNTHETIC_TEMPLATES: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install -r backend/requirements.lock.txt
+      - run: python backend/tools/create_test_templates.py --output "$GECC_PDF_TEMPLATE_DIR"
       - run: python backend/manage.py check
       - run: python backend/manage.py makemigrations --check --dry-run
       - run: python backend/manage.py test core
@@ -51,3 +54,21 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.lock.txt
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: python backend/tools/create_test_templates.py --output "${{ runner.temp }}/gecc-test-templates"
+      - run: npm run test:screen
+        working-directory: frontend
+        env:
+          GECC_PDF_TEMPLATE_DIR: ${{ runner.temp }}/gecc-test-templates
+          GECC_SYNTHETIC_TEMPLATES: '1'
+          GECC_SCREENSHOTS: ${{ runner.temp }}/gecc-screen-review
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screen-review
+          path: ${{ runner.temp }}/gecc-screen-review

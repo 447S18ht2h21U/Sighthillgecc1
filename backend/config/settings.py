@@ -19,7 +19,7 @@ if os.getenv('PGHOST'):
 else:
     if not DEBUG:
         raise ImproperlyConfigured('PostgreSQL is required outside local development.')
-    DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'dev.sqlite3'}}
+    DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': os.getenv('GECC_SQLITE_PATH', str(BASE_DIR / 'dev.sqlite3'))}}
 REST_FRAMEWORK = {'DEFAULT_AUTHENTICATION_CLASSES': ['core.auth.IdleSessionAuthentication'], 'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'], 'DEFAULT_RENDERER_CLASSES': ['rest_framework.renderers.JSONRenderer']}
 AUTH_PASSWORD_VALIDATORS = [{'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'}, {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'}, {'NAME': 'core.auth.PasswordPolicy'}]
 TIME_ZONE = 'America/New_York'

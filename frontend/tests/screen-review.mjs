@@ -1,0 +1,38 @@
+import { chromium } from '@playwright/test';
+import { execFileSync, spawn } from 'node:child_process';
+import { mkdtempSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+const front = process.cwd(), root = path.resolve(front, '..');
+const work = mkdtempSync(path.join(tmpdir(), 'gecc-review-'));
+const env = {...process.env, GECC_DEV:'1', GECC_SQLITE_PATH:path.join(work,'review.sqlite3'),GECC_DEMO_PASSWORD:'ScreenReview2026!'};
+// An isolated SQLite development database contains synthetic records only.
+for(const key of ['PGHOST','PGDATABASE','PGUSER','PGPORT','PGPASSWORD']) delete env[key];
+for(const command of ['migrate','bootstrap_dev']) execFileSync('python',[path.join(root,'backend/manage.py'),command],{env,stdio:'pipe'});
+const backend=spawn('python',[path.join(root,'backend/manage.py'),'runserver','127.0.0.1:8000','--noreload'],{env,stdio:'pipe'});
+const frontend=spawn(process.execPath,[path.join(front,'node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port','5173','--strictPort'],{cwd:front,env,stdio:'pipe'});
+const errors=[];for(const server of [backend,frontend])server.stderr.on('data',d=>errors.push(d.toString()));
+let browser,page;
+try{
+ for(let i=0;i<100;i++){try{const r=await fetch('http://127.0.0.1:5173/api/csrf/');if(r.ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
+ browser=await chromium.launch({headless:true,...(process.env.GECC_BROWSER_EXECUTABLE?{executablePath:process.env.GECC_BROWSER_EXECUTABLE,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']}: {})});
+ page=await browser.newPage({viewport:{width:1440,height:1000}});const browserErrors=[];page.on('pageerror',e=>browserErrors.push(e.message));
+ const shots=process.env.GECC_SCREENSHOTS || path.join(work,'screens');mkdirSync(shots,{recursive:true});
+ async function shot(name){await page.screenshot({path:path.join(shots,`${name}.png`),fullPage:true});}
+ async function signIn(username){await page.goto('http://127.0.0.1:5173');await page.getByLabel('Username',{exact:true}).fill(username);await page.getByLabel('Password',{exact:true}).fill(env.GECC_DEMO_PASSWORD);await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByRole('heading',{name:'Customers & projects'}).waitFor();}
+ await page.goto('http://127.0.0.1:5173');await page.getByRole('heading',{name:'Sign in',exact:true}).waitFor();await shot('01-login');
+ await signIn('sales');await page.getByRole('button',{name:'Add customer',exact:true}).click();await page.getByLabel('Legal name').fill('Screen Review Customer');await page.getByLabel('Billing address',{exact:true}).fill('20 Example Lane, Germantown, MD 20876');await page.getByLabel('Email',{exact:true}).fill('review@example.invalid');await page.getByLabel('Phone',{exact:true}).fill('301-555-0100');await page.getByRole('button',{name:'Save customer',exact:true}).click();await page.getByRole('heading',{name:'New customer'}).waitFor({state:'hidden'});
+ await page.getByRole('button',{name:'Create project',exact:true}).click();await page.locator('select[name="customer"]').selectOption({label:'Screen Review Customer'});await page.getByLabel('Installation address',{exact:true}).fill('22 Example Lane');await page.locator('select[name="reviewer"]').selectOption({label:'manager'});await page.getByRole('button',{name:'Create draft'}).click();await page.getByRole('heading',{name:'Master Sales Record • Version 1.0'}).waitFor();
+ await page.getByLabel('Scope of work',{exact:true}).fill('Install a replacement heat pump and thermostat. Remove the existing equipment.');await page.getByLabel('Base price ($)',{exact:true}).fill('12000.00');await page.getByLabel('Discount ($)',{exact:true}).fill('500.00');await page.getByLabel('Tax ($)',{exact:true}).fill('690.00');await page.getByLabel('Total price ($)',{exact:true}).fill('12190.00');await page.getByLabel('Payment terms',{exact:true}).fill('50% deposit when legally eligible; remaining 50% on completion.');await page.getByRole('button',{name:'Add equipment item'}).click();await page.getByLabel('Description',{exact:true}).fill('Heat pump');await shot('02-draft');
+ await page.getByRole('button',{name:'Save & submit',exact:true}).click();await page.getByText('Version 1.0 • SUBMITTED',{exact:false}).waitFor();assert.equal(await page.getByLabel('Scope of work',{exact:true}).isDisabled(),true);await shot('03-submitted');
+ await page.getByRole('button',{name:'Sign out',exact:true}).click();await signIn('manager');await page.locator('button.project').first().click();await page.getByRole('button',{name:'Approve version',exact:true}).click();await page.getByText('The approved record is locked.',{exact:false}).waitFor();await shot('04-approved');
+ async function prepare(button,kind){await page.getByRole('button',{name:button,exact:true}).click();const row=page.locator('.document-row').filter({has:page.getByText(kind,{exact:true})});await row.waitFor();const event=page.waitForEvent('download');await row.getByRole('link',{name:'Download PDF'}).click();const download=await event;await download.saveAs(path.join(shots,download.suggestedFilename()));}
+ await prepare('Prepare contract','CONTRACT');await prepare('Prepare invoice','INVOICE');await prepare('Prepare completion certificate','COMPLETION NON FINANCED');await shot('07-documents');
+
+ await page.getByLabel('Review note / revision reason').fill('Revise thermostat model');await page.getByRole('button',{name:'Create revision',exact:true}).click();await page.getByRole('heading',{name:'Master Sales Record • Version 2.0'}).waitFor();await page.getByText('Approved: Version 1.0',{exact:true}).waitFor();await shot('05-revision');
+ await page.setViewportSize({width:390,height:844});await shot('06-mobile');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'Mobile page must not scroll horizontally');
+ await page.setViewportSize({width:1440,height:1000});await page.getByLabel('Financing',{exact:true}).selectOption('FINANCED');await page.getByRole('button',{name:'Save & submit',exact:true}).click();await page.getByText('Version 2.0 • SUBMITTED',{exact:false}).waitFor();await page.getByRole('button',{name:'Sign out',exact:true}).click();await signIn('comptroller');await page.locator('button.project').first().click();await page.getByRole('button',{name:'Approve version',exact:true}).click();await page.getByText('Approved: Version 2.0',{exact:true}).waitFor();await prepare('Prepare completion certificate','COMPLETION FINANCED');await shot('08-financed-documents');assert.equal(await page.locator('.document-row').count(),4);
+
+ assert.deepEqual(browserErrors,[]);console.log(`Screen review passed. Screenshots: ${shots}`);
+} catch(e){if(page){await page.screenshot({path:path.join(work,'failure.png'),fullPage:true});console.error(await page.locator('body').innerText());console.error(`Failure screenshot: ${work}/failure.png`);}console.error(errors.slice(-5).join('\n'));throw e;}finally{await browser?.close();backend.kill();frontend.kill();}

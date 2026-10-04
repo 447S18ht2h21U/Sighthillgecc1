@@ -46,12 +46,12 @@ def next_code(initials):
         number = counter.value
     return f'{number}-{initials}-{timezone.now().astimezone(EASTERN).date().isoformat()}'
 
-SNAPSHOT_FIELDS = {'customer', 'contact', 'billing_address', 'project_location', 'scope', 'equipment', 'materials', 'base_price', 'discount', 'tax', 'total_price', 'payment_option', 'payment_terms', 'commercial_notes'}
+SNAPSHOT_FIELDS = {'customer', 'contact', 'billing_address', 'project_location', 'scope', 'equipment', 'materials', 'base_price', 'discount', 'tax', 'total_price', 'payment_option', 'payment_terms', 'commercial_notes', 'financing_type', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip'}
 def validate_snapshot(data, complete=False):
     if not isinstance(data, dict) or set(data) - SNAPSHOT_FIELDS:
         raise ValidationError('Invalid or unknown commercial fields.')
     result = copy.deepcopy(data)
-    for key in ('customer', 'contact', 'billing_address', 'project_location', 'scope', 'payment_terms', 'commercial_notes'):
+    for key in ('customer', 'contact', 'billing_address', 'project_location', 'scope', 'payment_terms', 'commercial_notes', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip'):
         if key in result and (not isinstance(result[key], str) or len(result[key]) > 10000):
             raise ValidationError({key: 'Must be text, at most 10,000 characters.'})
     for key in ('equipment', 'materials'):
@@ -59,7 +59,7 @@ def validate_snapshot(data, complete=False):
             if not isinstance(result[key], list) or len(result[key]) > 100:
                 raise ValidationError({key: 'Provide a list of up to 100 line items.'})
             for item in result[key]:
-                if not isinstance(item, dict) or set(item) != {'description', 'quantity'} or not isinstance(item['description'], str) or not item['description'].strip():
+                if not isinstance(item, dict) or set(item) != {'description', 'quantity'} or not isinstance(item['description'], str) or not item['description'].strip() or len(item['description']) > 1000:
                     raise ValidationError({key: 'Each item requires a description and quantity.'})
                 try:
                     quantity = Decimal(str(item['quantity']))
@@ -79,8 +79,10 @@ def validate_snapshot(data, complete=False):
             result[key] = format(value, '.2f')
     if 'payment_option' in result and result['payment_option'] not in PAYMENT_OPTIONS:
         raise ValidationError({'payment_option': 'Choose 50% deposit or 100% at completion.'})
+    if 'financing_type' in result and result['financing_type'] not in {'FINANCED', 'NON_FINANCED'}:
+        raise ValidationError({'financing_type': 'Choose financed or non-financed.'})
     if complete:
-        required = SNAPSHOT_FIELDS - {'commercial_notes', 'contact'}
+        required = SNAPSHOT_FIELDS - {'commercial_notes', 'contact', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip', 'financing_type'}
         missing = [key for key in required if key not in result or (isinstance(result[key], str) and not result[key].strip())]
         if missing:
             raise ValidationError({'required': sorted(missing)})
@@ -107,7 +109,7 @@ def create_project(actor, customer, location, associate, reviewer, duplicate_rea
     if duplicates and not duplicate_reason.strip():
         raise ValidationError({'duplicate_warning': 'A project exists for this customer/location. Supply duplicate_reason to continue.'})
     project = Project.objects.create(code=next_code(associate.initials), customer=customer, location=location.strip(), sales_associate=associate, reviewer=reviewer)
-    draft = MSR.objects.create(project=project, created_by=actor, prepared_by=actor, snapshot={'customer': customer.legal_name, 'billing_address': customer.billing_address, 'project_location': project.location, 'contact': '', 'scope': '', 'equipment': [], 'materials': [], 'base_price': '0.00', 'discount': '0.00', 'tax': '0.00', 'total_price': '0.00', 'payment_option': '50_PERCENT_DEPOSIT', 'payment_terms': '', 'commercial_notes': ''})
+    draft = MSR.objects.create(project=project, created_by=actor, prepared_by=actor, snapshot={'customer': customer.legal_name, 'billing_address': customer.billing_address, 'project_location': project.location, 'contact': '', 'scope': '', 'equipment': [], 'materials': [], 'base_price': '0.00', 'discount': '0.00', 'tax': '0.00', 'total_price': '0.00', 'payment_option': '50_PERCENT_DEPOSIT', 'payment_terms': '', 'commercial_notes': '', 'financing_type': 'NON_FINANCED', 'customer_phone': customer.phone, 'customer_email': customer.email, 'project_city': '', 'project_state': '', 'project_zip': ''})
     project.pending = draft
     project.save()
     audit(actor, 'project.created', project.id, {'code': project.code, 'version': 1, 'duplicate_override': duplicate_reason})

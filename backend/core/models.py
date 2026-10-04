@@ -104,3 +104,30 @@ class LocalCounter(models.Model):
     # Development only. Production uses a PostgreSQL sequence, outside rollback.
     id = models.PositiveIntegerField(primary_key=True, default=1)
     value = models.PositiveIntegerField(default=100)
+
+
+class Document(Entity):
+    class Kind(models.TextChoices):
+        CONTRACT = 'CONTRACT', 'Project SOW agreement'
+        INVOICE = 'INVOICE', 'HVAC invoice'
+        COMPLETION_FINANCED = 'COMPLETION_FINANCED', 'Financed completion certificate'
+        COMPLETION_NON_FINANCED = 'COMPLETION_NON_FINANCED', 'Non-financed completion certificate'
+    msr = models.ForeignKey(MSR, on_delete=models.PROTECT, related_name='documents')
+    kind = models.CharField(max_length=32, choices=Kind.choices)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    status = models.CharField(max_length=20, default='PREPARATION')
+    filename = models.CharField(max_length=200)
+    template_sha256 = models.CharField(max_length=64)
+    snapshot_sha256 = models.CharField(max_length=64)
+    pdf_sha256 = models.CharField(max_length=64)
+    renderer_version = models.CharField(max_length=20)
+    values = models.JSONField()
+    content = models.BinaryField()
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['msr', 'kind', 'template_sha256', 'renderer_version'], name='document_generation_unique')]
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Generated documents are immutable.')
+        super().save(*args, **kwargs)
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Generated documents cannot be deleted.')

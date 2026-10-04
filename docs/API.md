@@ -15,6 +15,10 @@ All business endpoints require an authenticated session. Mutations also require 
 | GET `/api/projects/{id}/history/` | Retained versions |
 | POST `/api/projects/{id}/revision/` | `reason`, `expected_approved_id` |
 | POST `/api/projects/{id}/state/` | `action`: cancel/reopen, `reason`, `expected_state` |
+| GET `/api/projects/{id}/documents/` | All retained project document versions |
+| POST `/api/msrs/{id}/documents/` | Prepare `kind`: CONTRACT, INVOICE, COMPLETION_FINANCED, COMPLETION_NON_FINANCED; current approval required |
+| GET `/api/documents/` | Scoped document metadata, optional `?msr=` |
+| GET `/api/documents/{id}/download/` | Private integrity-checked PDF attachment |
 | GET `/api/msrs/{id}/` | Commercial version |
 | POST `/api/msrs/{id}/transition/` | `action`: edit/submit/approve/reject, `expected_sequence`, optional `snapshot`/`reason` |
 | GET `/api/directory/` | Minimal active sales/reviewer directory |
@@ -23,4 +27,4 @@ All business endpoints require an authenticated session. Mutations also require 
 
 Customer/project/account/audit lists use pages of 50. Customer/project lists support scoped `?search=` text lookup. PostgreSQL full-text search and indexed operational filtering are later work. For `edit`, send the complete commercial snapshot; omissions are allowed in a draft but will prevent submission. Snapshot keys are validated and unknown fields rejected. Currency values are decimal strings. Quantities are positive decimal strings. Submission requires explicit equipment/material lists; an empty list records that no items apply.
 
-Stale edits return a validation error with `conflict`; reload before retrying. Duplicate creation warnings return `duplicate_warning`; resubmit with an explicit `duplicate_reason` only after reviewing the match. No document, payment, or external delivery action is executed by the outbox in this slice.
+Stale edits return a validation error with `conflict`; reload before retrying. Duplicate creation warnings return `duplicate_warning`; resubmit with an explicit `duplicate_reason` only after reviewing the match. Document preparation and its audit/outbox record commit atomically. No external delivery, signing, or payment action is executed by the outbox in this slice.
