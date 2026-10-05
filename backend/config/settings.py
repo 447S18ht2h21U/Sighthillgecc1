@@ -34,3 +34,10 @@ SECURE_SSL_REDIRECT = not DEBUG
 SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
 SECURE_HSTS_PRELOAD = not DEBUG
+LOGGING = {
+    'version': 1, 'disable_existing_loggers': False,
+    'filters': {'docusign_callback': {'()': 'core.log_filters.CallbackLogFilter'}},
+    'handlers': {'safe_console': {'class': 'logging.StreamHandler', 'filters': ['docusign_callback']}},
+    'loggers': {'django.server': {'handlers': ['safe_console'], 'level': 'INFO', 'propagate': False},
+                'django.request': {'handlers': ['safe_console'], 'level': 'WARNING', 'propagate': False}},
+}

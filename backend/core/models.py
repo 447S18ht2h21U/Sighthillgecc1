@@ -148,3 +148,28 @@ class SigningPlan(Entity):
         super().save(*args, **kwargs)
     def delete(self, *args, **kwargs):
         raise ValidationError('Signing reviews cannot be deleted.')
+
+
+class DocusignChallenge(Entity):
+    actor = models.ForeignKey(User, on_delete=models.PROTECT)
+    state_digest = models.CharField(max_length=64, unique=True)
+    session_digest = models.CharField(max_length=64)
+    configuration_digest = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True)
+
+
+class DocusignVerification(Entity):
+    """Account verification evidence only; access/refresh tokens are never stored."""
+    actor = models.ForeignKey(User, on_delete=models.PROTECT)
+    challenge = models.OneToOneField(DocusignChallenge, on_delete=models.PROTECT)
+    identity = models.JSONField()
+    digest = models.CharField(max_length=64)
+    class Meta:
+        ordering = ['-created_at']
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Docusign verification evidence is immutable.')
+        super().save(*args, **kwargs)
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Docusign verification evidence cannot be deleted.')

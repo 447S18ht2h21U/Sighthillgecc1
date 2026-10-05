@@ -37,3 +37,12 @@ Stale edits return a validation error with `conflict`; reload before retrying. D
 - `GET /api/projects/{id}/signing-reviews/` returns scoped immutable review history, source hashes, recipient/tab metadata, and computed release checks. Historical reviews survive commercial revisions. Status is `PREPARED`, `REVIEW_REQUIRED`, `SUPERSEDED`, or `CANCELLED`; `provider_status` is null and `send_available` is always false in this slice.
 
 The `envelope_preview` contains no PDF bytes. It is not a complete send payload, and no endpoint exports it to Docusign. Commercial PDFs remain unsigned preparation copies. Explicit release gates must produce signer-ready PDFs and verify work completion/cancellation details before any external invitation.
+
+
+## Docusign sandbox verification (Comptroller only)
+
+- `GET /api/docusign/status/` returns configuration readiness and historical verification identity only. No secrets or tokens are returned. `send_available` remains false.
+- `POST /api/docusign/connect/` starts confidential OAuth Authorization Code Grant with signature scope, returning a short-lived sandbox authorization URL. Requires an authenticated session and CSRF protection. Exact configured account ID, client ID, redirect URI and private client secret are required. Production is disabled.
+- `GET /api/docusign/callback/` consumes an actor/session/configuration-bound one-time state, exchanges the authorization code server-side, and verifies the configured sandbox account using userinfo. The callback returns confirmation only and discards access/refresh tokens. Denied/failed authorization requires a fresh connect request. Provider/exception bodies are never included in the response.
+
+Callback path: `/api/docusign/callback/`. Local development URL: `http://localhost:8000/api/docusign/callback/` only with a local backend actually running and a matching login cookie hostname. Hosting, production identity, encrypted reusable credentials, envelope release, provider reconciliation and signed-file retention are future work. See DOCUSIGN-SETUP.md. Reverse-proxy/analytics logs must redact callback queries just as Django's development logs do.
