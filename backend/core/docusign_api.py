@@ -30,6 +30,8 @@ def callback(request):
     try:
         proof = docusign.finish(request.user, request.session.session_key,
             request.query_params.get('state'), request.query_params.get('code'), request.query_params.get('error'))
+        if isinstance(proof, dict):
+            return private(Response(proof))
         return private(Response({'status': 'SANDBOX_ACCOUNT_VERIFIED', 'verification_id': str(proof.id),
             'message': 'Sandbox account verified. No tokens were retained and no signature requests were sent. Return to GECC and refresh Docusign status.'}))
     except APIException as exc:

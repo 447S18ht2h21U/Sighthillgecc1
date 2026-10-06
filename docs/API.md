@@ -46,3 +46,13 @@ The `envelope_preview` contains no PDF bytes. It is not a complete send payload,
 - `GET /api/docusign/callback/` consumes an actor/session/configuration-bound one-time state, exchanges the authorization code server-side, and verifies the configured sandbox account using userinfo. The callback returns confirmation only and discards access/refresh tokens. Denied/failed authorization requires a fresh connect request. Provider/exception bodies are never included in the response.
 
 Callback path: `/api/docusign/callback/`. Local development URL: `http://localhost:8000/api/docusign/callback/` only with a local backend actually running and a matching login cookie hostname. Hosting, production identity, encrypted reusable credentials, envelope release, provider reconciliation and signed-file retention are future work. See DOCUSIGN-SETUP.md. Reverse-proxy/analytics logs must redact callback queries just as Django's development logs do.
+
+### Development sandbox draft test
+
+- `GET /api/signing-reviews/{id}/sandbox-package/` — scoped package metadata or null; never returns PDF Base64.
+- `POST /api/signing-reviews/{id}/sandbox-package/` — assigned manager/Comptroller prepares an immutable test-only package, idempotent for a reviewed plan. Stale/cancelled/changed reviews fail.
+- `GET /api/sandbox-packages/{id}/documents/{index}/` — scoped private, checksum-verified historical PDF download.
+- `POST /api/sandbox-packages/{id}/connect-draft/` with `{"confirm_unsent_sandbox_draft":true}` — Comptroller, CSRF and actual session required; returns sandbox authorization URL. No token in API output. New OAuth authorization is required, not the historical account proof.
+- Existing callback returns `SANDBOX_DRAFT_VALIDATED` and an envelope ID on successful unsent-draft inspection. Failed/ambiguous provider operations require inspection of the recorded attempt and never automatically retry creation.
+
+Packages are marked test-only and do not authorize production release. All send actions remain disabled. Cancellation/completion dates are not fabricated. Provider status, recipient/tab and ID/name inspection remain point-in-time metadata checks; visual review, lifecycle reconciliation and signed retention are subsequent controls.
