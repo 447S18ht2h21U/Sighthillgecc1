@@ -97,7 +97,8 @@ def appendix(record, kind, prepared_at):
     SimpleDocTemplate(stream,pagesize=(612,792),leftMargin=48,rightMargin=48,topMargin=48,bottomMargin=48).build(content,onFirstPage=footer,onLaterPages=footer)
     return PdfReader(BytesIO(stream.getvalue()))
 
-def render_pdf(kind, record, prepared_at, sandbox_review=None):
+def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=None):
+    review = sandbox_review or (release_context['review'] if release_context else None)
     source = template_path(kind)
     reader = PdfReader(source)
     writer = PdfWriter();writer.clone_document_from_reader(reader)
@@ -105,12 +106,20 @@ def render_pdf(kind, record, prepared_at, sandbox_review=None):
     if not SIGNATURE_FIELDS.issubset(fields) or any(fields[name].get('/FT')!='/Sig' for name in SIGNATURE_FIELDS):
         raise ValidationError('The template lacks required native signature fields.')
     values = field_values(kind, record, prepared_at)
-    if sandbox_review:
-        values.update(customer_printed_name=sandbox_review['customer']['name'],
-                      gecc_representative_name=sandbox_review['gecc']['name'],
-                      gecc_role=sandbox_review['gecc']['role'].replace('_', ' ').title())
+    if review:
+        values.update(customer_printed_name=review['customer']['name'],
+                      gecc_representative_name=review['gecc']['name'],
+                      gecc_role=review['gecc']['role'].replace('_', ' ').title())
         if 'gecc_substitute_reason' in fields:
-            values['gecc_substitute_reason'] = sandbox_review['substitute_reason']
+            values['gecc_substitute_reason'] = review['substitute_reason']
+    if release_context:
+        evidence = release_context['evidence']
+        if kind == 'CONTRACT':
+            values['cancellation_deadline'] = evidence['deadline']
+        if kind.startswith('COMPLETION_'):
+            values['completion_date'] = evidence['completion_date']
+            if 'completion_exceptions' in fields:
+                values['completion_exceptions'] = 'Exceptions reviewed and resolved; see verification reference.'
     if set(values)-set(fields):
         raise ValidationError('The document template and field mapping disagree.')
     # Font sizes adapt within a readable range. Full values remain in the attached detail.
@@ -128,7 +137,7 @@ def render_pdf(kind, record, prepared_at, sandbox_review=None):
                 if stringWidth(value,'Helvetica',fontsize)>width:
                     fontsize = 8
                 if stringWidth(value,'Helvetica',fontsize)>width:
-                    if sandbox_review and name in {'customer_printed_name', 'gecc_representative_name'}:
+                    if review and name in {'customer_printed_name', 'gecc_representative_name'}:
                         raise ValidationError('Reviewed signer name does not fit the approved signature field. Template review is required.')
                     values[name] = 'See detail' if width >= 45 else 'Detail'
                 writer.update_page_form_field_values(page,{name:(values[name],'/Helv',fontsize)},auto_regenerate=False)
@@ -141,22 +150,29 @@ def render_pdf(kind, record, prepared_at, sandbox_review=None):
     # A preparation watermark keeps certificates from being mistaken for completed attestations.
     for page in writer.pages:
         overlay=BytesIO();c=canvas.Canvas(overlay,pagesize=(float(page.mediabox.width),float(page.mediabox.height)))
-        c.saveState();c.translate(306,396);c.rotate(35);c.setFillColor(colors.Color(.28,.40,.32,alpha=.13));c.setFont('Helvetica-Bold',27);c.drawCentredString(0,0,'SANDBOX TEST - DO NOT SIGN' if sandbox_review else 'UNSIGNED PREPARATION COPY');c.restoreState();c.save()
+        c.saveState();c.translate(306,396);c.rotate(35);c.setFillColor(colors.Color(.28,.40,.32,alpha=.13));c.setFont('Helvetica-Bold',27);c.drawCentredString(0,0,'SANDBOX TEST - DO NOT SIGN' if sandbox_review else 'UNSIGNED RELEASE REVIEW' if release_context else 'UNSIGNED PREPARATION COPY');c.restoreState();c.save()
         page.merge_page(PdfReader(BytesIO(overlay.getvalue())).pages[0])
     for page in appendix(record,kind,prepared_at).pages:
         writer.add_page(page)
-    if sandbox_review:
+    if review:
         summary = BytesIO()
         styles = getSampleStyleSheet()
-        rows = [Paragraph('Sandbox routing review', styles['Title']),
-                Paragraph('TEST ONLY. Not approved for sending or signing. No work completion or cancellation deadline has been verified.', styles['BodyText'])]
-        for label, value in [('Customer signer', sandbox_review['customer']['name']),
-                             ('Customer email', sandbox_review['customer']['email']),
-                             ('GECC signer', sandbox_review['gecc']['name']),
-                             ('GECC email', sandbox_review['gecc']['email']),
-                             ('GECC role', sandbox_review['gecc']['role'].replace('_', ' ')),
-                             ('Substitution reason', sandbox_review['substitute_reason'] or 'Not applicable')]:
+        rows = [Paragraph('Sandbox routing review' if sandbox_review else 'Release routing and verification review', styles['Title']),
+                Paragraph('TEST ONLY. Not approved for sending or signing. No work completion or cancellation deadline has been verified.' if sandbox_review else 'UNSIGNED RELEASE REVIEW. Manual verification is recorded below. Sending remains disabled.', styles['BodyText'])]
+        for label, value in [('Customer signer', review['customer']['name']),
+                             ('Customer email', review['customer']['email']),
+                             ('GECC signer', review['gecc']['name']),
+                             ('GECC email', review['gecc']['email']),
+                             ('GECC role', review['gecc']['role'].replace('_', ' ')),
+                             ('Substitution reason', review['substitute_reason'] or 'Not applicable')]:
             rows += [Spacer(1, 10), Paragraph(escape(label), styles['Heading3']), Paragraph(escape(value), styles['BodyText'])]
+        if release_context:
+            for value in evidence.values():
+                if isinstance(value, str):
+                    try:value.encode('cp1252')
+                    except UnicodeEncodeError:raise ValidationError('Verification text requires Western European characters until multilingual rendering is implemented.')
+            for label, value in [('Verification method', 'Manual attestation'), ('Evidence reference', evidence['source_reference']), ('Verification note', evidence['verification_note']), ('Exact cancellation deadline', evidence.get('deadline', 'Not applicable to this package')), ('Verified completion date', evidence.get('completion_date', 'Not applicable to this package'))]:
+                rows += [Spacer(1,10), Paragraph(escape(label), styles['Heading3']), Paragraph(escape(value), styles['BodyText'])]
         SimpleDocTemplate(summary, pagesize=(612, 792)).build(rows)
         for page in PdfReader(BytesIO(summary.getvalue())).pages:
             writer.add_page(page)

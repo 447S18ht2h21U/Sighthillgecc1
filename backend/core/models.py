@@ -198,3 +198,47 @@ class SandboxAttempt(Entity):
     account_id = models.CharField(max_length=36)
     envelope_id = models.CharField(max_length=36, blank=True)
     evidence = models.JSONField(default=dict)
+
+
+class ProjectEvidence(Entity):
+    msr = models.ForeignKey(MSR, on_delete=models.PROTECT, related_name='verification_evidence')
+    kind = models.CharField(max_length=32)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    data = models.JSONField()
+    digest = models.CharField(max_length=64)
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Verification evidence is immutable.')
+        super().save(*args, **kwargs)
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Verification evidence cannot be deleted.')
+
+
+class ReleasePackage(Entity):
+    plan = models.ForeignKey(SigningPlan, on_delete=models.PROTECT, related_name='release_packages')
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    payload = models.JSONField()
+    digest = models.CharField(max_length=64)
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['plan', 'digest'], name='release_package_unique')]
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Release packages are immutable.')
+        super().save(*args, **kwargs)
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Release packages cannot be deleted.')
+
+
+class ReleaseApproval(Entity):
+    package = models.ForeignKey(ReleasePackage, on_delete=models.PROTECT, related_name='decisions')
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    decision = models.CharField(max_length=20)
+    note = models.TextField()
+    package_digest = models.CharField(max_length=64)
+    digest = models.CharField(max_length=64)
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Release decisions are immutable.')
+        super().save(*args, **kwargs)
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Release decisions cannot be deleted.')
