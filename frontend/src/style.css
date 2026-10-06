@@ -3,3 +3,7 @@
 .documents{margin:28px 0;padding-top:8px;border-top:1px solid #e3e8e2}.document-row{display:flex;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid #e3e8e2;font-size:13px}.document-row span{display:block;color:#65776e;margin-top:5px}.document-row a{color:#23604d;white-space:nowrap}@media(max-width:850px){.document-row{flex-direction:column}}
 
 .docusign-setup{overflow-wrap:anywhere}
+
+.sandbox-package { border-top: 1px solid #dbe4df; margin-top: 1rem; padding-top: .5rem; overflow-wrap: anywhere; }
+.sandbox-confirm { display: flex; align-items: flex-start; gap: .6rem; margin: 1rem 0; }
+.sandbox-confirm input { width: auto; flex-shrink: 0; margin-top: .3rem; }

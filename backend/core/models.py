@@ -157,6 +157,7 @@ class DocusignChallenge(Entity):
     configuration_digest = models.CharField(max_length=64)
     expires_at = models.DateTimeField()
     consumed_at = models.DateTimeField(null=True)
+    context = models.JSONField(default=dict)
 
 
 class DocusignVerification(Entity):
@@ -173,3 +174,27 @@ class DocusignVerification(Entity):
         super().save(*args, **kwargs)
     def delete(self, *args, **kwargs):
         raise ValidationError('Docusign verification evidence cannot be deleted.')
+
+
+class SandboxPackage(Entity):
+    """Immutable test-only PDFs and routing; never authorization for live signing."""
+    plan = models.OneToOneField(SigningPlan, on_delete=models.PROTECT, related_name='sandbox_package')
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    payload = models.JSONField()
+    digest = models.CharField(max_length=64)
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Sandbox packages are immutable.')
+        super().save(*args, **kwargs)
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Sandbox packages cannot be deleted.')
+
+
+class SandboxAttempt(Entity):
+    package = models.OneToOneField(SandboxPackage, on_delete=models.PROTECT, related_name='attempt')
+    actor = models.ForeignKey(User, on_delete=models.PROTECT)
+    challenge = models.OneToOneField(DocusignChallenge, null=True, on_delete=models.PROTECT)
+    state = models.CharField(max_length=32, default='AUTH_PENDING')
+    account_id = models.CharField(max_length=36)
+    envelope_id = models.CharField(max_length=36, blank=True)
+    evidence = models.JSONField(default=dict)
