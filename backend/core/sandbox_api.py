@@ -52,3 +52,14 @@ def connect_draft(request, package_id):
         raise ValidationError('Provide a sandbox draft confirmation object.')
     return private(Response(sandbox.begin_draft(request.user, request.session.session_key,
                                                result.id, request.data.get('confirm_unsent_sandbox_draft'))))
+
+
+@api_view(['POST'])
+def connect_check(request, package_id):
+    result = scoped_package(request, package_id)
+    if not isinstance(request.data, dict):
+        from rest_framework.exceptions import ValidationError
+        raise ValidationError('Provide a read-only sandbox check confirmation object.')
+    from .reconciliation import begin
+    return private(Response(begin(request.user, request.session.session_key, result.id,
+                                  request.data.get('confirm_read_only_check'))))

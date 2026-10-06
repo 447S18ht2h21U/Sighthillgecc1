@@ -242,3 +242,20 @@ class ReleaseApproval(Entity):
         super().save(*args, **kwargs)
     def delete(self, *args, **kwargs):
         raise ValidationError('Release decisions cannot be deleted.')
+
+
+class SandboxObservation(Entity):
+    """Immutable read-only provider check; never proof of signed work or permission to send."""
+    attempt = models.ForeignKey(SandboxAttempt, on_delete=models.PROTECT, related_name='observations')
+    challenge = models.OneToOneField(DocusignChallenge, on_delete=models.PROTECT)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    evidence = models.JSONField()
+    digest = models.CharField(max_length=64)
+
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Sandbox observations are immutable.')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Sandbox observations cannot be deleted.')
