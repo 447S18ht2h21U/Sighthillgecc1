@@ -164,6 +164,9 @@ def finish(actor, session_key, state, code, error=None):
     with transaction.atomic():
         proof = DocusignVerification.objects.create(actor=actor, challenge=challenge, identity=identity, digest=canonical_hash(identity))
         audit(actor, 'docusign.account_verified', actor.id, {'verification_id': str(proof.id), 'identity': identity, 'digest': proof.digest})
+    if challenge.context.get('operation') in {'SANDBOX_SIGNING_SEND','SANDBOX_SIGNING_READ'}:
+        from .signing_test import finish as finish_test
+        return finish_test(actor, challenge, config, token)
     if challenge.context.get('operation') == 'SANDBOX_RECONCILIATION':
         from .reconciliation import finish as reconcile
         return reconcile(actor, challenge, config, token)
