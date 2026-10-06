@@ -177,7 +177,7 @@ def status(package):
 
 
 def describe(package):
-    return {'id':str(package.id),'digest':package.digest,'created_by':str(package.created_by_id),
+    return {'id':str(package.id),'digest':package.digest,'created_by':str(package.created_by_id),'created_at':package.created_at.isoformat(),
             'evidence_id':package.payload['evidence_id'],'release':status(package),
             'documents':[{'kind':e['kind'],'filename':e['filename'],'pdf_sha256':e['pdf_sha256'],
                           'download_url':f'/api/release-packages/{package.id}/documents/{i}/'} for i,e in enumerate(package.payload['documents'])],
