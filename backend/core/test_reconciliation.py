@@ -195,3 +195,15 @@ class ReconciliationTests(TestCase):
             return next(data)
         result,_=self.check_finish(self.check_start(),hook=hook)
         self.assertEqual(result['status'],'SANDBOX_RECONCILIATION_BLOCKED')
+
+    def test_mismatch_category_exposed_without_provider_error_details(self):
+        self.known_draft();data=self.readings()
+        data[1]['signers'][0]['tabs']['signHereTabs'][0]['xPosition']='999'
+        result,_=self.check_finish(self.check_start(),data)
+        self.assertEqual(result['blockers'],['A field label, document assignment, page or position differs.'])
+        self.assertEqual(SandboxObservation.objects.get().evidence['blockers'],result['blockers'])
+        with patch('core.sandbox.validated_evidence',side_effect=ValidationError('private-provider-body-and-token')):
+            result,_=self.check_finish(self.check_start())
+        self.assertEqual(result['blockers'],['Provider draft metadata differs from the saved sandbox package.'])
+        self.assertNotIn('private-provider',json.dumps(result))
+        self.assertNotIn('private-provider',json.dumps(list(SandboxObservation.objects.values('evidence'))))

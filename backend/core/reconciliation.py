@@ -12,6 +12,22 @@ from .services import audit
 
 STATES = {'DRAFT_VALIDATED', 'CREATED_UNVALIDATED', 'RECONCILIATION_REQUIRED', 'RECHECK_PENDING'}
 
+# Only known local validator messages may be shown; provider bodies remain private.
+CHECK_FAILURES = {
+    'The provider envelope is not the expected unsent draft.': 'The envelope ID or status differs from the expected unsent draft.',
+    'Sandbox draft recipient validation failed.': 'The number or IDs of the signing recipients differ.',
+    'Sandbox draft contains unexpected recipients.': 'The draft contains additional recipients.',
+    'Sandbox draft signer identity or routing changed.': 'A signer name, email address or signing order differs.',
+    'Sandbox draft tab validation failed.': 'The provider signature-field metadata could not be validated.',
+    'Sandbox draft tab count changed.': 'The number of fields assigned to a signer differs.',
+    'Sandbox draft tab placement changed.': 'A field label, document assignment, page or position differs.',
+    'Sandbox draft signature became optional.': 'A required signature field became optional.',
+    'Sandbox draft contains unexpected tabs.': 'The draft contains additional field types.',
+    'Sandbox draft document validation failed.': 'The provider document list could not be validated.',
+    'Sandbox draft documents changed.': 'Document IDs or filenames differ from the saved package.',
+}
+
+
 
 def eligible(actor, attempt, config):
     docusign.authorize(actor)
@@ -97,9 +113,10 @@ def finish(actor, challenge, config, token):
                 evidence.update(checks)
                 evidence['metadata_matched'] = True
                 outcome = 'MATCHED' if not blockers else 'BLOCKED'
-            except ValidationError:
+            except ValidationError as exc:
                 outcome = 'CHANGED'
-                blockers.append('Provider draft status, recipients, routing, documents or signature fields differ from the saved sandbox package.')
+                detail = str(exc.detail[0]) if isinstance(exc.detail, list) and exc.detail else ''
+                blockers.append(CHECK_FAILURES.get(detail, 'Provider draft metadata differs from the saved sandbox package.'))
     except Exception:
         blockers.append('Provider inspection did not complete. Start a fresh read-only check; no replacement draft was created.')
     evidence['observed_at'] = timezone.now().isoformat()
@@ -128,4 +145,4 @@ def finish(actor, challenge, config, token):
         audit(actor, 'sandbox.reconciliation_recorded', package.plan.msr.project_id,
               {'observation_id': str(observation.id), 'attempt_id': str(attempt.id), 'digest': observation.digest, 'evidence': evidence})
     return {'status': 'SANDBOX_RECONCILIATION_'+outcome, 'envelope_id': attempt.envelope_id,
-            'observation_id': str(observation.id), 'message': 'Existing sandbox draft checked. Return to GECC and refresh sandbox draft status. No tokens retained; sending remains disabled.'}
+            'observation_id': str(observation.id), 'blockers': blockers, 'message': 'Existing sandbox draft checked. Return to GECC and refresh sandbox draft status. No tokens retained; sending remains disabled.'}
