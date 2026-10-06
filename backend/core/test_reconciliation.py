@@ -175,3 +175,23 @@ class ReconciliationTests(TestCase):
         self.assertEqual(response.status_code,200);self.assertEqual(response['Cache-Control'],'private, no-store')
         self.assertEqual(response.json()['attempt']['observations'][0]['evidence']['outcome'],'MATCHED')
         self.assertNotIn('documentBase64',response.content.decode())
+
+    def test_account_configuration_changed_during_reads_blocks(self):
+        self.known_draft();data=iter(self.readings());count=0
+        def hook(*args,**kwargs):
+            nonlocal count
+            count+=1
+            if count==4:os.environ['GECC_DOCUSIGN_CLIENT_SECRET']='synthetic-replacement-secret'
+            return next(data)
+        result,_=self.check_finish(self.check_start(),hook=hook)
+        self.assertEqual(result['status'],'SANDBOX_RECONCILIATION_BLOCKED')
+
+    def test_disabled_actor_during_reads_blocks(self):
+        self.known_draft();data=iter(self.readings());count=0
+        def hook(*args,**kwargs):
+            nonlocal count
+            count+=1
+            if count==4:type(self.comptroller).objects.filter(pk=self.comptroller.id).update(is_active=False)
+            return next(data)
+        result,_=self.check_finish(self.check_start(),hook=hook)
+        self.assertEqual(result['status'],'SANDBOX_RECONCILIATION_BLOCKED')

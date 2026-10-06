@@ -7,7 +7,7 @@ from django.views.decorators.debug import sensitive_variables
 from rest_framework.exceptions import ValidationError
 from . import docusign, sandbox
 from .documents import canonical_hash
-from .models import DocusignChallenge, Project, SandboxAttempt, SandboxObservation
+from .models import DocusignChallenge, Project, SandboxAttempt, SandboxObservation, User
 from .services import audit
 
 STATES = {'DRAFT_VALIDATED', 'CREATED_UNVALIDATED', 'RECONCILIATION_REQUIRED', 'RECHECK_PENDING'}
@@ -112,7 +112,7 @@ def finish(actor, challenge, config, token):
             blockers.append('A newer sandbox check was authorized. This result does not update the draft state.')
         else:
             try:
-                bound(actor, challenge, attempt, docusign.configuration())
+                bound(User.objects.get(pk=actor.id), challenge, attempt, docusign.configuration())
             except (ValidationError, docusign.PermissionDenied):
                 outcome = 'BLOCKED'
                 blockers.append('Authorization, account configuration or package eligibility changed during inspection.')
