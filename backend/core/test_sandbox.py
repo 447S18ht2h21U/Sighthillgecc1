@@ -192,3 +192,12 @@ class SandboxTests(TestCase):
             self.assertEqual(self.client.post(url,{},format='json').status_code,400)
             self.assertEqual(self.client.post(url,{'confirm_unsent_sandbox_draft':True},format='json').status_code,400)
         self.assertFalse(SandboxAttempt.objects.exists())
+
+    def test_first_use_missing_package_returns_parseable_json_null(self):
+        self.setup_review();plan,_=prepare(self.manager,self.approved.id,self.input)
+        self.client.force_authenticate(self.manager)
+        response=self.client.get(f'/api/signing-reviews/{plan.id}/sandbox-package/')
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.content,b'null')
+        self.assertIsNone(response.json())
+        self.assertEqual(response['Cache-Control'],'private, no-store')

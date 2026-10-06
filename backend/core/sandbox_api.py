@@ -1,4 +1,4 @@
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -25,7 +25,9 @@ def package(request, plan_id):
         result, created = sandbox.prepare_package(request.user, plan.id)
         return private(Response(sandbox.describe(result), status=201 if created else 200))
     result = SandboxPackage.objects.filter(plan=plan).first()
-    return private(Response(None if result is None else sandbox.describe(result)))
+    if result is None:
+        return private(JsonResponse(None, safe=False))
+    return private(Response(sandbox.describe(result)))
 
 
 @api_view(['GET'])
