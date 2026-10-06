@@ -96,7 +96,9 @@ def describe(package):
             'documents': [{'kind': e['kind'], 'filename': e['filename'], 'pdf_sha256': e['pdf_sha256'],
                            'download_url': f'/api/sandbox-packages/{package.id}/documents/{i}/'} for i,e in enumerate(package.payload['documents'])],
             'attempt': None if not attempt else {'id': str(attempt.id), 'state': attempt.state, 'envelope_id': attempt.envelope_id,
-                                                'evidence': attempt.evidence}}
+                                                'evidence': attempt.evidence,
+                                                'observations': [{'id':str(o.id),'evidence':o.evidence,'digest':o.digest}
+                                                                 for o in attempt.observations.order_by('-challenge__created_at','-challenge_id')]}}
 
 
 @transaction.atomic

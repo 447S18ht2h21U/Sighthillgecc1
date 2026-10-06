@@ -159,11 +159,14 @@ def finish(actor, session_key, state, code, error=None):
     identity = {'environment': 'SANDBOX', 'client_id': config['client_id'], 'account_id': config['account_id'],
         'subject': subject, 'base_uri': BASE_URI, 'account_name': str(matches[0].get('account_name', ''))[:250],
         'verified_at': timezone.now().isoformat(), 'authorization_expires_at': (timezone.now()+timedelta(seconds=lifetime)).isoformat(),
-        'purpose': 'SANDBOX_DRAFT_ONLY' if challenge.context else 'ACCOUNT_VERIFICATION_ONLY', 'tokens_retained': False}
+        'purpose': challenge.context.get('operation', 'SANDBOX_DRAFT_ONLY') if challenge.context else 'ACCOUNT_VERIFICATION_ONLY', 'tokens_retained': False}
     del tokens, info, basic, code
     with transaction.atomic():
         proof = DocusignVerification.objects.create(actor=actor, challenge=challenge, identity=identity, digest=canonical_hash(identity))
         audit(actor, 'docusign.account_verified', actor.id, {'verification_id': str(proof.id), 'identity': identity, 'digest': proof.digest})
+    if challenge.context.get('operation') == 'SANDBOX_RECONCILIATION':
+        from .reconciliation import finish as reconcile
+        return reconcile(actor, challenge, config, token)
     if challenge.context:
         from .sandbox import finish_draft
         return finish_draft(actor, challenge, config, token)
