@@ -59,15 +59,15 @@ def field_values(kind, record, prepared_at):
         return {**common, 'customer_name':s['customer'], 'payment_option':'50% deposit / 50% balance' if s['payment_option']=='50_PERCENT_DEPOSIT' else '100% on completion', 'financing_type':'Financed' if s['financing_type']=='FINANCED' else 'Non-financed'}
     return {**common, 'project_city':s.get('project_city',''), 'project_state':s.get('project_state',''), 'project_zip':s.get('project_zip','')}
 
-def appendix(record, kind, prepared_at):
+def appendix(record, kind, prepared_at, signing_test=False):
     """Full snapshot details flow over pages, without truncating scope or item lists."""
     stream = BytesIO()
     styles = getSampleStyleSheet()
     styles['BodyText'].leading = 14
     styles['Heading3'].keepWithNext = True
     s = record.snapshot
-    content = [Paragraph('Approved project detail', styles['Title']), Paragraph(f"Project {escape(record.project.code)} | MSR {record.number}.0", styles['Heading2']), Paragraph('UNSIGNED PREPARATION COPY - signing workflow has not started.', styles['BodyText']), Spacer(1,12)]
-    if kind.startswith('COMPLETION_'):
+    content = [Paragraph('Approved project detail', styles['Title']), Paragraph(f"Project {escape(record.project.code)} | MSR {record.number}.0", styles['Heading2']), Paragraph('SANDBOX SIGNING TEST - fictional workflow only; no actual work, agreement, payment or lender authorization.' if signing_test else 'UNSIGNED PREPARATION COPY - signing workflow has not started.', styles['BodyText']), Spacer(1,12)]
+    if kind.startswith('COMPLETION_') and not signing_test:
         content += [Paragraph('Do not sign until work is complete. This preparation copy does not establish completion, payment verification, or lender funding authorization.', styles['BodyText']), Spacer(1,12)]
     def text(label, value):
         # Reject unsupported glyphs rather than silently rendering missing characters.
@@ -97,7 +97,9 @@ def appendix(record, kind, prepared_at):
     SimpleDocTemplate(stream,pagesize=(612,792),leftMargin=48,rightMargin=48,topMargin=48,bottomMargin=48).build(content,onFirstPage=footer,onLaterPages=footer)
     return PdfReader(BytesIO(stream.getvalue()))
 
-def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=None):
+def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=None, signing_test=False):
+    if signing_test and (not release_context or sandbox_review):
+        raise ValidationError("Signing tests require a separate verified test review.")
     review = sandbox_review or (release_context['review'] if release_context else None)
     source = template_path(kind)
     reader = PdfReader(source)
@@ -150,15 +152,15 @@ def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=N
     # A preparation watermark keeps certificates from being mistaken for completed attestations.
     for page in writer.pages:
         overlay=BytesIO();c=canvas.Canvas(overlay,pagesize=(float(page.mediabox.width),float(page.mediabox.height)))
-        c.saveState();c.translate(306,396);c.rotate(35);c.setFillColor(colors.Color(.28,.40,.32,alpha=.13));c.setFont('Helvetica-Bold',27);c.drawCentredString(0,0,'SANDBOX TEST - DO NOT SIGN' if sandbox_review else 'UNSIGNED RELEASE REVIEW' if release_context else 'UNSIGNED PREPARATION COPY');c.restoreState();c.save()
+        c.saveState();c.translate(306,396);c.rotate(35);c.setFillColor(colors.Color(.28,.40,.32,alpha=.13));c.setFont('Helvetica-Bold',27);c.drawCentredString(0,0,'SANDBOX SIGNING TEST' if signing_test else 'SANDBOX TEST - DO NOT SIGN' if sandbox_review else 'UNSIGNED RELEASE REVIEW' if release_context else 'UNSIGNED PREPARATION COPY');c.restoreState();c.save()
         page.merge_page(PdfReader(BytesIO(overlay.getvalue())).pages[0])
-    for page in appendix(record,kind,prepared_at).pages:
+    for page in appendix(record,kind,prepared_at,signing_test=signing_test).pages:
         writer.add_page(page)
     if review:
         summary = BytesIO()
         styles = getSampleStyleSheet()
-        rows = [Paragraph('Sandbox routing review' if sandbox_review else 'Release routing and verification review', styles['Title']),
-                Paragraph('TEST ONLY. Not approved for sending or signing. No work completion or cancellation deadline has been verified.' if sandbox_review else 'UNSIGNED RELEASE REVIEW. Manual verification is recorded below. Sending remains disabled.', styles['BodyText'])]
+        rows = [Paragraph('Sandbox signing test review' if signing_test else 'Sandbox routing review' if sandbox_review else 'Release routing and verification review', styles['Title']),
+                Paragraph('SANDBOX SIGNING TEST. Signatures simulate the workflow only. This is not an actual agreement, work-completion verification, payment instruction or lender authorization.' if signing_test else 'TEST ONLY. Not approved for sending or signing. No work completion or cancellation deadline has been verified.' if sandbox_review else 'UNSIGNED RELEASE REVIEW. Manual verification is recorded below. Sending remains disabled.', styles['BodyText'])]
         for label, value in [('Customer signer', review['customer']['name']),
                              ('Customer email', review['customer']['email']),
                              ('GECC signer', review['gecc']['name']),
@@ -176,7 +178,14 @@ def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=N
         SimpleDocTemplate(summary, pagesize=(612, 792)).build(rows)
         for page in PdfReader(BytesIO(summary.getvalue())).pages:
             writer.add_page(page)
-    writer.add_metadata({'/Title':f'GECC {kind} | {record.project.code} | MSR {record.number}.0','/Subject':'Unsigned preparation copy from an approved immutable MSR','/GECCMSR':str(record.id),'/GECCSnapshotSHA256':canonical_hash(record.snapshot)})
+    if signing_test:
+        # Repeat a visible test banner on every page, including flowing appendix pages.
+        for page in writer.pages:
+            overlay=BytesIO();c=canvas.Canvas(overlay,pagesize=(float(page.mediabox.width),float(page.mediabox.height)))
+            c.setFillColor(colors.HexColor('#8d2f1b'));c.setFont('Helvetica-Bold',10)
+            c.drawString(36,float(page.mediabox.height)-20,'SANDBOX SIGNING TEST - NO ACTUAL AGREEMENT OR WORK VERIFICATION')
+            c.save();page.merge_page(PdfReader(BytesIO(overlay.getvalue())).pages[0])
+    writer.add_metadata({'/Title':f'GECC {kind} | {record.project.code} | MSR {record.number}.0','/Subject':'Fictional sandbox signing test; no actual agreement or work verification' if signing_test else 'Unsigned preparation copy from an approved immutable MSR','/GECCMSR':str(record.id),'/GECCSnapshotSHA256':canonical_hash(record.snapshot)})
     stream=BytesIO();writer.write(stream);content=stream.getvalue()
     verify = PdfReader(BytesIO(content));actual=verify.get_fields() or {}
     for name,value in values.items():

@@ -173,7 +173,7 @@ def status(package):
         except PermissionDenied:return {'status':'BLOCKED','send_available':False,'blockers':['Release reviewer is no longer authorized.']}
         if not reviewer.is_active:return {'status':'BLOCKED','send_available':False,'blockers':['Release reviewer is inactive.']}
     state='REVIEW_REQUIRED' if not decision else 'APPROVED' if decision.decision=='APPROVED' else 'REVOKED'
-    return {'status':state,'send_available':False,'blockers':['Sending, provider lifecycle reconciliation, signed retention and production identity remain pending.']}
+    return {'status':state,'send_available':False,'blockers':['Production sending, lifecycle reconciliation, signed retention and identity remain pending.']}
 
 
 def describe(package):

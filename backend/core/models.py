@@ -259,3 +259,61 @@ class SandboxObservation(Entity):
 
     def delete(self, *args, **kwargs):
         raise ValidationError('Sandbox observations cannot be deleted.')
+
+
+class ImmutableSigningTestRecord(Entity):
+    class Meta:
+        abstract = True
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Signing-test records are immutable.')
+        super().save(*args, **kwargs)
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Signing-test records cannot be deleted.')
+
+
+class SigningTestPackage(ImmutableSigningTestRecord):
+    source = models.ForeignKey(ReleasePackage, on_delete=models.PROTECT, related_name='signing_tests')
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    payload = models.JSONField()
+    digest = models.CharField(max_length=64)
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['source','digest'], name='signing_test_package_unique')]
+
+
+class SigningTestDecision(ImmutableSigningTestRecord):
+    package = models.ForeignKey(SigningTestPackage, on_delete=models.PROTECT, related_name='decisions')
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    decision = models.CharField(max_length=20)
+    note = models.TextField()
+    digest = models.CharField(max_length=64)
+
+
+class SigningTestAttempt(Entity):
+    package = models.OneToOneField(SigningTestPackage, on_delete=models.PROTECT, related_name='attempt')
+    actor = models.ForeignKey(User, on_delete=models.PROTECT)
+    challenge = models.OneToOneField(DocusignChallenge, null=True, on_delete=models.PROTECT)
+    account_id = models.CharField(max_length=36)
+    envelope_id = models.CharField(max_length=36, blank=True)
+    state = models.CharField(max_length=32, default='AUTH_PENDING')
+    first_send_started_at = models.DateTimeField(null=True)
+
+
+class SigningTestObservation(ImmutableSigningTestRecord):
+    attempt = models.ForeignKey(SigningTestAttempt, on_delete=models.PROTECT, related_name='observations')
+    challenge = models.OneToOneField(DocusignChallenge, on_delete=models.PROTECT)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    evidence = models.JSONField()
+    digest = models.CharField(max_length=64)
+
+
+class SigningTestDocument(ImmutableSigningTestRecord):
+    attempt = models.ForeignKey(SigningTestAttempt, on_delete=models.PROTECT, related_name='retained_documents')
+    observation = models.ForeignKey(SigningTestObservation, on_delete=models.PROTECT)
+    document_id = models.CharField(max_length=20)
+    kind = models.CharField(max_length=32)
+    filename = models.CharField(max_length=250)
+    content = models.BinaryField()
+    pdf_sha256 = models.CharField(max_length=64)
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['attempt','document_id'], name='signing_test_document_unique')]
