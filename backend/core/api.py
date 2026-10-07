@@ -346,14 +346,52 @@ class MSRViewSet(viewsets.ReadOnlyModelViewSet):
 
 class AuditViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = Page
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        response['Cache-Control'] = 'private, no-store'
+        response['X-Content-Type-Options'] = 'nosniff'
+        return response
     def get_queryset(self):
-        if self.request.user.role != Role.COMPTROLLER:
-            raise PermissionDenied('Audit history requires Comptroller access.')
-        return AuditEvent.objects.order_by('-sequence')
+        actor = User.objects.get(pk=self.request.user.pk)
+        if not actor.is_active or actor.role != Role.COMPTROLLER:
+            raise PermissionDenied('Audit history requires an active Comptroller account.')
+        qs = AuditEvent.objects.select_related('actor').order_by('-sequence')
+        if self.action != 'list': return qs
+        values = list_filters(self.request, {'category': ['customer', 'contact', 'account', 'project', 'msr', 'document', 'signing', 'docusign', 'sandbox', 'release', 'signing_test']})
+        if values['category']: qs = qs.filter(action__startswith=values['category'] + '.')
+        term = values['search']
+        if term:
+            matches = Q(action__icontains=term) | Q(actor__username__icontains=term) | Q(actor__first_name__icontains=term) | Q(actor__last_name__icontains=term) | Q(payload__note__icontains=term) | Q(payload__reason__icontains=term)
+            from uuid import UUID
+            try: matches |= Q(entity_id=UUID(term))
+            except ValueError: pass
+            qs = qs.filter(matches)
+        from datetime import datetime, time, timedelta
+        from zoneinfo import ZoneInfo
+        dates = {}
+        for name in ['from', 'to']:
+            value = self.request.query_params.get(name, '')
+            if value:
+                try:
+                    dates[name] = serializers.DateField().run_validation(value)
+                    if name == 'to': dates[name] + timedelta(days=1)
+                except (serializers.ValidationError, OverflowError):
+                    raise ValidationError({name: 'Use a valid YYYY-MM-DD date (end date before 9999-12-31).'})
+        if 'from' in dates and 'to' in dates and dates['from'] > dates['to']:
+            raise ValidationError({'to': 'End date must be on or after start date.'})
+        eastern = ZoneInfo('America/New_York')
+        if 'from' in dates: qs = qs.filter(created_at__gte=datetime.combine(dates['from'], time.min, eastern))
+        if 'to' in dates: qs = qs.filter(created_at__lt=datetime.combine(dates['to'] + timedelta(days=1), time.min, eastern))
+        return qs
     class AuditSerializer(serializers.ModelSerializer):
+        actor = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
+        actor_username = serializers.CharField(source='actor.username', read_only=True)
+        actor_name = serializers.SerializerMethodField()
+        def get_actor_name(self, event):
+            return event.actor.get_full_name().strip() or event.actor.username
         class Meta:
             model = AuditEvent
-            fields = ['id', 'sequence', 'actor', 'action', 'entity_id', 'payload', 'previous_hash', 'digest', 'created_at']
+            fields = ['id', 'sequence', 'actor', 'actor_username', 'actor_name', 'action', 'entity_id', 'payload', 'previous_hash', 'digest', 'created_at']
     serializer_class = AuditSerializer
 
 class DirectoryViewSet(viewsets.ReadOnlyModelViewSet):

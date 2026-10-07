@@ -159,4 +159,13 @@ On October 7, 2026, the owner verified customer/contact edits, primary replaceme
 
 **Manage customers** searches authorized customer names, billing addresses, emails, phones and contact names/emails/phones. Choose All customers, Active or Archived and select **Search customers** to apply the fields. Project search matches codes, installation locations, current customer master names and customer names in the current approved/pending MSR. Project status and newest/oldest/code ordering can be combined with search. Searches are case-insensitive literal substring matches, limited to 200 characters. Phone punctuation must match the stored text; this is basic database search rather than fuzzy/global document search.
 
-Both lists show result counts and retain filters across pagination. Clearing filters restores all authorized results. Search does not alter records or approved snapshots. Project creation reads all authorized active-customer pages so choices beyond the first 50 remain available. Production identity, hosting and readable audit history remain pending.
+Both lists show result counts and retain filters across pagination. Clearing filters restores all authorized results. Search does not alter records or approved snapshots. Project creation reads all authorized active-customer pages so choices beyond the first 50 remain available. Production identity and hosting remain pending.
+
+
+On October 7, 2026, the owner verified installation-address project search, Approved/Cancelled status filtering and reset, customer search by Test Contact Two, Active/Archived filtering and clearing customer filters in the local application.
+
+## Readable audit history
+
+The active Comptroller can open **Audit history** for read-only changes, newest event first. Entries show Eastern-time timestamps, action categories, recorded actor IDs, current actor profile names/usernames and any recorded reason. Customer/contact/account edits show changed before/after fields. Other events preserve their stored details in an expandable view; the screen does not infer missing historical values or verify provider/business facts. Password values and credential hashes are never written by account-management audits.
+
+Filter by action, current actor name/username, recorded note/reason or exact record UUID; combine with a category and an inclusive Eastern calendar-date range. Lists paginate at 50 records. Current profile labels are explicitly distinguished from immutable recorded actor IDs; renaming an account does not rewrite prior events. Viewing history does not verify its hash chain; the existing `verify_audit` management command performs that separate check. Production authentication, hosting and remaining MVP acceptance remain pending.
