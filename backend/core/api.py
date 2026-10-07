@@ -272,11 +272,25 @@ def end_session(request):
     logout(request)
     return Response({'ok': True})
 
+def account_revision(user):
+    from .documents import canonical_hash
+    return canonical_hash({**account_values(user), 'credential_state': user.password})
+
+
+def account_values(user):
+    return {field: getattr(user, field) for field in ['username', 'email', 'first_name', 'last_name', 'role', 'initials', 'is_active']}
+
+
 class AccountSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
+    revision = serializers.SerializerMethodField()
+    expected_revision = serializers.CharField(write_only=True, required=False, max_length=64)
+    change_note = serializers.CharField(write_only=True, max_length=2000)
+    def get_revision(self, instance):
+        return account_revision(instance)
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'initials', 'is_active', 'password']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'initials', 'is_active', 'password', 'revision', 'expected_revision', 'change_note']
         read_only_fields = ['id']
         extra_kwargs = {'email': {'required': True, 'allow_blank': False}}
     def validate_initials(self, value):
@@ -285,19 +299,27 @@ class AccountSerializer(serializers.ModelSerializer):
             raise ValidationError('Use 1–8 uppercase letters.')
         return value
     def validate(self, attrs):
+        if self.instance and attrs.get('expected_revision') != account_revision(self.instance):
+            raise ValidationError('This account changed. Refresh users, reopen the account and review the latest values.')
+        if not attrs.get('change_note', '').strip():
+            raise ValidationError({'change_note': 'Explain this account change.'})
         if not self.instance and not attrs.get('password'):
             raise ValidationError('A development password is required.')
         if 'password' in attrs:
-            user = self.instance or User(**{k: v for k, v in attrs.items() if k != 'password'})
+            user = self.instance or User(**{k: v for k, v in attrs.items() if k not in {'password', 'change_note', 'expected_revision'}})
             try:
                 validate_password(attrs['password'], user)
             except DjangoValidationError as exc:
                 raise ValidationError({'password': exc.messages})
         return attrs
     def create(self, validated_data):
+        validated_data.pop('expected_revision', None)
+        validated_data.pop('change_note')
         password = validated_data.pop('password')
         return User.objects.create_user(password=password, **validated_data)
     def update(self, instance, validated_data):
+        validated_data.pop('expected_revision', None)
+        validated_data.pop('change_note')
         password = validated_data.pop('password', None)
         instance = super().update(instance, validated_data)
         if password:
@@ -309,25 +331,47 @@ class AccountViewSet(viewsets.ModelViewSet):
     serializer_class = AccountSerializer
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
     pagination_class = Page
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        response['Cache-Control'] = 'private, no-store'
+        response['X-Content-Type-Options'] = 'nosniff'
+        return response
     def get_queryset(self):
-        if self.request.user.role != Role.COMPTROLLER:
+        actor = User.objects.get(pk=self.request.user.pk)
+        if not actor.is_active or actor.role != Role.COMPTROLLER:
             raise PermissionDenied('Only the Comptroller administers business accounts.')
         return User.objects.order_by('username')
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        User.objects.select_for_update().get(pk=request.user.pk)
+        self.get_queryset()
+        return super().create(request, *args, **kwargs)
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        target = self.get_object()
+        # Lock both accounts in a stable order before permission/revision validation.
+        list(User.objects.select_for_update().filter(pk__in=[request.user.pk, target.pk]).order_by('pk'))
+        self.get_queryset()
+        return super().update(request, *args, **kwargs)
     def perform_create(self, serializer):
         self.get_queryset()
         if not settings.DEBUG:
             raise ValidationError('Production identity provisioning requires the Cognito adapter.')
         with transaction.atomic():
+            note = serializer.validated_data['change_note']
             user = serializer.save()
-            audit(self.request.user, 'account.created', user.id, {'role': user.role, 'active': user.is_active})
+            audit(self.request.user, 'account.created', user.id, {'role': user.role, 'active': user.is_active, 'after': account_values(user), 'note': note})
     def perform_update(self, serializer):
         if not settings.DEBUG:
             raise ValidationError('Production identity provisioning requires the Cognito adapter.')
         if serializer.instance.pk == self.request.user.pk and ('role' in serializer.validated_data or serializer.validated_data.get('is_active') is False):
             raise ValidationError('Self-demotion or self-deactivation is not allowed.')
         with transaction.atomic():
+            before = account_values(serializer.instance)
+            note = serializer.validated_data['change_note']
+            password_changed = 'password' in serializer.validated_data
             user = serializer.save()
-            audit(self.request.user, 'account.updated', user.id, {'role': user.role, 'active': user.is_active})
+            audit(self.request.user, 'account.updated', user.id, {'role': user.role, 'active': user.is_active, 'before': before, 'after': account_values(user), 'note': note, 'password_changed': password_changed})
 
 
 class DocumentSerializer(serializers.ModelSerializer):
