@@ -28,12 +28,12 @@ export function CustomerManagement({api,onChanged,onBack}:{api:API;onChanged:()=
    {editCustomer&&<form key={selected.revision} onSubmit={e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.currentTarget));void run(async()=>{await api(`customers/${selected.id}/`,'PATCH',{...f,archived:f.archived==='on',expected_revision:selected.revision});setEditCustomer(false);await refresh();await onChanged();setMessage('Customer changes saved.');});}}>
     <h3>Edit customer details</h3><fieldset disabled={busy}><div className="grid">
      <label>Customer legal name<input name="legal_name" defaultValue={selected.legal_name} required maxLength={250}/></label>
-     <label>Customer billing address<textarea name="billing_address" defaultValue={selected.billing_address} required/></label>
+     <label>Customer billing address<textarea aria-label="Customer billing address" name="billing_address" defaultValue={selected.billing_address} required/></label>
      <label>Customer email<input name="email" type="email" defaultValue={selected.email} maxLength={254}/></label>
      <label>Customer phone<input name="phone" defaultValue={selected.phone} maxLength={40}/></label>
     </div><label className="sandbox-confirm"><input name="archived" type="checkbox" defaultChecked={selected.archived}/>Customer archived — unavailable for new projects</label>
-    <label>Customer change note<textarea name="change_note" required maxLength={2000}/></label>
-    <label>Duplicate override reason (only if warned)<textarea name="duplicate_reason" maxLength={2000}/></label>
+    <label>Customer change note<textarea aria-label="Customer change note" name="change_note" required maxLength={2000}/></label>
+    <label>Duplicate override reason (only if warned)<textarea aria-label="Duplicate override reason (only if warned)" name="duplicate_reason" maxLength={2000}/></label>
     <p className="muted">These changes update the customer record. Existing project snapshots stay unchanged. Revise an approved Master Sales Record separately when commercial details need to change.</p>
     <div className="actions"><button>Save customer changes</button><button type="button" className="quiet" onClick={closeForms}>Cancel customer changes</button></div></fieldset>
    </form>}
@@ -47,7 +47,7 @@ export function CustomerManagement({api,onChanged,onBack}:{api:API;onChanged:()=
      <label>Contact phone<input name="phone" defaultValue={editContact?.phone||''} maxLength={40}/></label>
     </div><label className="sandbox-confirm"><input type="checkbox" checked={primary} onChange={e=>setPrimary(e.target.checked)}/>Primary contact for this customer</label>
     {replacing&&<label className="sandbox-confirm"><input type="checkbox" name="replace_primary_confirmed" required/>Replace {selected.primary_contact?.name} as primary contact. Keep their contact record.</label>}
-    <label>Contact change note<textarea name="change_note" required maxLength={2000}/></label>
+    <label>Contact change note<textarea aria-label="Contact change note" name="change_note" required maxLength={2000}/></label>
     <div className="actions"><button>{editContact?'Save contact changes':'Create contact'}</button><button type="button" className="quiet" onClick={closeForms}>Cancel contact changes</button></div></fieldset>
    </form>}
   </>:<p>Select a customer to edit details and manage contacts.</p>}</div></div>
