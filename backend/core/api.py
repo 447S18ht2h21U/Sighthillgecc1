@@ -39,17 +39,59 @@ def customer_scope(user):
         return Customer.objects.none()
     return Customer.objects.filter(Q(created_by=user) | Q(project__in=project_scope(user))).distinct()
 
-class CustomerSerializer(serializers.ModelSerializer):
-    duplicate_reason = serializers.CharField(write_only=True, required=False, allow_blank=True)
+def record_values(item):
+    fields = ['legal_name', 'billing_address', 'email', 'phone', 'archived'] if isinstance(item, Customer) else ['name', 'relationship', 'email', 'phone', 'primary']
+    result = {field: getattr(item, field) for field in fields}
+    if isinstance(item, Contact): result['customer'] = str(item.customer_id)
+    return result
+
+
+def record_revision(item):
+    from .documents import canonical_hash
+    return canonical_hash({'id': str(item.id), **record_values(item)})
+
+
+def record_editor(actor, lock=False):
+    qs = User.objects.select_for_update() if lock else User.objects
+    current = qs.get(pk=actor.pk)
+    if not current.is_active or current.role not in EDITORS:
+        raise PermissionDenied('Customer and contact changes require an active authorized commercial user.')
+    return current
+
+
+class RecordChangeSerializer(serializers.ModelSerializer):
+    revision = serializers.SerializerMethodField()
+    expected_revision = serializers.CharField(write_only=True, required=False, max_length=64)
+    change_note = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=2000)
+    def get_revision(self, instance): return record_revision(instance)
+    def validate(self, attrs):
+        if self.instance:
+            if attrs.get('expected_revision') != record_revision(self.instance):
+                raise ValidationError('This record changed. Refresh and reopen it before saving.')
+            if not attrs.get('change_note', '').strip():
+                raise ValidationError({'change_note': 'Explain this record change.'})
+        return attrs
+
+
+class CustomerSerializer(RecordChangeSerializer):
+    duplicate_reason = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=2000)
+    primary_contact = serializers.SerializerMethodField()
+    def get_primary_contact(self, instance):
+        item = instance.contacts.filter(primary=True).first()
+        return {'id':str(item.id), 'name':item.name} if item else None
     class Meta:
         model = Customer
-        fields = ['id', 'legal_name', 'billing_address', 'email', 'phone', 'archived', 'created_at', 'duplicate_reason']
+        fields = ['id', 'legal_name', 'billing_address', 'email', 'phone', 'archived', 'created_at', 'duplicate_reason', 'revision', 'expected_revision', 'change_note', 'primary_contact']
         read_only_fields = ['id', 'created_at']
 
-class ContactSerializer(serializers.ModelSerializer):
+class ContactSerializer(RecordChangeSerializer):
+    customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all(), pk_field=serializers.UUIDField())
+    replace_primary_confirmed = serializers.BooleanField(write_only=True, required=False)
+    expected_primary_id = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=36)
     class Meta:
         model = Contact
-        fields = ['id', 'customer', 'name', 'relationship', 'email', 'phone', 'primary']
+        fields = ['id', 'customer', 'name', 'relationship', 'email', 'phone', 'primary', 'revision', 'expected_revision', 'change_note', 'replace_primary_confirmed', 'expected_primary_id']
+        validators = []
         read_only_fields = ['id']
     def validate_customer(self, value):
         if not customer_scope(self.context['request'].user).filter(pk=value.pk).exists():
@@ -78,46 +120,109 @@ class ProjectInput(serializers.Serializer):
     reviewer = serializers.UUIDField()
     duplicate_reason = serializers.CharField(required=False, allow_blank=True, max_length=2000)
 
-class CustomerViewSet(viewsets.ModelViewSet):
+class PrivateRecordViewSet(viewsets.ModelViewSet):
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        response['Cache-Control'] = 'private, no-store'
+        response['X-Content-Type-Options'] = 'nosniff'
+        return response
+
+
+class CustomerViewSet(PrivateRecordViewSet):
     serializer_class = CustomerSerializer
     pagination_class = Page
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
     def get_queryset(self):
-        qs = customer_scope(self.request.user).order_by('legal_name')
+        actor = User.objects.get(pk=self.request.user.pk)
+        qs = customer_scope(actor).order_by('legal_name', 'id') if actor.is_active else Customer.objects.none()
         term = self.request.query_params.get('search', '')[:200]
         return qs.filter(Q(legal_name__icontains=term) | Q(email__icontains=term)) if term else qs
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        record_editor(request.user, lock=True)
+        return super().create(request, *args, **kwargs)
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        record_editor(request.user, lock=True)
+        item = self.get_object()
+        Customer.objects.select_for_update().get(pk=item.pk)
+        return super().update(request, *args, **kwargs)
+    def duplicate_check(self, values, instance=None):
+        name = values.get('legal_name', instance.legal_name if instance else '')
+        address = values.get('billing_address', instance.billing_address if instance else '')
+        qs = Customer.objects.filter(legal_name__iexact=name, billing_address__iexact=address)
+        if instance: qs = qs.exclude(pk=instance.pk)
+        reason = values.pop('duplicate_reason', '')
+        if instance and name.casefold() == instance.legal_name.casefold() and address.casefold() == instance.billing_address.casefold(): return reason
+        if qs.exists() and not reason.strip():
+            raise ValidationError({'duplicate_warning': 'Possible duplicate customer. Supply a duplicate override reason to continue.'})
+        return reason
     def perform_create(self, serializer):
-        if self.request.user.role not in EDITORS:
-            raise PermissionDenied()
-        reason = serializer.validated_data.pop('duplicate_reason', '')
-        if Customer.objects.filter(legal_name__iexact=serializer.validated_data['legal_name'], billing_address__iexact=serializer.validated_data['billing_address']).exists() and not reason.strip():
-            raise ValidationError({'duplicate_warning': 'Possible duplicate customer. Supply duplicate_reason to continue.'})
-        with transaction.atomic():
-            customer = serializer.save(created_by=self.request.user)
-            audit(self.request.user, 'customer.created', customer.id, {'duplicate_override': reason, 'fields': serializer.data})
+        reason = self.duplicate_check(serializer.validated_data)
+        note = serializer.validated_data.pop('change_note', '')
+        serializer.validated_data.pop('expected_revision', None)
+        customer = serializer.save(created_by=self.request.user)
+        audit(self.request.user, 'customer.created', customer.id, {'duplicate_override': reason, 'note':note, 'fields': serializer.data})
     def perform_update(self, serializer):
-        serializer.validated_data.pop('duplicate_reason', None)
-        with transaction.atomic():
-            Customer.objects.select_for_update().get(pk=serializer.instance.pk)
-            customer = serializer.save()
-            audit(self.request.user, 'customer.updated', customer.id, {'fields': serializer.data})
+        reason = self.duplicate_check(serializer.validated_data, serializer.instance)
+        before = record_values(serializer.instance)
+        note = serializer.validated_data.pop('change_note')
+        serializer.validated_data.pop('expected_revision')
+        customer = serializer.save()
+        audit(self.request.user, 'customer.updated', customer.id, {'before':before, 'after':record_values(customer), 'note':note, 'duplicate_override':reason})
 
-class ContactViewSet(viewsets.ModelViewSet):
+
+class ContactViewSet(PrivateRecordViewSet):
     serializer_class = ContactSerializer
     pagination_class = Page
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
     def get_queryset(self):
-        return Contact.objects.filter(customer__in=customer_scope(self.request.user)).order_by('name')
+        actor = User.objects.get(pk=self.request.user.pk)
+        qs = Contact.objects.filter(customer__in=customer_scope(actor)).order_by('name', 'id') if actor.is_active else Contact.objects.none()
+        customer = self.request.query_params.get('customer')
+        if customer: qs = qs.filter(customer_id=serializers.UUIDField().run_validation(customer))
+        return qs
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        record_editor(request.user, lock=True)
+        return super().create(request, *args, **kwargs)
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        record_editor(request.user, lock=True)
+        item = self.get_object()
+        Customer.objects.select_for_update().get(pk=item.customer_id)
+        Contact.objects.select_for_update().get(pk=item.pk)
+        return super().update(request, *args, **kwargs)
+    def primary_change(self, serializer, customer, note):
+        confirmed = serializer.validated_data.pop('replace_primary_confirmed', False)
+        expected = serializer.validated_data.pop('expected_primary_id', '')
+        if not serializer.validated_data.get('primary', False): return
+        current = Contact.objects.select_for_update().filter(customer=customer, primary=True).first()
+        current_id = str(current.id) if current else ''
+        if expected != current_id:
+            raise ValidationError('The primary contact changed. Refresh contacts and review your selection.')
+        if current and (not serializer.instance or current.pk != serializer.instance.pk):
+            if confirmed is not True:
+                raise ValidationError('Confirm replacement of the current primary contact.')
+            before = record_values(current); current.primary = False; current.save(update_fields=['primary'])
+            audit(self.request.user, 'contact.primary_replaced', customer.id, {'contact_id':str(current.id), 'before':before, 'after':record_values(current), 'note':note})
     def perform_create(self, serializer):
-        if self.request.user.role not in EDITORS:
-            raise PermissionDenied()
-        with transaction.atomic():
-            item = serializer.save()
-            audit(self.request.user, 'contact.created', item.customer_id, {'fields': serializer.data})
+        customer = Customer.objects.select_for_update().get(pk=serializer.validated_data['customer'].pk)
+        if not customer_scope(record_editor(self.request.user)).filter(pk=customer.pk).exists(): raise PermissionDenied()
+        if customer.archived: raise ValidationError('Restore the archived customer before adding a contact.')
+        note = serializer.validated_data.pop('change_note', '')
+        if not note.strip(): raise ValidationError({'change_note':'Explain this contact addition.'})
+        serializer.validated_data.pop('expected_revision', None)
+        self.primary_change(serializer, customer, note)
+        item = serializer.save()
+        audit(self.request.user, 'contact.created', item.customer_id, {'contact_id':str(item.id), 'fields':serializer.data, 'note':note})
     def perform_update(self, serializer):
-        with transaction.atomic():
-            item = serializer.save()
-            audit(self.request.user, 'contact.updated', item.customer_id, {'fields': serializer.data})
+        before = record_values(serializer.instance)
+        note = serializer.validated_data.pop('change_note')
+        serializer.validated_data.pop('expected_revision')
+        self.primary_change(serializer, serializer.instance.customer, note)
+        item = serializer.save()
+        audit(self.request.user, 'contact.updated', item.customer_id, {'contact_id':str(item.id), 'before':before, 'after':record_values(item), 'note':note})
 
 class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProjectSerializer

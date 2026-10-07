@@ -143,3 +143,11 @@ The Comptroller can open **User management** to list all accounts with paginatio
 The owner verified all three sandbox signing workflows and seven retained files on October 6, 2026. On October 7 the owner verified a local/external backup and opened every retained file from an isolated restore copy, then returned to the original database with sandbox sending disabled. This is a local recovery test, not evidence of production zero-data-loss or 15-minute recovery capability.
 
 **Deferred until after MVP:** simplify opening and reviewing multiple documents, as requested by the owner on October 7, 2026.
+
+## Customer editing and contacts
+
+Authorized Sales Associates, assigned Sales Managers and the Comptroller can open **Manage customers** to edit scoped customer details and add/edit contacts. Lists are paginated. Updates require a change note and the current record revision, validated under locks. Customer corrections do not modify any existing MSR snapshot or generated document. Archiving preserves history and blocks new projects/contact additions; restoring is an audited update. Identity changes that match another customer require an explicit duplicate override reason.
+
+Each customer has at most one primary contact. Replacing it requires confirmation and the current primary contact ID; the former contact remains, and demotion/promotion plus audit events commit together. Contact records cannot move between customers or be deleted through the API. Production authentication/hosting and remaining MVP screens are still pending.
+
+On October 7, 2026, the owner verified account creation, assigned-record isolation, deactivation/login blocking, reactivation, role change, password reset and protected self-role/active controls in the local User management screen.

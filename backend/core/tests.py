@@ -112,7 +112,7 @@ class FoundationTests(TestCase):
     def test_customer_edits_never_modify_approved_snapshot(self):
         approved = self.approve()
         self.client.force_authenticate(self.sales)
-        self.assertEqual(self.client.patch(f'/api/customers/{self.customer.id}/', {'legal_name':'Changed Name'}, format='json').status_code, 200)
+        self.assertEqual(self.client.patch(f'/api/customers/{self.customer.id}/', {'legal_name':'Changed Name', 'expected_revision':self.client.get(f'/api/customers/{self.customer.id}/').data['revision'], 'change_note':'Correct the customer master only.'}, format='json').status_code, 200)
         approved.refresh_from_db()
         self.assertEqual(approved.snapshot['customer'], 'Example Customer')
     def test_audit_chain_and_outbox_atomicity(self):
