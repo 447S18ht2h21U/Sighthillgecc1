@@ -22,6 +22,20 @@ from .rules import PAYMENT_OPTIONS, SIGNATURE_WORKFLOWS
 class Page(PageNumberPagination):
     page_size = 50
 
+def list_filters(request, choices):
+    """Validate list-only filters; detail routes keep their usual access scope."""
+    values = {}
+    term = request.query_params.get('search', '').strip()
+    if len(term) > 200:
+        raise ValidationError({'search': 'Use at most 200 characters.'})
+    values['search'] = term
+    for name, allowed in choices.items():
+        value = request.query_params.get(name, '')
+        if value and value not in allowed:
+            raise ValidationError({name: 'Choose one of: ' + ', '.join(allowed)})
+        values[name] = value
+    return values
+
 def project_scope(user):
     qs = Project.objects.select_related('current_approved', 'pending')
     if user.role == Role.COMPTROLLER:
@@ -135,8 +149,13 @@ class CustomerViewSet(PrivateRecordViewSet):
     def get_queryset(self):
         actor = User.objects.get(pk=self.request.user.pk)
         qs = customer_scope(actor).order_by('legal_name', 'id') if actor.is_active else Customer.objects.none()
-        term = self.request.query_params.get('search', '')[:200]
-        return qs.filter(Q(legal_name__icontains=term) | Q(email__icontains=term)) if term else qs
+        if self.action != 'list': return qs
+        values = list_filters(self.request, {'status': ['ACTIVE', 'ARCHIVED']})
+        if values['status']: qs = qs.filter(archived=values['status'] == 'ARCHIVED')
+        term = values['search']
+        if term:
+            qs = qs.filter(Q(legal_name__icontains=term) | Q(email__icontains=term) | Q(phone__icontains=term) | Q(billing_address__icontains=term) | Q(contacts__name__icontains=term) | Q(contacts__email__icontains=term) | Q(contacts__phone__icontains=term)).distinct()
+        return qs
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         record_editor(request.user, lock=True)
@@ -224,13 +243,22 @@ class ContactViewSet(PrivateRecordViewSet):
         item = serializer.save()
         audit(self.request.user, 'contact.updated', item.customer_id, {'contact_id':str(item.id), 'before':before, 'after':record_values(item), 'note':note})
 
-class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
+class ProjectViewSet(PrivateRecordViewSet):
     serializer_class = ProjectSerializer
     pagination_class = Page
+    http_method_names = ['get', 'post', 'head', 'options']
     def get_queryset(self):
-        qs = project_scope(self.request.user).order_by('-created_at')
-        term = self.request.query_params.get('search', '')[:200]
-        return qs.filter(Q(code__icontains=term) | Q(location__icontains=term)) if term else qs
+        actor = User.objects.get(pk=self.request.user.pk)
+        qs = project_scope(actor).order_by('-created_at', '-id') if actor.is_active else Project.objects.none()
+        if self.action != 'list': return qs
+        values = list_filters(self.request, {'state': ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'REVISED', 'CANCELLED'], 'sort': ['NEWEST', 'OLDEST', 'CODE']})
+        if values['state']: qs = qs.filter(state=values['state'])
+        term = values['search']
+        if term:
+            qs = qs.filter(Q(code__icontains=term) | Q(location__icontains=term) | Q(customer__legal_name__icontains=term) | Q(current_approved__snapshot__customer__icontains=term) | Q(pending__snapshot__customer__icontains=term))
+        if values['sort'] == 'OLDEST': qs = qs.order_by('created_at', 'id')
+        elif values['sort'] == 'CODE': qs = qs.order_by('code', 'id')
+        return qs
     def create(self, request):
         input = ProjectInput(data=request.data)
         input.is_valid(raise_exception=True)

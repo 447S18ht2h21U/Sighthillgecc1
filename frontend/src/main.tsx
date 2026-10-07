@@ -5,6 +5,7 @@ import { SigningReview } from './SigningReview';
 import { DocusignSetup } from './DocusignSetup';
 import { AccountManagement } from './AccountManagement';
 import { CustomerManagement } from './CustomerManagement';
+import { ProjectBrowser } from './ProjectBrowser';
 type Person = {id:string;username:string;role:string};
 type Customer = {id:string;legal_name:string;billing_address:string;archived:boolean};
 type Line = {description:string;quantity:string};
@@ -23,14 +24,18 @@ async function api<T>(path:string, method='GET', data?:unknown):Promise<T>{
 }
 function App(){
  const [user,setUser]=useState<Person|null>(null), [ready,setReady]=useState(false), [error,setError]=useState(''), [busy,setBusy]=useState(false);
- const [customers,setCustomers]=useState<Customer[]>([]), [people,setPeople]=useState<Person[]>([]), [projects,setProjects]=useState<Project[]>([]), [selected,setSelected]=useState<Project|null>(null);
+ const [customers,setCustomers]=useState<Customer[]>([]), [people,setPeople]=useState<Person[]>([]), [projectRefresh,setProjectRefresh]=useState(0), [selected,setSelected]=useState<Project|null>(null);
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null), [reason,setReason]=useState(''), [history,setHistory]=useState<MSR[]>([]);
  const [documents,setDocuments]=useState<PreparedDocument[]>([]);
  const [panel,setPanel]=useState<'projects'|'customer'|'project'|'accounts'|'customers'>('projects');
  async function run(job:()=>Promise<void>){setBusy(true);setError('');try{await job();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  async function load(){
-  const [c,d,p]=await Promise.all([api<{results:Customer[]}>('customers/'),api<Person[]>('directory/'),api<{results:Project[]}>('projects/')]);
-  setCustomers(c.results);setPeople(d);setProjects(p.results);
+  const c:Customer[]=[];
+  // Read every authorized active-customer page so project creation is not limited to the first 50.
+  let page=1;
+  while(true){const batch=await api<{results:Customer[];next:string|null}>(`customers/?status=ACTIVE&page=${page}`);c.push(...batch.results);if(!batch.next)break;page++;}
+  const d=await api<Person[]>('directory/');
+  setCustomers(c);setPeople(d);setProjectRefresh(n=>n+1);
  }
  useEffect(()=>{void (async()=>{await csrf();try{setUser(await api<Person>('me/'));await load();}catch{/* A signed-out browser opens the login form. */}finally{setReady(true);}})();},[]);
  useEffect(()=>{
@@ -53,7 +58,7 @@ function App(){
  const editable=selected?.state!=='CANCELLED' && selected?.pending && ['DRAFT','REJECTED'].includes(selected.pending.status);
  const approver=['SALES_MANAGER','COMPTROLLER'].includes(user.role);
  return <><header><div className="brand">GECC <span>Project workspace</span></div><div>{user.username} <span className="badge">{user.role.replaceAll('_',' ')}</span><button className="quiet" onClick={()=>void run(async()=>{await api('logout/','POST',{});setUser(null);setSelected(null);setPanel('projects');})}>Sign out</button></div></header><main>
- <div className="title"><div><p className="eyebrow">FOUNDATION / COMMERCIAL RECORDS</p><h1>Customers & projects</h1></div><div className="actions"><button className="quiet" onClick={()=>void run(()=>refresh(selected?.id))} disabled={busy}>Refresh</button>{['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<><button onClick={()=>setPanel('customer')}>Add customer</button><button onClick={()=>setPanel('project')}>Create project</button></>}</div></div>
+ <div className="title"><div><p className="eyebrow">FOUNDATION / COMMERCIAL RECORDS</p><h1>Customers & projects</h1></div><div className="actions"><button className="quiet" onClick={()=>void run(()=>refresh(selected?.id))} disabled={busy}>Refresh</button>{['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<><button onClick={()=>setPanel('customer')}>Add customer</button><button disabled={busy} onClick={()=>void run(async()=>{await load();setPanel('project');})}>Create project</button></>}</div></div>
  {error&&<div role="alert" className="error">{error}</div>}
  {['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<button className="quiet" onClick={()=>setPanel('customers')}>Manage customers</button>}
  {panel==='customers'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<CustomerManagement api={api} onChanged={load} onBack={()=>setPanel('projects')}/>}
@@ -62,7 +67,7 @@ function App(){
  {user.role==='COMPTROLLER'&&!['accounts','customers'].includes(panel)&&<DocusignSetup api={api} run={run} busy={busy}/>}
  {panel==='customer'&&<section><h2>New customer</h2><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void run(async()=>{await api('customers/','POST',Object.fromEntries(f));await load();setPanel('projects');});}}><div className="grid"><label>Legal name<input name="legal_name" required/></label><label>Billing address<input name="billing_address" required/></label><label>Email<input name="email" type="email"/></label><label>Phone<input name="phone"/></label><label>Duplicate override reason (if needed)<input name="duplicate_reason"/></label></div><button disabled={busy}>Save customer</button><button type="button" className="quiet" onClick={()=>setPanel('projects')}>Close</button></form></section>}
  {panel==='project'&&<section><h2>New project</h2><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void run(async()=>{const p=await api<Project>('projects/','POST',Object.fromEntries(f));await load();choose(p);setPanel('projects');});}}><div className="grid"><label>Customer<select aria-label="Customer" name="customer" required defaultValue=""><option value="">Choose customer</option>{customers.filter(c=>!c.archived).map(c=><option key={c.id} value={c.id}>{c.legal_name}</option>)}</select></label><label>Installation address<input name="location" required/></label><label>Sales Associate<select aria-label="Sales Associate" name="sales_associate" required defaultValue={user.role==='SALES_ASSOCIATE'?user.id:''}><option value="">Choose associate</option>{people.filter(p=>p.role==='SALES_ASSOCIATE').map(p=><option key={p.id} value={p.id}>{p.username}</option>)}</select></label><label>Sales Manager<select aria-label="Sales Manager" name="reviewer" required defaultValue={user.role==='SALES_MANAGER'?user.id:''}><option value="">Choose reviewer</option>{people.filter(p=>p.role==='SALES_MANAGER').map(p=><option key={p.id} value={p.id}>{p.username}</option>)}</select></label><label>Duplicate override reason (if needed)<input name="duplicate_reason"/></label></div><button disabled={busy}>Create draft</button><button type="button" className="quiet" onClick={()=>setPanel('projects')}>Close</button></form></section>}
- {!['accounts','customers'].includes(panel)&&<div className="workspace"><aside><h2>Projects <small>{projects.length}</small></h2>{projects.length===0&&<p className="muted">Create a customer and project to begin.</p>}{projects.map(p=><button className={`project ${selected?.id===p.id?'active':''}`} key={p.id} onClick={()=>choose(p)}><strong>{p.code}</strong><span>{p.location}</span><span className="badge">{p.state}</span></button>)}</aside>
+ {!['accounts','customers'].includes(panel)&&<div className="workspace"><ProjectBrowser<Project> api={api} selectedId={selected?.id} refreshKey={projectRefresh} onChoose={choose}/>
  <article>{!selected?<section className="empty"><h2>Your commercial workspace</h2><p>Select a project to prepare its Master Sales Record or review an approval.</p></section>:<><section><div className="title"><div><h2>{selected.code}</h2><p className="muted">{selected.location}</p></div><span className="badge">{selected.state}</span></div>
  <div className="versionbar"><span>Approved: {selected.current_approved?`Version ${selected.current_approved.number}.0`:'None yet'}</span><span>Pending: {selected.pending?`Version ${selected.pending.number}.0 • ${selected.pending.status}`:'None'}</span><button className="quiet" onClick={()=>void run(async()=>setHistory(await api<MSR[]>(`projects/${selected.id}/history/`)))}>Version history</button></div>
  {selected.current_approved&&<details><summary>View approved version {selected.current_approved.number}.0</summary><Summary data={selected.current_approved.snapshot}/></details>}
