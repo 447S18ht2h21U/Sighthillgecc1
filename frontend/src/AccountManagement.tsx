@@ -35,7 +35,7 @@ export function AccountManagement({actorId,api,onChanged,onBack}:{actorId:string
     <label>User last name<input name="last_name" defaultValue={edit?.last_name||''} required maxLength={150}/></label>
     <label>User email<input type="email" name="email" defaultValue={edit?.email||''} required maxLength={254}/></label>
     <label>User initials<input aria-label="User initials" name="initials" defaultValue={edit?.initials||''} required pattern="[A-Z]{1,8}" maxLength={8}/><span className="muted">Use 1–8 uppercase letters.</span></label>
-    <label>User role<select name="role" disabled={self} defaultValue={edit?.role||'SALES_ASSOCIATE'}>{roles.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+    <label>User role<select aria-label="User role" name="role" disabled={self} defaultValue={edit?.role||'SALES_ASSOCIATE'}>{roles.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
     {!self&&<label>{edit?'New local password (optional)':'Local password'}<input aria-label={edit?'New local password (optional)':'Local password'} name="password" type="password" required={!edit} minLength={12} autoComplete="new-password"/><span className="muted">At least 12 characters, including a letter, number and special character.{edit?' Leave blank to keep the existing password.':''}</span></label>}
    </div>
    <label className="sandbox-confirm"><input type="checkbox" name="is_active" disabled={self} defaultChecked={edit?edit.is_active:true}/>Account active — can sign in</label>
