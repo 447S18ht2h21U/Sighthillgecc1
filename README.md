@@ -151,3 +151,12 @@ Authorized Sales Associates, assigned Sales Managers and the Comptroller can ope
 Each customer has at most one primary contact. Replacing it requires confirmation and the current primary contact ID; the former contact remains, and demotion/promotion plus audit events commit together. Contact records cannot move between customers or be deleted through the API. Production authentication/hosting and remaining MVP screens are still pending.
 
 On October 7, 2026, the owner verified account creation, assigned-record isolation, deactivation/login blocking, reactivation, role change, password reset and protected self-role/active controls in the local User management screen.
+
+
+On October 7, 2026, the owner verified customer/contact edits, primary replacement with the former contact retained, archive/restore and preservation of Approved Version 4.0 in the local customer screen.
+
+## Customer and project search
+
+**Manage customers** searches authorized customer names, billing addresses, emails, phones and contact names/emails/phones. Choose All customers, Active or Archived and select **Search customers** to apply the fields. Project search matches codes, installation locations, current customer master names and customer names in the current approved/pending MSR. Project status and newest/oldest/code ordering can be combined with search. Searches are case-insensitive literal substring matches, limited to 200 characters. Phone punctuation must match the stored text; this is basic database search rather than fuzzy/global document search.
+
+Both lists show result counts and retain filters across pagination. Clearing filters restores all authorized results. Search does not alter records or approved snapshots. Project creation reads all authorized active-customer pages so choices beyond the first 50 remain available. Production identity, hosting and readable audit history remain pending.
