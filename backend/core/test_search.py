@@ -85,7 +85,7 @@ class SearchTests(TestCase):
         for url in [f'/api/customers/{self.customer.id}/?status=ARCHIVED&search=missing',f'/api/projects/{self.project.id}/?state=CANCELLED&search=missing']:
             self.assertEqual(self.client.get(url).status_code,200)
 
-    def test_pagination_order_private_headers_and_no_search_mutation(self):
+    def test_pagination_order_private_headers_and_no_commercial_search_mutation(self):
         for n in range(51):
             Project.objects.create(code=f'SYNTHETIC-{n:03}',customer=self.customer,location='Synthetic Location',sales_associate=self.sales,reviewer=self.manager)
         self.client.force_authenticate(self.sales);before=AuditEvent.objects.count()
@@ -94,4 +94,5 @@ class SearchTests(TestCase):
         self.assertIn('search=SYNTHETIC',first.data['next']);self.assertEqual(second.data['results'][0]['code'],'SYNTHETIC-050')
         self.assertEqual(first['Cache-Control'],'private, no-store')
         oldest=self.ids('/api/projects/?sort=OLDEST');self.assertEqual(oldest[0],str(self.project.id))
-        self.assertEqual(AuditEvent.objects.count(),before)
+        self.assertEqual(AuditEvent.objects.count(),before+3)
+        self.assertEqual(AuditEvent.objects.order_by('-sequence').first().action,'access.read')
