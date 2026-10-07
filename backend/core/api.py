@@ -22,6 +22,17 @@ from .rules import PAYMENT_OPTIONS, SIGNATURE_WORKFLOWS
 class Page(PageNumberPagination):
     page_size = 50
 
+class AuditPage(Page):
+    def bounded_link(self, link):
+        from rest_framework.utils.urls import replace_query_param
+        return replace_query_param(link, 'through_sequence', self.request.audit_snapshot_sequence) if link else None
+    def get_paginated_response(self, data):
+        response = super().get_paginated_response(data)
+        response.data['next'] = self.bounded_link(response.data['next'])
+        response.data['previous'] = self.bounded_link(response.data['previous'])
+        response.data['snapshot_sequence'] = self.request.audit_snapshot_sequence
+        return response
+
 def list_filters(request, choices):
     """Validate list-only filters; detail routes keep their usual access scope."""
     values = {}
@@ -345,7 +356,7 @@ class MSRViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(MSRSerializer(result).data)
 
 class AuditViewSet(viewsets.ReadOnlyModelViewSet):
-    pagination_class = Page
+    pagination_class = AuditPage
     def finalize_response(self, request, response, *args, **kwargs):
         response = super().finalize_response(request, response, *args, **kwargs)
         response['Cache-Control'] = 'private, no-store'
@@ -357,7 +368,12 @@ class AuditViewSet(viewsets.ReadOnlyModelViewSet):
             raise PermissionDenied('Audit history requires an active Comptroller account.')
         qs = AuditEvent.objects.select_related('actor').order_by('-sequence')
         if self.action != 'list': return qs
-        values = list_filters(self.request, {'category': ['customer', 'contact', 'account', 'project', 'msr', 'document', 'signing', 'docusign', 'sandbox', 'release', 'signing_test']})
+        from .models import AuditHead
+        current = AuditHead.objects.get(pk=1).sequence
+        limit = serializers.IntegerField(min_value=0, max_value=current).run_validation(self.request.query_params.get('through_sequence', current))
+        self.request.audit_snapshot_sequence = limit
+        qs = qs.filter(sequence__lte=limit)
+        values = list_filters(self.request, {'category': ['auth', 'access', 'customer', 'contact', 'account', 'project', 'msr', 'document', 'signing', 'docusign', 'sandbox', 'release', 'signing_test']})
         if values['category']: qs = qs.filter(action__startswith=values['category'] + '.')
         term = values['search']
         if term:
@@ -385,9 +401,10 @@ class AuditViewSet(viewsets.ReadOnlyModelViewSet):
         return qs
     class AuditSerializer(serializers.ModelSerializer):
         actor = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
-        actor_username = serializers.CharField(source='actor.username', read_only=True)
+        actor_username = serializers.CharField(source='actor.username', read_only=True, allow_null=True)
         actor_name = serializers.SerializerMethodField()
         def get_actor_name(self, event):
+            if not event.actor_id: return 'Unauthenticated request'
             return event.actor.get_full_name().strip() or event.actor.username
         class Meta:
             model = AuditEvent
@@ -430,16 +447,26 @@ def dev_login(request):
         if not isinstance(data, dict):
             raise ValueError()
     except (ValueError, UnicodeDecodeError):
+        from .audit_context import NO_RESOURCE
+        audit(None, 'auth.login_failed', NO_RESOURCE, {'reason': 'Invalid login request.'})
         return JsonResponse({'detail': 'Invalid JSON.'}, status=400)
+    if not isinstance(data.get('username'), str) or not isinstance(data.get('password'), str):
+        from .audit_context import NO_RESOURCE
+        audit(None, 'auth.login_failed', NO_RESOURCE, {'reason': 'Invalid login request.'})
+        return JsonResponse({'detail': 'Invalid credentials.'}, status=400)
     user = authenticate(request, username=data.get('username'), password=data.get('password'))
     if user is None:
+        from .audit_context import NO_RESOURCE
+        audit(None, 'auth.login_failed', NO_RESOURCE, {'reason': 'Invalid credentials.'})
         return JsonResponse({'detail': 'Invalid credentials.'}, status=400)
+    audit(user, 'auth.login_succeeded', user.id, {})
     login(request, user)
     request.session['last_activity'] = time.time()
     return JsonResponse({'ok': True})
 
 @api_view(['POST'])
 def end_session(request):
+    audit(request.user, 'auth.logout', request.user.id, {})
     logout(request)
     return Response({'ok': True})
 

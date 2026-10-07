@@ -16,6 +16,8 @@ class IdleSessionAuthentication(SessionAuthentication):
         if result:
             last = request.session.get('last_activity', 0)
             if time.time() - last >= 1800:
+                from .services import audit
+                audit(result[0], 'auth.session_expired', result[0].id, {'reason': '30-minute inactivity limit reached.'})
                 logout(request._request)
                 raise AuthenticationFailed('Session expired after 30 minutes without user activity.')
         return result

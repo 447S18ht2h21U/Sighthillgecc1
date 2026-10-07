@@ -4,10 +4,10 @@ import json
 import re
 from decimal import Decimal, InvalidOperation
 from django.db import transaction, connection
-from django.db.models import Max
+from django.db.models import Max, F
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from .models import AuditHead, AuditEvent, Outbox, LocalCounter, MSR, Project, Role
+from .models import AuditHead, AuditEvent, Outbox, LocalCounter, MSR, Project, Role, User
 from .rules import PAYMENT_OPTIONS, EASTERN
 EDITORS = {Role.SALES_ASSOCIATE, Role.SALES_MANAGER, Role.COMPTROLLER}
 APPROVERS = {Role.SALES_MANAGER, Role.COMPTROLLER}
@@ -19,12 +19,25 @@ def authorize(user, project, approval=False):
     if not permitted(user, project) or user.role not in (APPROVERS if approval else EDITORS):
         raise PermissionDenied('You do not have permission for this project.')
 
+@transaction.atomic
 def audit(actor, action, entity_id, payload):
-    # Caller holds an atomic transaction; a singleton lock serializes the hash chain.
+    # A singleton lock serializes the hash chain inside this atomic transaction.
+    if connection.vendor == 'sqlite':
+        # SQLite has no row locks: acquire its writer lock before reading the
+        # chain head so concurrent HTTP reads cannot choose the same sequence.
+        AuditHead.objects.filter(pk=1).update(sequence=F('sequence'))
     head = AuditHead.objects.select_for_update().get(pk=1)
     sequence = head.sequence + 1
     previous = head.digest
-    body = {'sequence': sequence, 'actor': str(actor.id), 'action': action, 'entity_id': str(entity_id), 'payload': payload, 'previous_hash': previous}
+    from .audit_context import request_context
+    payload = copy.deepcopy(payload)
+    current = User.objects.get(pk=actor.pk) if actor is not None else None
+    payload['_context'] = {
+        **(request_context.get() or {'source': 'APPLICATION'}),
+        'actor_role': current.role if current else None,
+        'actor_active': current.is_active if current else None,
+    }
+    body = {'sequence': sequence, 'actor': str(actor.id) if actor else None, 'action': action, 'entity_id': str(entity_id), 'payload': payload, 'previous_hash': previous}
     digest = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     event = AuditEvent.objects.create(sequence=sequence, actor=actor, action=action, entity_id=entity_id, payload=payload, previous_hash=previous, digest=digest)
     head.sequence, head.digest = sequence, digest
@@ -121,6 +134,7 @@ def transition(actor, msr_id, action, expected_sequence, snapshot=None, reason='
     ref = MSR.objects.get(pk=msr_id)
     project = Project.objects.select_for_update().get(pk=ref.project_id)
     record = MSR.objects.select_for_update().get(pk=msr_id)
+    before = copy.deepcopy(record.snapshot)
     authorize(actor, project, approval=action in {'approve', 'reject'})
     if project.state == 'CANCELLED' or project.pending_id != record.id:
         raise ValidationError('This is not the active draft. Approved records require a revision.')
@@ -154,7 +168,10 @@ def transition(actor, msr_id, action, expected_sequence, snapshot=None, reason='
     record.save()
     project.save()
     # Retain the exact submitted/rejected/approved contents, including prior attempts.
-    audit(actor, f'msr.{action}', project.id, {'msr_id': str(record.id), 'version': record.number, 'edit_sequence': record.edit_sequence, 'reason': reason, 'snapshot': record.snapshot})
+    payload = {'msr_id': str(record.id), 'version': record.number, 'edit_sequence': record.edit_sequence, 'reason': reason, 'snapshot': record.snapshot}
+    if action == 'edit':
+        payload.update(before=before, after=record.snapshot)
+    audit(actor, f'msr.{action}', project.id, payload)
     return record
 
 @transaction.atomic

@@ -81,7 +81,7 @@ class AuditHead(models.Model):
 
 class AuditEvent(Entity):
     sequence = models.PositiveBigIntegerField(unique=True)
-    actor = models.ForeignKey(User, on_delete=models.PROTECT)
+    actor = models.ForeignKey(User, on_delete=models.PROTECT, null=True)
     action = models.CharField(max_length=80)
     entity_id = models.UUIDField()
     payload = models.JSONField()

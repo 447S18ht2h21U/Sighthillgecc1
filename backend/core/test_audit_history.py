@@ -71,13 +71,15 @@ class AuditHistoryTests(TestCase):
         response=self.client.get(f'/api/audit/{event.id}/?category=invalid&search=missing')
         self.assertEqual(response.status_code,200);self.assertEqual(response.data['id'],str(event.id))
 
-    def test_pagination_newest_sequence_and_reads_do_not_change_history(self):
+    def test_pagination_newest_sequence_and_reads_preserve_original_history(self):
         for n in range(51):self.record(payload={'note':f'Pagination fixture {n}'})
-        before=list(AuditEvent.objects.values_list('id','digest','payload'))
+        before=list(AuditEvent.objects.order_by('sequence').values_list('id','digest','payload'))
         first=self.read({'category':'customer'});second=self.read({'category':'customer','page':2})
         self.assertEqual(first.data['count'],51);self.assertEqual(len(first.data['results']),50);self.assertEqual(len(second.data['results']),1)
         sequences=[r['sequence'] for r in first.data['results']+second.data['results']];self.assertEqual(sequences,sorted(sequences,reverse=True))
-        self.assertIn('category=customer',first.data['next']);self.assertEqual(list(AuditEvent.objects.values_list('id','digest','payload')),before)
+        self.assertIn('category=customer',first.data['next']);self.assertIn('through_sequence=',first.data['next'])
+        self.assertEqual(list(AuditEvent.objects.filter(id__in=[r[0] for r in before]).order_by('sequence').values_list('id','digest','payload')),before)
+        self.assertEqual(AuditEvent.objects.filter(action='access.read').count(),2)
         event=first.data['results'][0]
         for method in ['post','patch','delete']:
             url='/api/audit/' if method=='post' else f"/api/audit/{event['id']}/"

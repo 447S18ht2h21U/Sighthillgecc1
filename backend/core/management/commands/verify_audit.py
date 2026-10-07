@@ -8,7 +8,7 @@ class Command(BaseCommand):
         previous, sequence = '0' * 64, 0
         for event in AuditEvent.objects.order_by('sequence').iterator():
             sequence += 1
-            body = {'sequence': event.sequence, 'actor': str(event.actor_id), 'action': event.action, 'entity_id': str(event.entity_id), 'payload': event.payload, 'previous_hash': event.previous_hash}
+            body = {'sequence': event.sequence, 'actor': str(event.actor_id) if event.actor_id else None, 'action': event.action, 'entity_id': str(event.entity_id), 'payload': event.payload, 'previous_hash': event.previous_hash}
             digest = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
             if event.sequence != sequence or event.previous_hash != previous or event.digest != digest:
                 raise CommandError(f'Invalid audit event {event.id}')
