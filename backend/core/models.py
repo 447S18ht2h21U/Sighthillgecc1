@@ -429,3 +429,123 @@ class ContractorOnboardingDocument(Entity):
 
     def __str__(self):
         return f"{self.engagement.engagement_code} - {self.kind}"
+
+class ContractorCompensationPlan(Entity):
+    """Versioned compensation terms for a contractor engagement."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        APPROVED = 'APPROVED', 'Approved'
+        SUPERSEDED = 'SUPERSEDED', 'Superseded'
+
+    engagement = models.ForeignKey(
+        ContractorEngagement,
+        on_delete=models.PROTECT,
+        related_name='compensation_plans',
+    )
+    version = models.PositiveIntegerField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+    effective_date = models.DateField()
+    compensation_terms = models.JSONField(default=dict)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='contractor_compensation_plans_created',
+    )
+    approved_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='contractor_compensation_plans_approved',
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['engagement', 'version'],
+                name='contractor_compensation_version_unique',
+            ),
+        ]
+        ordering = ['engagement', '-version']
+
+    def __str__(self):
+        return f'{self.engagement.engagement_code} - Compensation v{self.version}'
+
+
+class CustomerPayment(Entity):
+    """Customer payment receipt awaiting or holding verification."""
+
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending Verification'
+        VERIFIED = 'VERIFIED', 'Verified'
+        REJECTED = 'REJECTED', 'Rejected'
+
+    class Kind(models.TextChoices):
+        DEPOSIT = 'DEPOSIT', 'Deposit'
+        FINAL = 'FINAL', 'Final Payment'
+        FULL = 'FULL', 'Full Payment'
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.PROTECT,
+        related_name='customer_payments',
+    )
+
+    msr = models.ForeignKey(
+        MSR,
+        on_delete=models.PROTECT,
+        related_name='customer_payments',
+    )
+
+    kind = models.CharField(
+        max_length=20,
+        choices=Kind.choices,
+    )
+
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    received_date = models.DateField()
+
+    payment_reference = models.CharField(
+        max_length=150,
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+
+    recorded_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='customer_payments_recorded',
+    )
+
+    verified_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='customer_payments_verified',
+    )
+
+    verified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ['project', 'received_date', 'created_at']
+
+    def __str__(self):
+        return f'{self.project.code} - {self.kind} - ${self.amount}'

@@ -124,3 +124,74 @@ def activate_contractor_engagement(actor, engagement_id):
     )
 
     return engagement
+
+@transaction.atomic
+def approve_compensation_plan(actor, plan_id):
+    """Approve draft compensation terms through the Comptroller."""
+
+    from django.utils import timezone
+    from .models import ContractorCompensationPlan
+
+    require_comptroller(actor)
+
+    plan = (
+        ContractorCompensationPlan.objects
+        .select_for_update()
+        .select_related('engagement')
+        .get(pk=plan_id)
+    )
+
+    if plan.status != ContractorCompensationPlan.Status.DRAFT:
+        raise ValidationError(
+            'Only draft compensation plans may be approved.'
+        )
+
+    if plan.engagement.status != ContractorEngagement.Status.ACTIVE:
+        raise ValidationError(
+            'The contractor engagement must be active.'
+        )
+
+    if not plan.compensation_terms:
+        raise ValidationError(
+            'Compensation terms are required.'
+        )
+
+    plan.status = ContractorCompensationPlan.Status.APPROVED
+    plan.approved_by = actor
+    plan.approved_at = timezone.now()
+
+    plan.save(
+        update_fields=['status', 'approved_by', 'approved_at']
+    )
+
+    audit(
+        actor,
+        'contractor.compensation.approved',
+        plan.id,
+        {
+            'engagement_id': str(plan.engagement_id),
+            'version': plan.version,
+        },
+    )
+
+    return plan
+def get_effective_compensation_plan(engagement_id, as_of_date):
+    """
+    Return the approved compensation plan effective on a given date.
+
+    Previously approved plans remain immutable.
+    Draft and superseded plans are excluded.
+    Returns None if no approved plan is effective.
+    """
+    from .models import ContractorCompensationPlan
+
+    return (
+        ContractorCompensationPlan.objects
+        .filter(
+            engagement_id=engagement_id,
+            status=ContractorCompensationPlan.Status.APPROVED,
+            effective_date__lte=as_of_date,
+        )
+        .order_by('-effective_date', '-version')
+        .first()
+    )
