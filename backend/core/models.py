@@ -549,3 +549,73 @@ class CustomerPayment(Entity):
 
     def __str__(self):
         return f'{self.project.code} - {self.kind} - ${self.amount}'
+
+class CustomerPaymentAdjustment(Entity):
+    """Auditable refund or reversal of a customer payment."""
+
+    class Kind(models.TextChoices):
+        REFUND = 'REFUND', 'Refund'
+        REVERSAL = 'REVERSAL', 'Payment Reversal'
+
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending Approval'
+        APPROVED = 'APPROVED', 'Approved'
+        REJECTED = 'REJECTED', 'Rejected'
+
+    payment = models.ForeignKey(
+        CustomerPayment,
+        on_delete=models.PROTECT,
+        related_name='adjustments',
+    )
+
+    kind = models.CharField(
+        max_length=20,
+        choices=Kind.choices,
+    )
+
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    adjustment_date = models.DateField()
+
+    adjustment_reference = models.CharField(
+        max_length=150,
+    )
+
+    reason = models.TextField()
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+
+    recorded_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='payment_adjustments_recorded',
+    )
+
+    approved_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='payment_adjustments_approved',
+    )
+
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ['payment', 'adjustment_date', 'created_at']
+
+    def __str__(self):
+        return (
+            f'{self.payment.payment_reference} - '
+            f'{self.kind} - ${self.amount}'
+        )

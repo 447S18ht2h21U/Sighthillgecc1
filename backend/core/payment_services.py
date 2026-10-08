@@ -1,4 +1,4 @@
-"""GECC customer payment verification services."""
+﻿"""GECC customer payment verification services."""
 
 from decimal import Decimal, InvalidOperation
 
@@ -7,7 +7,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from .contractor_services import require_comptroller
-from .models import CustomerPayment, Project, MSR
+from .models import CustomerPayment, CustomerPaymentAdjustment, Project, MSR
 from .services import audit
 
 
@@ -139,18 +139,123 @@ def get_project_payment_status(project_id):
         Decimal('0.00'),
     )
 
-    outstanding_balance = max(
-        approved_total - verified_total,
+    approved_adjustments = CustomerPaymentAdjustment.objects.filter(
+        payment__project=project,
+        payment__status=CustomerPayment.Status.VERIFIED,
+        status=CustomerPaymentAdjustment.Status.APPROVED,
+    )
+
+    adjustment_total = sum(
+        (adjustment.amount for adjustment in approved_adjustments),
         Decimal('0.00'),
     )
 
-    paid_in_full = verified_total >= approved_total
+    net_received = verified_total - adjustment_total
 
+    outstanding_balance = max(
+        approved_total - net_received,
+        Decimal('0.00'),
+    )
+
+    paid_in_full = net_received >= approved_total
     return {
         'project_id': str(project.id),
         'msr_id': str(msr.id),
         'approved_total': approved_total,
         'verified_total': verified_total,
+        'adjustment_total': adjustment_total,
+        'net_received': net_received,
         'outstanding_balance': outstanding_balance,
         'paid_in_full': paid_in_full,
     }
+
+@transaction.atomic
+def approve_customer_payment_adjustment(actor, adjustment_id):
+    """Approve a refund or reversal against a verified receipt."""
+
+    require_comptroller(actor)
+
+    adjustment_ref = CustomerPaymentAdjustment.objects.get(
+        pk=adjustment_id
+    )
+
+    # Lock the project first to serialize financial decisions.
+    project = Project.objects.select_for_update().get(
+        pk=adjustment_ref.payment.project_id
+    )
+
+    payment = CustomerPayment.objects.select_for_update().get(
+        pk=adjustment_ref.payment_id
+    )
+
+    adjustment = CustomerPaymentAdjustment.objects.select_for_update().get(
+        pk=adjustment_id
+    )
+
+    if adjustment.status != CustomerPaymentAdjustment.Status.PENDING:
+        raise ValidationError(
+            'Only pending adjustments may be approved.'
+        )
+
+    if payment.project_id != project.id:
+        raise ValidationError(
+            'Adjustment payment does not match the project.'
+        )
+
+    if payment.status != CustomerPayment.Status.VERIFIED:
+        raise ValidationError(
+            'Only verified payments may be adjusted.'
+        )
+
+    if adjustment.amount <= Decimal('0.00'):
+        raise ValidationError(
+            'Adjustment amount must be greater than zero.'
+        )
+
+    if not adjustment.adjustment_reference.strip():
+        raise ValidationError(
+            'An adjustment reference is required.'
+        )
+
+    if not adjustment.reason.strip():
+        raise ValidationError(
+            'An adjustment reason is required.'
+        )
+
+    approved_adjustments = CustomerPaymentAdjustment.objects.filter(
+        payment=payment,
+        status=CustomerPaymentAdjustment.Status.APPROVED,
+    )
+
+    already_adjusted = sum(
+        (item.amount for item in approved_adjustments),
+        Decimal('0.00'),
+    )
+
+    if already_adjusted + adjustment.amount > payment.amount:
+        raise ValidationError(
+            'Approved adjustments cannot exceed the original payment.'
+        )
+
+    adjustment.status = CustomerPaymentAdjustment.Status.APPROVED
+    adjustment.approved_by = actor
+    adjustment.approved_at = timezone.now()
+
+    adjustment.save(
+        update_fields=['status', 'approved_by', 'approved_at']
+    )
+
+    audit(
+        actor,
+        'customer.payment.adjustment.approved',
+        adjustment.id,
+        {
+            'project_id': str(project.id),
+            'payment_id': str(payment.id),
+            'adjustment_kind': adjustment.kind,
+            'adjustment_amount': str(adjustment.amount),
+            'adjustment_reference': adjustment.adjustment_reference,
+        },
+    )
+
+    return adjustment

@@ -13,13 +13,14 @@ from .models import (
     Project,
     MSR,
     CustomerPayment,
+    CustomerPaymentAdjustment,
     AuditEvent,
 )
 from .payment_services import (
     verify_customer_payment,
     get_project_payment_status,
+    approve_customer_payment_adjustment,
 )
-
 class CustomerPaymentVerificationTests(TestCase):
 
     def setUp(self):
@@ -327,3 +328,301 @@ class CustomerPaymentVerificationTests(TestCase):
             Decimal('0.00'),
         )
         self.assertTrue(result['paid_in_full'])
+
+    def test_comptroller_can_approve_refund(self):
+        verify_customer_payment(
+            self.comptroller,
+            self.payment.id,
+        )
+
+        adjustment = CustomerPaymentAdjustment.objects.create(
+            payment=self.payment,
+            kind=CustomerPaymentAdjustment.Kind.REFUND,
+            amount=Decimal('200.00'),
+            adjustment_date=date(2026, 10, 8),
+            adjustment_reference='TEST-REFUND-001',
+            reason='Customer refund test',
+            recorded_by=self.sales_manager,
+        )
+
+        approved = approve_customer_payment_adjustment(
+            self.comptroller,
+            adjustment.id,
+        )
+
+        self.assertEqual(
+            approved.status,
+            CustomerPaymentAdjustment.Status.APPROVED,
+        )
+        self.assertEqual(
+            approved.approved_by_id,
+            self.comptroller.id,
+        )
+        self.assertIsNotNone(approved.approved_at)
+
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action='customer.payment.adjustment.approved',
+                entity_id=adjustment.id,
+            ).exists()
+        )
+
+    def test_sales_manager_cannot_approve_refund(self):
+        verify_customer_payment(
+            self.comptroller,
+            self.payment.id,
+        )
+
+        adjustment = CustomerPaymentAdjustment.objects.create(
+            payment=self.payment,
+            kind=CustomerPaymentAdjustment.Kind.REFUND,
+            amount=Decimal('200.00'),
+            adjustment_date=date(2026, 10, 8),
+            adjustment_reference='TEST-REFUND-UNAUTHORIZED',
+            reason='Unauthorized approval test',
+            recorded_by=self.sales_manager,
+        )
+
+        with self.assertRaises(PermissionDenied):
+            approve_customer_payment_adjustment(
+                self.sales_manager,
+                adjustment.id,
+            )
+
+        adjustment.refresh_from_db()
+
+        self.assertEqual(
+            adjustment.status,
+            CustomerPaymentAdjustment.Status.PENDING,
+        )
+        self.assertIsNone(adjustment.approved_by)
+        self.assertIsNone(adjustment.approved_at)
+
+    def test_refund_cannot_exceed_original_payment(self):
+        verify_customer_payment(
+            self.comptroller,
+            self.payment.id,
+        )
+
+        adjustment = CustomerPaymentAdjustment.objects.create(
+            payment=self.payment,
+            kind=CustomerPaymentAdjustment.Kind.REFUND,
+            amount=Decimal('600.00'),
+            adjustment_date=date(2026, 10, 8),
+            adjustment_reference='TEST-REFUND-EXCESS',
+            reason='Refund exceeds original payment',
+            recorded_by=self.sales_manager,
+        )
+
+        with self.assertRaises(ValidationError):
+            approve_customer_payment_adjustment(
+                self.comptroller,
+                adjustment.id,
+            )
+
+        adjustment.refresh_from_db()
+
+        self.assertEqual(
+            adjustment.status,
+            CustomerPaymentAdjustment.Status.PENDING,
+        )
+        self.assertIsNone(adjustment.approved_by)
+        self.assertIsNone(adjustment.approved_at)
+
+    def test_combined_refunds_cannot_exceed_original_payment(self):
+        verify_customer_payment(
+            self.comptroller,
+            self.payment.id,
+        )
+
+        first_refund = CustomerPaymentAdjustment.objects.create(
+            payment=self.payment,
+            kind=CustomerPaymentAdjustment.Kind.REFUND,
+            amount=Decimal('300.00'),
+            adjustment_date=date(2026, 10, 8),
+            adjustment_reference='TEST-REFUND-FIRST',
+            reason='First partial refund',
+            recorded_by=self.sales_manager,
+        )
+
+        approve_customer_payment_adjustment(
+            self.comptroller,
+            first_refund.id,
+        )
+
+        second_refund = CustomerPaymentAdjustment.objects.create(
+            payment=self.payment,
+            kind=CustomerPaymentAdjustment.Kind.REFUND,
+            amount=Decimal('250.00'),
+            adjustment_date=date(2026, 10, 8),
+            adjustment_reference='TEST-REFUND-SECOND',
+            reason='Second partial refund',
+            recorded_by=self.sales_manager,
+        )
+
+        with self.assertRaises(ValidationError):
+            approve_customer_payment_adjustment(
+                self.comptroller,
+                second_refund.id,
+            )
+
+        first_refund.refresh_from_db()
+        second_refund.refresh_from_db()
+
+        self.assertEqual(
+            first_refund.status,
+            CustomerPaymentAdjustment.Status.APPROVED,
+        )
+        self.assertEqual(
+            second_refund.status,
+            CustomerPaymentAdjustment.Status.PENDING,
+        )
+        self.assertIsNone(second_refund.approved_by)
+
+    def test_approved_refund_cannot_be_modified(self):
+        from django.db import DatabaseError
+
+        verify_customer_payment(
+            self.comptroller,
+            self.payment.id,
+        )
+
+        adjustment = CustomerPaymentAdjustment.objects.create(
+            payment=self.payment,
+            kind=CustomerPaymentAdjustment.Kind.REFUND,
+            amount=Decimal('200.00'),
+            adjustment_date=date(2026, 10, 8),
+            adjustment_reference='TEST-REFUND-IMMUTABLE',
+            reason='Test approved refund immutability',
+            recorded_by=self.sales_manager,
+        )
+
+        approve_customer_payment_adjustment(
+            self.comptroller,
+            adjustment.id,
+        )
+
+        from django.db import transaction
+
+        with transaction.atomic():
+            with self.assertRaises(DatabaseError):
+                CustomerPaymentAdjustment.objects.filter(
+                    pk=adjustment.id,
+                ).update(
+                    amount=Decimal('100.00'),
+                )
+
+        adjustment.refresh_from_db()
+
+        self.assertEqual(
+            adjustment.amount,
+            Decimal('200.00'),
+        )
+        self.assertEqual(
+            adjustment.status,
+            CustomerPaymentAdjustment.Status.APPROVED,
+        )
+
+    def test_approved_refund_cannot_be_deleted(self):
+        from django.db import DatabaseError, transaction
+
+        verify_customer_payment(
+            self.comptroller,
+            self.payment.id,
+        )
+
+        adjustment = CustomerPaymentAdjustment.objects.create(
+            payment=self.payment,
+            kind=CustomerPaymentAdjustment.Kind.REFUND,
+            amount=Decimal('200.00'),
+            adjustment_date=date(2026, 10, 8),
+            adjustment_reference='TEST-REFUND-NO-DELETE',
+            reason='Test approved refund deletion protection',
+            recorded_by=self.sales_manager,
+        )
+
+        approve_customer_payment_adjustment(
+            self.comptroller,
+            adjustment.id,
+        )
+
+        with transaction.atomic():
+            with self.assertRaises(DatabaseError):
+                CustomerPaymentAdjustment.objects.filter(
+                    pk=adjustment.id,
+                ).delete()
+
+        adjustment.refresh_from_db()
+
+        self.assertEqual(
+            adjustment.status,
+            CustomerPaymentAdjustment.Status.APPROVED,
+        )
+        self.assertEqual(
+            adjustment.amount,
+            Decimal('200.00'),
+        )
+
+    def test_cannot_insert_preapproved_refund(self):
+        from django.db import DatabaseError, transaction
+        from django.utils import timezone
+
+        verify_customer_payment(
+            self.comptroller,
+            self.payment.id,
+        )
+
+        with transaction.atomic():
+            with self.assertRaises(DatabaseError):
+                CustomerPaymentAdjustment.objects.create(
+                    payment=self.payment,
+                    kind=CustomerPaymentAdjustment.Kind.REFUND,
+                    amount=Decimal('200.00'),
+                    adjustment_date=date(2026, 10, 8),
+                    adjustment_reference='TEST-REFUND-BYPASS',
+                    reason='Attempt to bypass approval',
+                    recorded_by=self.sales_manager,
+                    status=CustomerPaymentAdjustment.Status.APPROVED,
+                    approved_by=self.comptroller,
+                    approved_at=timezone.now(),
+                )
+
+        self.assertFalse(
+            CustomerPaymentAdjustment.objects.filter(
+                adjustment_reference='TEST-REFUND-BYPASS',
+            ).exists()
+        )
+    def test_approved_refund_reduces_net_received(self):
+        self.payment.amount = Decimal('1000.00')
+        self.payment.save(update_fields=['amount'])
+
+        verify_customer_payment(self.comptroller, self.payment.id)
+
+        before = get_project_payment_status(self.project.id)
+        self.assertTrue(before['paid_in_full'])
+        self.assertEqual(before['net_received'], Decimal('1000.00'))
+
+        adjustment = CustomerPaymentAdjustment.objects.create(
+            payment=self.payment,
+            kind=CustomerPaymentAdjustment.Kind.REFUND,
+            amount=Decimal('200.00'),
+            adjustment_date=date(2026, 10, 8),
+            adjustment_reference='TEST-NET-REFUND-001',
+            reason='Verify refund reduces project balance',
+            recorded_by=self.sales_manager,
+        )
+
+        pending = get_project_payment_status(self.project.id)
+        self.assertEqual(pending['net_received'], Decimal('1000.00'))
+
+        approve_customer_payment_adjustment(
+            self.comptroller,
+            adjustment.id,
+        )
+
+        after = get_project_payment_status(self.project.id)
+        self.assertEqual(after['verified_total'], Decimal('1000.00'))
+        self.assertEqual(after['adjustment_total'], Decimal('200.00'))
+        self.assertEqual(after['net_received'], Decimal('800.00'))
+        self.assertEqual(after['outstanding_balance'], Decimal('200.00'))
+        self.assertFalse(after['paid_in_full'])
