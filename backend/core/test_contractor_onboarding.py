@@ -66,14 +66,13 @@ class ContractorOnboardingTests(TestCase):
             ContractorOnboardingDocument.Kind.LICENSE_FRONT,
             ContractorOnboardingDocument.Kind.LICENSE_BACK,
         ):
-            ContractorOnboardingDocument.objects.create(
+            document = ContractorOnboardingDocument.objects.create(
                 engagement=engagement,
                 kind=kind,
                 storage_reference='test-only-reference',
-                status=ContractorOnboardingDocument.Status.APPROVED,
-                reviewed_by=comptroller,
-                reviewed_at=__import__('django.utils.timezone', fromlist=['now']).now(),
             )
+            from .contractor_services import approve_onboarding_document
+            approve_onboarding_document(comptroller, document.id)
 
         with self.assertRaises(ValidationError):
             activate_contractor_engagement(comptroller, engagement.id)
@@ -115,14 +114,13 @@ class ContractorOnboardingTests(TestCase):
             ContractorOnboardingDocument.Kind.LICENSE_BACK,
             ContractorOnboardingDocument.Kind.AGREEMENT,
         ):
-            ContractorOnboardingDocument.objects.create(
+            document = ContractorOnboardingDocument.objects.create(
                 engagement=engagement,
                 kind=kind,
                 storage_reference='test-only-reference',
-                status=ContractorOnboardingDocument.Status.APPROVED,
-                reviewed_by=comptroller,
-                reviewed_at=timezone.now(),
             )
+            from .contractor_services import approve_onboarding_document
+            approve_onboarding_document(comptroller, document.id)
 
         activate_contractor_engagement(comptroller, engagement.id)
 
@@ -227,14 +225,13 @@ class ContractorOnboardingTests(TestCase):
             ContractorOnboardingDocument.Kind.LICENSE_BACK,
             ContractorOnboardingDocument.Kind.AGREEMENT,
         ):
-            ContractorOnboardingDocument.objects.create(
+            document = ContractorOnboardingDocument.objects.create(
                 engagement=engagement,
                 kind=kind,
                 storage_reference='test-only-reference',
-                status=ContractorOnboardingDocument.Status.APPROVED,
-                reviewed_by=comptroller,
-                reviewed_at=timezone.now(),
             )
+            from .contractor_services import approve_onboarding_document
+            approve_onboarding_document(comptroller, document.id)
 
         with self.assertRaises(PermissionDenied):
             activate_contractor_engagement(manager, engagement.id)
@@ -248,6 +245,7 @@ class ContractorOnboardingTests(TestCase):
 
     def test_sales_manager_cannot_approve_onboarding_document(self):
         from rest_framework.exceptions import PermissionDenied
+        from .models import ContractorOnboardingDocument
         from .models import ContractorOnboardingDocument
         from .contractor_services import approve_onboarding_document
 
@@ -298,6 +296,7 @@ class ContractorOnboardingTests(TestCase):
 
     def test_comptroller_approval_records_audit_event(self):
         from .models import ContractorOnboardingDocument, AuditEvent
+        from .models import ContractorOnboardingDocument
         from .contractor_services import approve_onboarding_document
 
         comptroller = User.objects.create_user(
@@ -355,6 +354,7 @@ class ContractorOnboardingTests(TestCase):
     def test_document_cannot_be_approved_twice(self):
         from rest_framework.exceptions import ValidationError
         from .models import ContractorOnboardingDocument, AuditEvent
+        from .models import ContractorOnboardingDocument
         from .contractor_services import approve_onboarding_document
 
         comptroller = User.objects.create_user(
@@ -406,6 +406,7 @@ class ContractorOnboardingTests(TestCase):
     def test_document_without_storage_reference_cannot_be_approved(self):
         from rest_framework.exceptions import ValidationError
         from .models import ContractorOnboardingDocument, AuditEvent
+        from .models import ContractorOnboardingDocument
         from .contractor_services import approve_onboarding_document
 
         comptroller = User.objects.create_user(
@@ -451,4 +452,139 @@ class ContractorOnboardingTests(TestCase):
                 action='contractor.document.approved',
                 entity_id=document.id,
             ).exists()
+        )
+
+
+    def test_approved_document_rejects_direct_database_update(self):
+        from django.db import DatabaseError, transaction
+        from .models import ContractorOnboardingDocument
+        from .contractor_services import approve_onboarding_document
+
+        comptroller = User.objects.create_user(
+            username='test_immutable_document',
+            password='TestPassword123!',
+            role=Role.COMPTROLLER,
+            initials='ID',
+        )
+
+        contractor = Contractor.objects.create(
+            contractor_number='CTR-TEST-010',
+            legal_name='Document Integrity Test',
+            created_by=comptroller,
+        )
+
+        engagement = ContractorEngagement.objects.create(
+            contractor=contractor,
+            engagement_code='CTR-TEST-010-01',
+            role_description='Technical Associate',
+            created_by=comptroller,
+        )
+
+        document = ContractorOnboardingDocument.objects.create(
+            engagement=engagement,
+            kind=ContractorOnboardingDocument.Kind.W9,
+            storage_reference='original-test-reference',
+        )
+
+        approve_onboarding_document(comptroller, document.id)
+
+        with self.assertRaises(DatabaseError):
+            with transaction.atomic():
+                ContractorOnboardingDocument.objects.filter(
+                    pk=document.id
+                ).update(storage_reference='tampered-reference')
+
+        document.refresh_from_db()
+        self.assertEqual(
+            document.storage_reference,
+            'original-test-reference',
+        )
+
+
+    def test_approved_document_rejects_direct_database_delete(self):
+        from django.db import DatabaseError, transaction
+        from .models import ContractorOnboardingDocument
+        from .contractor_services import approve_onboarding_document
+
+        comptroller = User.objects.create_user(
+            username='test_document_delete_guard',
+            password='TestPassword123!',
+            role=Role.COMPTROLLER,
+            initials='DG',
+        )
+
+        contractor = Contractor.objects.create(
+            contractor_number='CTR-TEST-011',
+            legal_name='Document Deletion Test',
+            created_by=comptroller,
+        )
+
+        engagement = ContractorEngagement.objects.create(
+            contractor=contractor,
+            engagement_code='CTR-TEST-011-01',
+            role_description='Technical Associate',
+            created_by=comptroller,
+        )
+
+        document = ContractorOnboardingDocument.objects.create(
+            engagement=engagement,
+            kind=ContractorOnboardingDocument.Kind.W9,
+            storage_reference='deletion-test-reference',
+        )
+
+        approve_onboarding_document(comptroller, document.id)
+
+        with self.assertRaises(DatabaseError):
+            with transaction.atomic():
+                ContractorOnboardingDocument.objects.filter(
+                    pk=document.id
+                ).delete()
+
+        self.assertTrue(
+            ContractorOnboardingDocument.objects.filter(
+                pk=document.id
+            ).exists()
+        )
+
+
+    def test_database_rejects_approval_without_comptroller_review(self):
+        from django.db import DatabaseError, transaction
+        from .models import ContractorOnboardingDocument
+
+        comptroller = User.objects.create_user(
+            username='test_invalid_approval',
+            password='TestPassword123!',
+            role=Role.COMPTROLLER,
+            initials='IA',
+        )
+
+        contractor = Contractor.objects.create(
+            contractor_number='CTR-TEST-012',
+            legal_name='Invalid Approval Test',
+            created_by=comptroller,
+        )
+
+        engagement = ContractorEngagement.objects.create(
+            contractor=contractor,
+            engagement_code='CTR-TEST-012-01',
+            role_description='Technical Associate',
+            created_by=comptroller,
+        )
+
+        document = ContractorOnboardingDocument.objects.create(
+            engagement=engagement,
+            kind=ContractorOnboardingDocument.Kind.W9,
+            storage_reference='invalid-approval-test-reference',
+        )
+
+        with self.assertRaises(DatabaseError):
+            with transaction.atomic():
+                ContractorOnboardingDocument.objects.filter(
+                    pk=document.id
+                ).update(status=ContractorOnboardingDocument.Status.APPROVED)
+
+        document.refresh_from_db()
+        self.assertEqual(
+            document.status,
+            ContractorOnboardingDocument.Status.PENDING,
         )
