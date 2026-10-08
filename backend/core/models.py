@@ -619,3 +619,78 @@ class CustomerPaymentAdjustment(Entity):
             f'{self.payment.payment_reference} - '
             f'{self.kind} - ${self.amount}'
         )
+
+class ProjectCostRecord(Entity):
+    """Versioned project costs linked to an approved MSR."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        APPROVED = 'APPROVED', 'Approved'
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.PROTECT,
+        related_name='cost_records',
+    )
+    msr = models.ForeignKey(
+        MSR,
+        on_delete=models.PROTECT,
+        related_name='cost_records',
+    )
+    version = models.PositiveIntegerField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+
+    equipment_cost = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+    )
+    material_cost = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+    )
+    dealer_fee = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+    )
+    technician_cost = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+    )
+    lead_cost = models.DecimalField(
+        max_digits=12, decimal_places=2, default=3000,
+    )
+    damon_cost = models.DecimalField(
+        max_digits=12, decimal_places=2, default=500,
+    )
+    jerry_cost = models.DecimalField(
+        max_digits=12, decimal_places=2, default=250,
+    )
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='project_cost_records_created',
+    )
+    approved_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='project_cost_records_approved',
+    )
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['project', 'version'],
+                name='project_cost_version_unique',
+            ),
+        ]
+        ordering = ['project', '-version']
+
+    def __str__(self):
+        return f'{self.project.code} - Costs v{self.version}'
