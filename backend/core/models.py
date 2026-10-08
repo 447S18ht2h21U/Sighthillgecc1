@@ -317,3 +317,115 @@ class SigningTestDocument(ImmutableSigningTestRecord):
     pdf_sha256 = models.CharField(max_length=64)
     class Meta:
         constraints = [models.UniqueConstraint(fields=['attempt','document_id'], name='signing_test_document_unique')]
+
+class Contractor(Entity):
+    """Permanent identity for a GECC independent contractor."""
+
+    contractor_number = models.CharField(max_length=20, unique=True)
+    legal_name = models.CharField(max_length=250)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=40, blank=True)
+    mailing_address = models.TextField(blank=True)
+
+    user = models.OneToOneField(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='contractor_profile',
+    )
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='contractors_created',
+    )
+
+    def __str__(self):
+        return f"{self.contractor_number} - {self.legal_name}"
+
+class ContractorEngagement(Entity):
+    """A distinct period of service for a GECC contractor."""
+
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending Onboarding'
+        ACTIVE = 'ACTIVE', 'Active'
+        INACTIVE = 'INACTIVE', 'Inactive'
+        TERMINATED = 'TERMINATED', 'Terminated'
+
+    contractor = models.ForeignKey(
+        Contractor,
+        on_delete=models.PROTECT,
+        related_name='engagements',
+    )
+
+    engagement_code = models.CharField(max_length=30, unique=True)
+    role_description = models.CharField(max_length=150)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='contractor_engagements_created',
+    )
+
+    class Meta:
+        ordering = ['contractor', 'start_date']
+
+    def __str__(self):
+        return f"{self.engagement_code} - {self.contractor.legal_name}"
+
+class ContractorOnboardingDocument(Entity):
+    """Tracks restricted contractor onboarding documents."""
+
+    class Kind(models.TextChoices):
+        W9 = 'W9', 'W-9 Tax Form'
+        LICENSE_FRONT = 'LICENSE_FRONT', "Driver's License Front"
+        LICENSE_BACK = 'LICENSE_BACK', "Driver's License Back"
+        AGREEMENT = 'AGREEMENT', 'Independent Contractor Agreement'
+
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending Review'
+        APPROVED = 'APPROVED', 'Approved'
+        REJECTED = 'REJECTED', 'Rejected'
+
+    engagement = models.ForeignKey(
+        ContractorEngagement,
+        on_delete=models.PROTECT,
+        related_name='onboarding_documents',
+    )
+
+    kind = models.CharField(max_length=30, choices=Kind.choices)
+    storage_reference = models.CharField(max_length=500)
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    reviewed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='contractor_documents_reviewed',
+    )
+
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_note = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['engagement', 'kind', '-uploaded_at']
+
+    def __str__(self):
+        return f"{self.engagement.engagement_code} - {self.kind}"
