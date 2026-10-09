@@ -10,10 +10,17 @@ from .financial_report_services import (
     create_income_statement,
     approve_financial_report,
 )
+from .payment_services import (
+    verify_customer_payment,
+)
+from .financial_report_services import (
+    create_balance_sheet,
+)
 from .models import (
     MSR,
     Project,
     Customer,
+	CustomerPayment,
     ProjectCostRecord,
     Contractor,
     ContractorEngagement,
@@ -382,4 +389,66 @@ class FinancialReportTests(TestCase):
         self.assertEqual(
             report.status,
             FinancialReport.Status.APPROVED,
+        )
+
+    def test_balance_sheet_calculates_assets_and_liabilities(self):
+
+        from .models import CustomerPayment
+
+        payment = CustomerPayment.objects.create(
+            project=self.project,
+            msr=self.msr,
+            kind=CustomerPayment.Kind.FULL,
+            amount=Decimal('10000.00'),
+            received_date=date(2026, 10, 15),
+            payment_reference='FIN-BS-001',
+            recorded_by=self.comptroller,
+        )
+
+        verify_customer_payment(
+            self.comptroller,
+            payment.id,
+        )
+        payment.refresh_from_db()
+
+        print(
+            'BALANCE SHEET PAYMENT:',
+            payment.status,
+            payment.amount,
+            payment.received_date,
+        )
+        self.create_paid_contractor_payment()
+
+        self.create_paid_employee_payroll()
+
+        report = create_balance_sheet(
+            self.comptroller,
+            date(2026, 10, 15),
+        )
+
+        self.assertEqual(
+            report.kind,
+            FinancialReport.Kind.BALANCE_SHEET,
+        )
+
+        snapshot = report.report_snapshot
+
+        self.assertEqual(
+            snapshot['cash'],
+            '10000.00',
+        )
+
+        self.assertEqual(
+            snapshot['contractor_liabilities'],
+            '0.00',
+        )
+
+        self.assertEqual(
+            snapshot['employee_payroll_liabilities'],
+            '0.00',
+        )
+
+        self.assertEqual(
+            snapshot['total_assets'],
+            '10000.00',
         )

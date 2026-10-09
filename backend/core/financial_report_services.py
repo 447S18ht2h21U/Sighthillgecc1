@@ -13,9 +13,9 @@ from .models import (
     ContractorPaymentRecord,
     EmployeePayrollRecord,
     CommissionRecord,
+    CustomerPayment,
 )
 from .services import audit
-
 
 @transaction.atomic
 def create_income_statement(
@@ -188,6 +188,91 @@ def approve_financial_report(
             'period_start': str(report.period_start),
             'period_end': str(report.period_end),
         },
+    )
+
+    return report
+
+@transaction.atomic
+def create_balance_sheet(
+    actor,
+    period_end,
+):
+    """
+    Create a draft balance sheet snapshot.
+    """
+
+    existing = FinancialReport.objects.filter(
+        kind=FinancialReport.Kind.BALANCE_SHEET,
+        period_start=period_end,
+        period_end=period_end,
+    ).first()
+
+    if existing:
+        raise ValidationError(
+            'A balance sheet already exists for this period.'
+        )
+
+    verified_payments = CustomerPayment.objects.filter(
+        status=CustomerPayment.Status.VERIFIED,
+        received_date__lte=period_end,
+    )
+
+    cash = sum(
+        (
+            payment.amount
+            for payment in verified_payments
+        ),
+        Decimal('0.00'),
+    )
+
+    contractor_liabilities = sum(
+        (
+            record.final_amount
+            for record in ContractorPaymentRecord.objects.filter(
+                status=ContractorPaymentRecord.Status.APPROVED,
+            )
+        ),
+        Decimal('0.00'),
+    )
+
+    employee_liabilities = sum(
+        (
+            record.net_amount
+            for record in EmployeePayrollRecord.objects.filter(
+                status=EmployeePayrollRecord.Status.APPROVED,
+            )
+        ),
+        Decimal('0.00'),
+    )
+
+    snapshot = {
+        'cash': str(cash),
+        'contractor_liabilities': str(
+            contractor_liabilities
+        ),
+        'employee_payroll_liabilities': str(
+            employee_liabilities
+        ),
+        'total_assets': str(cash),
+        'total_liabilities': str(
+            contractor_liabilities
+            + employee_liabilities
+        ),
+    }
+
+    report = FinancialReport.objects.create(
+        kind=FinancialReport.Kind.BALANCE_SHEET,
+        period_start=period_end,
+        period_end=period_end,
+        report_snapshot=snapshot,
+        created_by=actor,
+    )
+
+    audit(
+        actor,
+        'financial_report.balance_sheet.created',
+        report.id,
+        snapshot,
     )
 
     return report
