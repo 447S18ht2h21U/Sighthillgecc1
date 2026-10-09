@@ -796,3 +796,65 @@ class CommissionRecord(Entity):
             f'{self.project.code} - '
             f'{self.kind} - ${self.final_amount}'
         )
+
+class CommissionReport(Entity):
+    """Biweekly commission report snapshot and approval record."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        APPROVED = 'APPROVED', 'Approved'
+
+    period_start = models.DateField()
+
+    period_end = models.DateField()
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+
+    report_snapshot = models.JSONField(
+        default=dict,
+    )
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='commission_reports_created',
+    )
+
+    approved_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='commission_reports_approved',
+    )
+
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    'period_start',
+                    'period_end',
+                ],
+                name='commission_report_period_unique',
+            ),
+        ]
+
+        ordering = [
+            '-period_end',
+            '-created_at',
+        ]
+
+    def __str__(self):
+        return (
+            f'Commission Report '
+            f'{self.period_start} to {self.period_end}'
+        )
