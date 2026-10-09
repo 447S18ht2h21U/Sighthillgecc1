@@ -694,3 +694,105 @@ class ProjectCostRecord(Entity):
 
     def __str__(self):
         return f'{self.project.code} - Costs v{self.version}'
+
+class CommissionRecord(Entity):
+    """Versioned earned commission record from approved calculations."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        APPROVED = 'APPROVED', 'Approved'
+
+    class Kind(models.TextChoices):
+        RYAN_VARIABLE = 'RYAN_VARIABLE', 'Ryan Variable Commission'
+        DOUG_VARIABLE = 'DOUG_VARIABLE', 'Doug Variable Commission'
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.PROTECT,
+        related_name='commission_records',
+    )
+
+    msr = models.ForeignKey(
+        MSR,
+        on_delete=models.PROTECT,
+        related_name='commission_records',
+    )
+
+    kind = models.CharField(
+        max_length=32,
+        choices=Kind.choices,
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+
+    recipient = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='commission_records_received',
+    )
+
+    rate = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+    )
+
+    basis_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    deduction_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+    )
+
+    final_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    calculation_snapshot = models.JSONField(
+        default=dict,
+    )
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='commission_records_created',
+    )
+
+    approved_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='commission_records_approved',
+    )
+
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    'project',
+                    'kind',
+                ],
+                name='project_commission_kind_unique',
+            ),
+        ]
+        ordering = ['project', 'kind']
+
+    def __str__(self):
+        return (
+            f'{self.project.code} - '
+            f'{self.kind} - ${self.final_amount}'
+        )
