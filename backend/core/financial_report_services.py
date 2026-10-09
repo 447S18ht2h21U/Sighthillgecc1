@@ -14,7 +14,9 @@ from .models import (
     EmployeePayrollRecord,
     CommissionRecord,
     CustomerPayment,
+    EmployeeProjectAllocation,
 )
+
 from .services import audit
 
 @transaction.atomic
@@ -371,6 +373,137 @@ def create_cash_flow_statement(
     audit(
         actor,
         'financial_report.cash_flow.created',
+        report.id,
+        snapshot,
+    )
+
+    return report
+
+@transaction.atomic
+def create_project_profitability_report(
+    actor,
+    project,
+):
+    """
+    Create a project profitability snapshot.
+    """
+
+    existing = FinancialReport.objects.filter(
+        kind=FinancialReport.Kind.PROJECT_PROFITABILITY,
+        period_start=project.created_at.date(),
+        period_end=project.created_at.date(),
+    ).first()
+
+    if existing:
+        raise ValidationError(
+            'A project profitability report already exists.'
+        )
+
+    revenue = Decimal(
+        str(
+            project.current_approved.snapshot.get(
+                'total_price',
+                '0'
+            )
+        )
+    )
+
+    cost_records = ProjectCostRecord.objects.filter(
+        project=project,
+        status=ProjectCostRecord.Status.APPROVED,
+    )
+
+    direct_costs = sum(
+        (
+            record.equipment_cost
+            + record.material_cost
+            + record.dealer_fee
+            + record.technician_cost
+            + record.lead_cost
+            + record.damon_cost
+            + record.jerry_cost
+            for record in cost_records
+        ),
+        Decimal('0.00'),
+    )
+
+    employee_expense = Decimal('0.00')
+
+    allocations = EmployeeProjectAllocation.objects.filter(
+        project=project,
+        status=EmployeeProjectAllocation.Status.APPROVED,
+    )
+
+    for allocation in allocations:
+
+        payroll_records = EmployeePayrollRecord.objects.filter(
+            employee=allocation.employee,
+            status=EmployeePayrollRecord.Status.PAID,
+        )
+
+        allocated_amount = sum(
+            (
+                payroll.net_amount
+                * allocation.allocation_percentage
+                / Decimal('100.00')
+                for payroll in payroll_records
+            ),
+            Decimal('0.00'),
+        )
+
+        employee_expense += allocated_amount
+
+    contractor_expense = sum(
+        (
+            payment.final_amount
+            for payment in ContractorPaymentRecord.objects.filter(
+                project=project,
+                status=ContractorPaymentRecord.Status.PAID,
+            )
+        ),
+        Decimal('0.00'),
+    )
+
+    commission_expense = sum(
+        (
+            commission.final_amount
+            for commission in CommissionRecord.objects.filter(
+                project=project,
+                status=CommissionRecord.Status.APPROVED,
+            )
+        ),
+        Decimal('0.00'),
+    )
+
+    gross_margin = (
+        revenue
+        - direct_costs
+        - contractor_expense
+        - employee_expense
+        - commission_expense
+    )
+
+    snapshot = {
+        'project_id': str(project.id),
+        'revenue': str(revenue),
+        'direct_costs': str(direct_costs),
+        'contractor_expense': str(contractor_expense),
+        'employee_expense': str(employee_expense),
+        'commission_expense': str(commission_expense),
+        'gross_margin': str(gross_margin),
+    }
+
+    report = FinancialReport.objects.create(
+        kind=FinancialReport.Kind.PROJECT_PROFITABILITY,
+        period_start=project.created_at.date(),
+        period_end=project.created_at.date(),
+        report_snapshot=snapshot,
+        created_by=actor,
+    )
+
+    audit(
+        actor,
+        'financial_report.project_profitability.created',
         report.id,
         snapshot,
     )

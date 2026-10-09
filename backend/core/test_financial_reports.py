@@ -6,23 +6,32 @@ from django.utils import timezone
 
 from rest_framework.exceptions import ValidationError
 
+from .employee_project_allocation_services import (
+    approve_employee_project_allocation,
+)
+
 from .financial_report_services import (
     create_income_statement,
     create_balance_sheet,
     create_cash_flow_statement,
+    create_project_profitability_report,
     approve_financial_report,
 )
+
 from .payment_services import (
     verify_customer_payment,
 )
+
 from .financial_report_services import (
     create_balance_sheet,
 )
+
 from .models import (
     MSR,
     Project,
     Customer,
-	CustomerPayment,
+    EmployeeProjectAllocation,
+    CustomerPayment,
     ProjectCostRecord,
     Contractor,
     ContractorEngagement,
@@ -36,17 +45,21 @@ from .models import (
     Role,
     User,
 )
+
 from .project_cost_services import approve_project_cost_record
+
 from .contractor_payment_services import (
     create_contractor_payment_record,
     approve_contractor_payment_record,
     mark_contractor_payment_paid,
 )
+
 from .employee_payroll_services import (
     create_employee_payroll_record,
     approve_employee_payroll_record,
     mark_employee_payroll_paid,
 )
+
 from .commission_record_services import (
     approve_commission_record,
 )
@@ -90,17 +103,22 @@ class FinancialReportTests(TestCase):
             approved_by=self.comptroller,
             approved_at=timezone.now(),
         )
-
+        
         self.project.current_approved = self.msr
         self.project.save(
             update_fields=['current_approved']
         )
 
+        self.employee = Employee.objects.create(
+            employee_number='EMP-001',
+            legal_name='Financial Report Employee',
+            hire_date=date(2026, 10, 1),
+            created_by=self.comptroller,
+        )
         self.cost_record = ProjectCostRecord.objects.create(
             project=self.project,
             msr=self.msr,
             version=1,
-            equipment_cost=Decimal('2000.00'),
             material_cost=Decimal('1000.00'),
             dealer_fee=Decimal('500.00'),
             technician_cost=Decimal('750.00'),
@@ -113,6 +131,44 @@ class FinancialReportTests(TestCase):
         approve_project_cost_record(
             self.comptroller,
             self.cost_record.id,
+        )
+
+    def test_project_profitability_uses_allocated_employee_labor(self):
+
+        allocation = EmployeeProjectAllocation.objects.create(
+            employee=self.employee,
+            project=self.project,
+            allocation_percentage=Decimal('100.00'),
+            effective_date=date(2026, 10, 1),
+            created_by=self.comptroller,
+        )
+
+        approve_employee_project_allocation(
+            self.comptroller,
+            allocation.id,
+        )
+
+        self.create_paid_employee_payroll()
+
+        self.create_paid_contractor_payment()
+
+        self.create_approved_commission()
+
+        report = create_project_profitability_report(
+            self.comptroller,
+            self.project,
+        )
+
+        self.assertEqual(
+            report.kind,
+            FinancialReport.Kind.PROJECT_PROFITABILITY,
+        )
+
+        snapshot = report.report_snapshot
+
+        self.assertEqual(
+            snapshot['employee_expense'],
+            '2000.00',
         )
 
     def create_paid_contractor_payment(self):
@@ -173,14 +229,8 @@ class FinancialReportTests(TestCase):
 
     def create_paid_employee_payroll(self):
 
-        employee = Employee.objects.create(
-            employee_number='EMP-FIN-001',
-            legal_name='Financial Employee',
-            hire_date=date(2026, 10, 1),
-            status=Employee.Status.ACTIVE,
-            created_by=self.comptroller,
-        )
-
+        employee = self.employee
+        
         plan = EmployeeCompensationPlan.objects.create(
             employee=employee,
             version=1,
@@ -273,12 +323,12 @@ class FinancialReportTests(TestCase):
 
         self.assertEqual(
             snapshot['direct_costs'],
-            '8000.00',
+            '6000.00',
         )
 
         self.assertEqual(
             snapshot['gross_profit'],
-            '2000.00',
+            '4000.00',
         )
 
         self.assertEqual(
@@ -298,7 +348,7 @@ class FinancialReportTests(TestCase):
 
         self.assertEqual(
             snapshot['net_income'],
-            '-1450.00',
+            '550.00',
         )
 
     def test_financial_report_can_be_approved(self):

@@ -1,4 +1,4 @@
-import uuid
+﻿import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.exceptions import ValidationError
@@ -1107,6 +1107,7 @@ class EmployeeCompensationPlan(Entity):
 class EmployeePayrollRecord(Entity):
     """Auditable employee payroll obligation and settlement record."""
 
+
     class Status(models.TextChoices):
         DRAFT = 'DRAFT', 'Draft'
         APPROVED = 'APPROVED', 'Approved'
@@ -1201,6 +1202,77 @@ class EmployeePayrollRecord(Entity):
             f'{self.kind} ${self.net_amount}'
         )
 
+
+class EmployeeProjectAllocation(Entity):
+    """Controlled allocation of employee labor cost to projects."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        APPROVED = 'APPROVED', 'Approved'
+        SUPERSEDED = 'SUPERSEDED', 'Superseded'
+
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.PROTECT,
+        related_name='project_allocations',
+    )
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.PROTECT,
+        related_name='employee_allocations',
+    )
+
+    allocation_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+    )
+
+    effective_date = models.DateField()
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='employee_project_allocations_created',
+    )
+
+    approved_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='employee_project_allocations_approved',
+    )
+
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    'employee',
+                    'project',
+                    'effective_date',
+                ],
+                name='employee_project_allocation_unique',
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f'{self.employee.legal_name} - '
+            f'{self.project.code} - '
+            f'{self.allocation_percentage}%'
+        )
 class PayrollSummary(Entity):
     """Controlled payroll reporting snapshot."""
 
@@ -1368,3 +1440,4 @@ class FinancialReport(Entity):
             f'{self.kind} '
             f'{self.period_start} to {self.period_end}'
         )
+
