@@ -858,3 +858,116 @@ class CommissionReport(Entity):
             f'Commission Report '
             f'{self.period_start} to {self.period_end}'
         )
+
+class ContractorPaymentRecord(Entity):
+    """Auditable contractor payment obligation and settlement record."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        APPROVED = 'APPROVED', 'Approved'
+        PAID = 'PAID', 'Paid'
+
+    class Kind(models.TextChoices):
+        FIXED_COMPENSATION = (
+            'FIXED_COMPENSATION',
+            'Fixed Compensation',
+        )
+        COMMISSION = (
+            'COMMISSION',
+            'Commission',
+        )
+        ADJUSTMENT = (
+            'ADJUSTMENT',
+            'Adjustment',
+        )
+
+    engagement = models.ForeignKey(
+        ContractorEngagement,
+        on_delete=models.PROTECT,
+        related_name='payment_records',
+    )
+
+    compensation_plan = models.ForeignKey(
+        ContractorCompensationPlan,
+        on_delete=models.PROTECT,
+        related_name='payment_records',
+    )
+
+    project = models.ForeignKey(
+        Project,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='contractor_payment_records',
+    )
+
+    kind = models.CharField(
+        max_length=32,
+        choices=Kind.choices,
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+
+    payment_period_start = models.DateField()
+
+    payment_period_end = models.DateField()
+
+    basis_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    deduction_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+    )
+
+    final_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    calculation_snapshot = models.JSONField(
+        default=dict,
+    )
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='contractor_payment_records_created',
+    )
+
+    approved_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='contractor_payment_records_approved',
+    )
+
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    paid_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = [
+            '-payment_period_end',
+            '-created_at',
+        ]
+
+    def __str__(self):
+        return (
+            f'{self.engagement.engagement_code} '
+            f'{self.kind} ${self.final_amount}'
+        )
