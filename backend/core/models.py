@@ -971,3 +971,232 @@ class ContractorPaymentRecord(Entity):
             f'{self.engagement.engagement_code} '
             f'{self.kind} ${self.final_amount}'
         )
+
+class Employee(Entity):
+    """GECC employee payroll identity."""
+
+    class Status(models.TextChoices):
+        ACTIVE = 'ACTIVE', 'Active'
+        INACTIVE = 'INACTIVE', 'Inactive'
+        TERMINATED = 'TERMINATED', 'Terminated'
+
+    employee_number = models.CharField(
+        max_length=20,
+        unique=True,
+    )
+
+    legal_name = models.CharField(
+        max_length=250,
+    )
+
+    email = models.EmailField(
+        blank=True,
+    )
+
+    phone = models.CharField(
+        max_length=40,
+        blank=True,
+    )
+
+    user = models.OneToOneField(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='employee_profile',
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
+
+    hire_date = models.DateField()
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='employees_created',
+    )
+
+    def __str__(self):
+        return (
+            f'{self.employee_number} - '
+            f'{self.legal_name}'
+        )
+
+class EmployeeCompensationPlan(Entity):
+    """Versioned compensation terms for a GECC employee."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        APPROVED = 'APPROVED', 'Approved'
+        SUPERSEDED = 'SUPERSEDED', 'Superseded'
+
+    class Kind(models.TextChoices):
+        SALARY = 'SALARY', 'Salary'
+        HOURLY = 'HOURLY', 'Hourly'
+
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.PROTECT,
+        related_name='compensation_plans',
+    )
+
+    version = models.PositiveIntegerField()
+
+    kind = models.CharField(
+        max_length=20,
+        choices=Kind.choices,
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+
+    effective_date = models.DateField()
+
+    compensation_terms = models.JSONField(
+        default=dict,
+    )
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='employee_compensation_plans_created',
+    )
+
+    approved_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='employee_compensation_plans_approved',
+    )
+
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    'employee',
+                    'version',
+                ],
+                name='employee_compensation_version_unique',
+            ),
+        ]
+
+        ordering = [
+            'employee',
+            '-version',
+        ]
+
+    def __str__(self):
+        return (
+            f'{self.employee.employee_number} '
+            f'Compensation v{self.version}'
+        )
+
+class EmployeePayrollRecord(Entity):
+    """Auditable employee payroll obligation and settlement record."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        APPROVED = 'APPROVED', 'Approved'
+        PAID = 'PAID', 'Paid'
+
+    class Kind(models.TextChoices):
+        SALARY = 'SALARY', 'Salary'
+        HOURLY = 'HOURLY', 'Hourly'
+        BONUS = 'BONUS', 'Bonus'
+        ADJUSTMENT = 'ADJUSTMENT', 'Adjustment'
+
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.PROTECT,
+        related_name='payroll_records',
+    )
+
+    compensation_plan = models.ForeignKey(
+        EmployeeCompensationPlan,
+        on_delete=models.PROTECT,
+        related_name='payroll_records',
+    )
+
+    kind = models.CharField(
+        max_length=32,
+        choices=Kind.choices,
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+
+    payroll_period_start = models.DateField()
+
+    payroll_period_end = models.DateField()
+
+    gross_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    deduction_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+    )
+
+    net_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    calculation_snapshot = models.JSONField(
+        default=dict,
+    )
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='employee_payroll_records_created',
+    )
+
+    approved_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='employee_payroll_records_approved',
+    )
+
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    paid_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = [
+            '-payroll_period_end',
+            '-created_at',
+        ]
+
+    def __str__(self):
+        return (
+            f'{self.employee.employee_number} '
+            f'{self.kind} ${self.net_amount}'
+        )
