@@ -1279,3 +1279,92 @@ class PayrollSummary(Entity):
             f'Payroll Summary '
             f'{self.period_start} to {self.period_end}'
         )
+
+class FinancialReport(Entity):
+    """Controlled corporate financial reporting snapshot."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        APPROVED = 'APPROVED', 'Approved'
+
+    class Kind(models.TextChoices):
+        INCOME_STATEMENT = (
+            'INCOME_STATEMENT',
+            'Income Statement',
+        )
+
+        BALANCE_SHEET = (
+            'BALANCE_SHEET',
+            'Balance Sheet',
+        )
+
+        CASH_FLOW = (
+            'CASH_FLOW',
+            'Cash Flow Statement',
+        )
+
+        PROJECT_PROFITABILITY = (
+            'PROJECT_PROFITABILITY',
+            'Project Profitability',
+        )
+
+    kind = models.CharField(
+        max_length=32,
+        choices=Kind.choices,
+    )
+
+    period_start = models.DateField()
+
+    period_end = models.DateField()
+
+    report_snapshot = models.JSONField(
+        default=dict,
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='financial_reports_created',
+    )
+
+    approved_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='financial_reports_approved',
+    )
+
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    'kind',
+                    'period_start',
+                    'period_end',
+                ],
+                name='financial_report_period_unique',
+            ),
+        ]
+
+        ordering = [
+            '-period_end',
+            'kind',
+        ]
+
+    def __str__(self):
+        return (
+            f'{self.kind} '
+            f'{self.period_start} to {self.period_end}'
+        )
