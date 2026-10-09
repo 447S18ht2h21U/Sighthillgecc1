@@ -1200,3 +1200,82 @@ class EmployeePayrollRecord(Entity):
             f'{self.employee.employee_number} '
             f'{self.kind} ${self.net_amount}'
         )
+
+class PayrollSummary(Entity):
+    """Controlled payroll reporting snapshot."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        APPROVED = 'APPROVED', 'Approved'
+
+    period_start = models.DateField()
+
+    period_end = models.DateField()
+
+    contractor_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+    )
+
+    employee_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+    )
+
+    total_payroll_expense = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    summary_snapshot = models.JSONField(
+        default=dict,
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='payroll_summaries_created',
+    )
+
+    approved_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='payroll_summaries_approved',
+    )
+
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    'period_start',
+                    'period_end',
+                ],
+                name='payroll_summary_period_unique',
+            ),
+        ]
+
+        ordering = [
+            '-period_end',
+            '-created_at',
+        ]
+
+    def __str__(self):
+        return (
+            f'Payroll Summary '
+            f'{self.period_start} to {self.period_end}'
+        )
