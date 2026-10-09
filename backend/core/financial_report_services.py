@@ -1,4 +1,4 @@
-"""GECC corporate financial reporting services."""
+﻿"""GECC corporate financial reporting services."""
 
 from decimal import Decimal
 
@@ -128,7 +128,6 @@ def create_income_statement(
         'commission_expense': str(commission_expense),
         'net_income': str(net_income),
     }
-
     report = FinancialReport.objects.create(
         kind=FinancialReport.Kind.INCOME_STATEMENT,
         period_start=period_start,
@@ -145,7 +144,6 @@ def create_income_statement(
     )
 
     return report
-
 
 @transaction.atomic
 def approve_financial_report(
@@ -271,6 +269,108 @@ def create_balance_sheet(
     audit(
         actor,
         'financial_report.balance_sheet.created',
+        report.id,
+        snapshot,
+    )
+
+    return report
+
+@transaction.atomic
+def create_cash_flow_statement(
+    actor,
+    period_start,
+    period_end,
+):
+    """
+    Create a draft cash flow statement snapshot.
+    """
+
+    existing = FinancialReport.objects.filter(
+        kind=FinancialReport.Kind.CASH_FLOW,
+        period_start=period_start,
+        period_end=period_end,
+    ).first()
+
+    if existing:
+        raise ValidationError(
+            'A cash flow statement already exists for this period.'
+        )
+
+    cash_received = sum(
+        (
+            payment.amount
+            for payment in CustomerPayment.objects.filter(
+                status=CustomerPayment.Status.VERIFIED,
+                received_date__gte=period_start,
+                received_date__lte=period_end,
+            )
+        ),
+        Decimal('0.00'),
+    )
+
+    contractor_payments = sum(
+        (
+            payment.final_amount
+            for payment in ContractorPaymentRecord.objects.filter(
+                status=ContractorPaymentRecord.Status.PAID,
+                paid_at__date__gte=period_start,
+                paid_at__date__lte=period_end,
+            )
+        ),
+        Decimal('0.00'),
+    )
+
+    employee_payroll = sum(
+        (
+            payroll.net_amount
+            for payroll in EmployeePayrollRecord.objects.filter(
+                status=EmployeePayrollRecord.Status.PAID,
+                paid_at__date__gte=period_start,
+                paid_at__date__lte=period_end,
+            )
+        ),
+        Decimal('0.00'),
+    )
+
+    commission_payments = sum(
+        (
+            commission.final_amount
+            for commission in CommissionRecord.objects.filter(
+                status=CommissionRecord.Status.APPROVED,
+                approved_at__date__gte=period_start,
+                approved_at__date__lte=period_end,
+            )
+        ),
+        Decimal('0.00'),
+    )
+
+    net_operating_cash_flow = (
+        cash_received
+        - contractor_payments
+        - employee_payroll
+        - commission_payments
+    )
+
+    snapshot = {
+        'cash_received': str(cash_received),
+        'contractor_payments': str(contractor_payments),
+        'employee_payroll': str(employee_payroll),
+        'commission_payments': str(commission_payments),
+        'net_operating_cash_flow': str(
+            net_operating_cash_flow
+        ),
+    }
+
+    report = FinancialReport.objects.create(
+        kind=FinancialReport.Kind.CASH_FLOW,
+        period_start=period_start,
+        period_end=period_end,
+        report_snapshot=snapshot,
+        created_by=actor,
+    )
+    audit(
+        actor,
+        'financial_report.cash_flow.created',
         report.id,
         snapshot,
     )

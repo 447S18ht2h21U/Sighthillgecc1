@@ -8,6 +8,8 @@ from rest_framework.exceptions import ValidationError
 
 from .financial_report_services import (
     create_income_statement,
+    create_balance_sheet,
+    create_cash_flow_statement,
     approve_financial_report,
 )
 from .payment_services import (
@@ -451,4 +453,65 @@ class FinancialReportTests(TestCase):
         self.assertEqual(
             snapshot['total_assets'],
             '10000.00',
+        )
+
+    def test_cash_flow_calculates_operating_cash_flow(self):
+
+        payment = CustomerPayment.objects.create(
+            project=self.project,
+            msr=self.msr,
+            kind=CustomerPayment.Kind.FULL,
+            amount=Decimal('10000.00'),
+            received_date=date(2026, 10, 15),
+            payment_reference='FIN-CF-001',
+            recorded_by=self.comptroller,
+        )
+
+        verify_customer_payment(
+            self.comptroller,
+            payment.id,
+        )
+
+        self.create_paid_contractor_payment()
+
+        self.create_paid_employee_payroll()
+
+        self.create_approved_commission()
+
+        report = create_cash_flow_statement(
+            self.comptroller,
+            date(2026, 10, 1),
+            date(2026, 10, 15),
+        )
+
+        self.assertEqual(
+            report.kind,
+            FinancialReport.Kind.CASH_FLOW,
+        )
+
+        snapshot = report.report_snapshot
+
+        self.assertEqual(
+            snapshot['cash_received'],
+            '10000.00',
+        )
+
+        self.assertEqual(
+            snapshot['contractor_payments'],
+            '1000.00',
+        )
+
+        self.assertEqual(
+            snapshot['employee_payroll'],
+            '2000.00',
+        )
+
+        self.assertEqual(
+            snapshot['commission_payments'],
+            '450.00',
+        )
+
+        self.assertEqual(
+            snapshot['net_operating_cash_flow'],
+            '6550.00',
         )
