@@ -3,6 +3,8 @@
     InstallationSchedule,
     CustomerPayment,
     Project,
+    ProjectTechnicalAssignment,
+    Role,
 )
 
 
@@ -51,3 +53,68 @@ def get_project_dashboard_stage(project):
         return 'contracted_for_work'
 
     return 'completed_customer_record'
+
+    def test_verified_payment_moves_project_to_payment_received(self):
+
+        approved = self.approve()
+
+        payment = CustomerPayment.objects.create(
+            project=self.project,
+            msr=approved,
+            kind=CustomerPayment.Kind.DEPOSIT,
+            amount=Decimal('500.00'),
+            received_date=date(2026, 10, 8),
+            payment_reference='DASH-TEST-001',
+            recorded_by=self.sales,
+        )
+
+        verify_customer_payment(
+            self.comptroller,
+            payment.id,
+        )
+
+        stage = get_project_dashboard_stage(
+            self.project,
+        )
+
+        self.assertEqual(
+            stage,
+            'payment_received',
+        )
+
+def get_dashboard_projects(actor):
+
+    if actor.role in [
+        Role.SALES_MANAGER,
+        Role.INSTALLATION_MANAGER,
+        Role.COMPTROLLER,
+    ]:
+        projects = Project.objects.all()
+
+    elif actor.role == Role.SALES_ASSOCIATE:
+        projects = Project.objects.filter(
+            sales_associate=actor,
+        )
+
+    elif actor.role == Role.TECHNICIAN:
+        projects = Project.objects.filter(
+            technical_assignments__technical_associate=actor,
+            technical_assignments__status=ProjectTechnicalAssignment.Status.ACTIVE,
+        )
+
+    else:
+        projects = Project.objects.none()
+
+    dashboard = {
+        key: []
+        for key in DASHBOARD_STAGES.keys()
+    }
+
+    for project in projects.distinct():
+        stage = get_project_dashboard_stage(project)
+
+        dashboard[stage].append(
+            project
+        )
+
+    return dashboard
