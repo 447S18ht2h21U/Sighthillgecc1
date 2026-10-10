@@ -257,6 +257,44 @@ class InstallationSchedule(Entity):
         blank=True,
     )
 
+class ProjectTechnicalAssignment(Entity):
+    """Controlled assignment of technical responsibility to a project."""
+
+    class Status(models.TextChoices):
+        ACTIVE = 'ACTIVE', 'Active'
+        ENDED = 'ENDED', 'Ended'
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.PROTECT,
+        related_name='technical_assignments',
+    )
+
+    technical_associate = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='technical_project_assignments',
+    )
+
+    assigned_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='technical_assignments_created',
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
+
+    effective_date = models.DateField()
+
+    ended_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
 class ReleasePackage(Entity):
     plan = models.ForeignKey(SigningPlan, on_delete=models.PROTECT, related_name='release_packages')
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
