@@ -1,8 +1,11 @@
 # GECC Architecture Baseline v2
 
-**Status:** Draft - architecture reconciliation
+**Status:** Approved - architecture and implementation baseline
 **Date:** October 10, 2026
-**Supersedes:** No existing document  
+**Approval date:** October 10, 2026
+**Approved by:** GECC Business Owner
+**Approval reference:** Business Owner approval of Architecture Baseline v2; pre-approval Git commit d744895
+**Supersedes:** No existing document
 **Business authority:** GECC Business Owner / Comptroller
 
 ## 1. Purpose and document control
@@ -1024,3 +1027,19 @@ Record the responsible authority, affected requirements, reason for change, effe
 This Architecture Baseline v2 is a reconciliation and implementation-planning document. It does not supersede an approved requirement solely by restating or interpreting it.
 
 Conflicts and unresolved decisions shall remain explicitly identified until approved through the applicable governance process.
+
+### 12.11 Formal architecture baseline approval
+
+**Decision date:** October 10, 2026
+
+**Decision:** GECC Architecture Baseline v2 is approved as the governing architecture and implementation-planning baseline.
+
+**Approval authority:** GECC Business Owner
+
+**Pre-approval Git checkpoint:** d744895
+
+**Approval scope:** Authorizes controlled implementation planning and development in accordance with this baseline, its approved requirements, and its documented change-control procedures.
+
+**Conditions:** Outstanding legal, accounting, security, infrastructure, integration, testing, and operational acceptance requirements remain mandatory.
+
+**Production authorization:** Not granted. Production deployment requires separate satisfaction of the applicable release gates and documented release approval.
