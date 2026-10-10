@@ -213,6 +213,49 @@ class ProjectEvidence(Entity):
     def delete(self, *args, **kwargs):
         raise ValidationError('Verification evidence cannot be deleted.')
 
+class InstallationSchedule(Entity):
+    """Controlled installation scheduling record."""
+
+    class Status(models.TextChoices):
+        SCHEDULED = 'SCHEDULED', 'Scheduled'
+        COMPLETED = 'COMPLETED', 'Completed'
+        CANCELLED = 'CANCELLED', 'Cancelled'
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.PROTECT,
+        related_name='installation_schedules',
+    )
+
+    scheduled_date = models.DateField()
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.SCHEDULED,
+    )
+
+    installation_manager = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='installations_managed',
+    )
+
+    scheduled_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='installations_scheduled',
+    )
+
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    cancelled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
 
 class ReleasePackage(Entity):
     plan = models.ForeignKey(SigningPlan, on_delete=models.PROTECT, related_name='release_packages')
