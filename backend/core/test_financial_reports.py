@@ -1,4 +1,4 @@
-﻿from decimal import Decimal
+from decimal import Decimal
 from datetime import date
 
 from django.test import TestCase
@@ -58,6 +58,7 @@ from .employee_payroll_services import (
     create_employee_payroll_record,
     approve_employee_payroll_record,
     mark_employee_payroll_paid,
+    issue_employee_payroll_payment,
 )
 
 from .commission_record_services import (
@@ -74,6 +75,13 @@ class FinancialReportTests(TestCase):
             password='test-password',
             role=Role.COMPTROLLER,
             initials='CC',
+        )
+
+        self.ceo = User.objects.create_user(
+            username='financial_report_ceo',
+            password='test-password',
+            role=Role.CEO,
+            initials='CEO',
         )
 
         self.customer = Customer.objects.create(
@@ -262,8 +270,16 @@ class FinancialReportTests(TestCase):
         )
 
         approve_employee_payroll_record(
-            self.comptroller,
+            self.ceo,
             payroll.id,
+        )
+
+        issue_employee_payroll_payment(
+            self.ceo,
+            payroll.id,
+            Decimal('2000.00'),
+            'ACH',
+            'FIN-PAYROLL-TEST-001',
         )
 
         mark_employee_payroll_paid(

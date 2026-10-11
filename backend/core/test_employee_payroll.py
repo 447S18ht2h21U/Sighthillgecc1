@@ -9,6 +9,7 @@ from .employee_payroll_services import (
     create_employee_payroll_record,
     approve_employee_payroll_record,
     mark_employee_payroll_paid,
+    issue_employee_payroll_payment,
 )
 from .models import (
     Employee,
@@ -30,6 +31,12 @@ class EmployeePayrollTests(TestCase):
             initials='CC',
         )
 
+        self.ceo = User.objects.create_user(
+            username='employee_payroll_ceo',
+            password='test-password',
+            role=Role.CEO,
+            initials='CEO',
+        )
         self.employee = Employee.objects.create(
             employee_number='EMP-001',
             legal_name='Test Employee',
@@ -141,7 +148,7 @@ class EmployeePayrollTests(TestCase):
         )
 
         approved = approve_employee_payroll_record(
-            self.comptroller,
+            self.ceo,
             record.id,
         )
 
@@ -152,7 +159,7 @@ class EmployeePayrollTests(TestCase):
 
         self.assertEqual(
             approved.approved_by_id,
-            self.comptroller.id,
+            self.ceo.id,
         )
 
         self.assertIsNotNone(
@@ -176,8 +183,16 @@ class EmployeePayrollTests(TestCase):
         )
 
         approve_employee_payroll_record(
-            self.comptroller,
+            self.ceo,
             record.id,
+        )
+
+        issue_employee_payroll_payment(
+            self.ceo,
+            record.id,
+            Decimal('2000.00'),
+            'ACH',
+            'PAYROLL-TEST-001',
         )
 
         paid = mark_employee_payroll_paid(
@@ -213,7 +228,7 @@ class EmployeePayrollTests(TestCase):
         )
 
         approve_employee_payroll_record(
-            self.comptroller,
+            self.ceo,
             record.id,
         )
 
@@ -256,8 +271,16 @@ class EmployeePayrollTests(TestCase):
         )
 
         approve_employee_payroll_record(
-            self.comptroller,
+            self.ceo,
             record.id,
+        )
+
+        issue_employee_payroll_payment(
+            self.ceo,
+            record.id,
+            Decimal('2000.00'),
+            'ACH',
+            'PAYROLL-TEST-001',
         )
 
         paid = mark_employee_payroll_paid(

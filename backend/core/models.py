@@ -1565,3 +1565,37 @@ class FinancialReport(Entity):
             f'{self.period_start} to {self.period_end}'
         )
 
+
+class EmployeePayrollPaymentIssuance(Entity):
+    """Immutable evidence of CEO-issued employee payroll payment."""
+
+    class Method(models.TextChoices):
+        ACH = 'ACH', 'ACH'
+        WIRE = 'WIRE', 'Wire transfer'
+        CHECK = 'CHECK', 'Check'
+        OTHER = 'OTHER', 'Other'
+
+    payroll_record = models.OneToOneField(
+        EmployeePayrollRecord,
+        on_delete=models.PROTECT,
+        related_name='payment_issuance',
+    )
+    issued_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='employee_payroll_payments_issued',
+    )
+    issued_at = models.DateTimeField()
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+    payment_method = models.CharField(
+        max_length=16,
+        choices=Method.choices,
+    )
+    transaction_reference = models.CharField(max_length=200)
+    supporting_evidence = models.TextField(blank=True)
+
+    def __str__(self):
+        return f'Payroll payment issuance {self.payroll_record_id}'

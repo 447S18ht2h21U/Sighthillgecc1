@@ -14,6 +14,7 @@ from .employee_payroll_services import (
     approve_employee_payroll_record,
     mark_employee_payroll_paid,
     create_employee_payroll_record,
+    issue_employee_payroll_payment,
 )
 from .payroll_summary_services import (
     create_payroll_summary,
@@ -42,6 +43,13 @@ class PayrollSummaryTests(TestCase):
             password='test-password',
             role=Role.COMPTROLLER,
             initials='CC',
+        )
+
+        self.ceo = User.objects.create_user(
+            username='payroll_summary_ceo',
+            password='test-password',
+            role=Role.CEO,
+            initials='CEO',
         )
 
         self.contractor = Contractor.objects.create(
@@ -145,8 +153,16 @@ class PayrollSummaryTests(TestCase):
         )
 
         approve_employee_payroll_record(
-            self.comptroller,
+            self.ceo,
             employee_payroll.id,
+        )
+
+        issue_employee_payroll_payment(
+            self.ceo,
+            employee_payroll.id,
+            Decimal('2000.00'),
+            'ACH',
+            'PAYROLL-SUMMARY-TEST-001',
         )
 
         mark_employee_payroll_paid(
