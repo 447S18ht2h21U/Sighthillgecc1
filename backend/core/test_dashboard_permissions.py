@@ -8,6 +8,7 @@ from .models import (
     Customer,
     Project,
     ProjectTechnicalAssignment,
+    InstallationSchedule,
 )
 
 from .dashboard_services import (
@@ -90,6 +91,16 @@ class DashboardPermissionTests(TestCase):
             sales_associate=self.sales_two,
             reviewer=self.comptroller,
         )
+
+
+        for project in (self.project_one, self.project_two):
+            InstallationSchedule.objects.create(
+                project=project,
+                scheduled_date=date(2026, 10, 20),
+                status=InstallationSchedule.Status.SCHEDULED,
+                installation_manager=self.installation_manager,
+                scheduled_by=self.installation_manager,
+            )
 
     def test_sales_associate_only_sees_assigned_projects(self):
 

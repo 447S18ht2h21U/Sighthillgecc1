@@ -1,3 +1,18 @@
+/* VERIDIAN Design System v1 */
+:root {
+  --veridian-navy: #142B3B;
+  --veridian-teal: #087F75;
+  --veridian-ivory: #F7F8F5;
+  --veridian-mist: #D7E3E7;
+  --veridian-gold: #C39A58;
+  --veridian-text: #142B3B;
+  --veridian-muted: #526675;
+  --veridian-success: #167347;
+  --veridian-warning: #946200;
+  --veridian-danger: #B42318;
+  --veridian-font: Inter, system-ui, sans-serif;
+}
+
 :root{font-family:Inter,system-ui,sans-serif;color:#20312c;background:#f3f5f2;font-synthesis:none}*{box-sizing:border-box}body{margin:0}header{background:#183d32;color:white;padding:22px 4%;display:flex;justify-content:space-between;align-items:center}.brand{font-size:26px;font-weight:800;letter-spacing:.03em}.brand span{font-size:14px;font-weight:400;margin-left:16px;letter-spacing:0}main{max-width:1440px;padding:32px;margin:auto}h1{font-size:32px;margin:6px 0 24px}h2{font-size:21px;margin:0 0 12px}h3{font-size:16px;margin-top:24px}.eyebrow{color:#647a6b;font-size:11px;font-weight:700;letter-spacing:.14em}.muted,footer{color:#65776e;font-size:14px;line-height:1.6}.title{display:flex;justify-content:space-between;align-items:center;gap:20px}.actions{display:flex;gap:10px;flex-wrap:wrap}button{font:inherit;border:1px solid #23604d;border-radius:6px;background:#23604d;color:white;padding:10px 15px;cursor:pointer}button:disabled{opacity:.5;cursor:default}button.quiet{background:transparent;color:#23604d;border-color:#b6c8be}header button.quiet{color:white;margin-left:14px}label{display:block;font-size:13px;font-weight:600;margin:14px 0;line-height:1.6}input,select,textarea{width:100%;font:inherit;padding:10px;border:1px solid #bfcac3;border-radius:5px;background:white;color:#20312c;display:block}textarea{min-height:85px;resize:vertical}input:focus,textarea:focus,select:focus{outline:2px solid #87b3a0;outline-offset:1px}fieldset{border:0;padding:0;margin:0}fieldset:disabled input,fieldset:disabled textarea,fieldset:disabled select{background:#f0f3ef}.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}.workspace{display:grid;grid-template-columns:290px 1fr;gap:24px}section,aside{background:white;border:1px solid #d9e1d9;border-radius:10px;padding:24px;margin-bottom:24px}aside{align-self:start}.project{display:flex;flex-direction:column;align-items:start;text-align:left;width:100%;gap:8px;background:white;color:#20312c;border-color:#d4ddd6;margin:12px 0}.project.active{background:#edf5ef;border-color:#23604d}.project strong{font-size:13px}.project span{font-size:13px}.badge{background:#e7eee7;border-radius:4px;color:#3d6652;font-size:11px;padding:5px 8px;white-space:nowrap}.versionbar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;padding:16px 0;border-block:1px solid #e3e8e2;font-size:13px}details{margin:14px 0;background:#f4f7f3;padding:14px;border-radius:6px}summary{cursor:pointer;font-size:14px}dl{display:grid;grid-template-columns:180px 1fr;font-size:13px;gap:10px}dt{text-transform:capitalize;font-weight:600}dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}.line{display:grid;grid-template-columns:1fr 100px auto;gap:12px;align-items:center}.error{color:#8d2f1b;background:#fff0e9;padding:16px;border:1px solid #efcabb;border-radius:6px;margin-bottom:24px}.login{max-width:470px;margin-top:8vh;background:white;border-radius:12px;padding:36px}.login .brand{margin-bottom:32px}.empty{min-height:260px}small{font-size:13px;color:#77877a}footer{text-align:center;margin-top:24px}@media(max-width:850px){.workspace{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.title,header{align-items:start;flex-direction:column}.line{grid-template-columns:1fr 80px}.line button{grid-column:1/-1}main{padding:18px}dl{grid-template-columns:1fr}header{gap:12px}}
 
 .documents{margin:28px 0;padding-top:8px;border-top:1px solid #e3e8e2}.document-row{display:flex;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid #e3e8e2;font-size:13px}.document-row span{display:block;color:#65776e;margin-top:5px}.document-row a{color:#23604d;white-space:nowrap}@media(max-width:850px){.document-row{flex-direction:column}}
@@ -21,3 +36,293 @@
 .record-filters{margin:16px 0}.record-filters label{display:block;margin-bottom:12px}.record-filters input,.record-filters select{width:100%;min-width:0}.customer-filters{display:grid;grid-template-columns:minmax(180px,2fr) minmax(130px,1fr) auto;gap:16px;align-items:end}.record-filters .actions{flex-wrap:wrap}aside .project{overflow-wrap:anywhere}@media(max-width:900px){.customer-filters{grid-template-columns:1fr}}
 
 .audit-history{margin-top:20px;overflow-wrap:anywhere}.audit-filters{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:16px;align-items:end}.audit-filters .actions{grid-column:1/-1}.audit-list{list-style:none;padding:0}.audit-list>li{border-top:1px solid #d9e1d9;padding:20px 0}.audit-list h3{margin-top:0}.audit-change{display:grid;grid-template-columns:1fr 2fr 2fr;gap:16px;border-top:1px solid #e3e8e2;padding:12px 0}.audit-change span{font-size:12px;font-weight:600}.audit-change p,.audit-note,.audit-list dd{white-space:pre-wrap;overflow-wrap:anywhere}.audit-list dl{display:block}.audit-list dl>div{margin-bottom:14px}.audit-list dd{margin-top:4px}@media(max-width:850px){.audit-filters,.audit-change{grid-template-columns:1fr}}
+
+/* GECC Project Status Dashboard */
+.project-status-dashboard {
+  margin-top: 1.5rem;
+}
+
+.dashboard-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.dashboard-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  min-height: 145px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1e293b;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.dashboard-stage:hover,
+.dashboard-stage:focus-visible {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.dashboard-stage-selected {
+  border: 2px solid #2563eb;
+  background: #eff6ff;
+}
+
+.dashboard-stage span {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.dashboard-stage strong {
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+.dashboard-stage small {
+  font-size: 0.8rem;
+}
+
+.dashboard-project-list {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+}
+
+.dashboard-project-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+}
+
+.dashboard-project-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dashboard-project-list li:last-child {
+  border-bottom: none;
+}
+
+@media (max-width: 600px) {
+  .dashboard-stage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-stage {
+    min-height: 130px;
+    padding: 0.85rem;
+  }
+
+  .dashboard-stage strong {
+    font-size: 1.6rem;
+  }
+}
+
+
+/* GECC dashboard inline project lists */
+.dashboard-stage-with-projects {
+  cursor: default;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-stage-with-projects:hover {
+  border-color: #cbd5e1;
+  box-shadow: none;
+}
+
+.dashboard-stage-with-projects > strong {
+  font-size: 2rem;
+}
+
+.dashboard-stage-projects {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.dashboard-stage-projects ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.dashboard-stage-projects li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dashboard-stage-projects li:last-child {
+  border-bottom: none;
+}
+
+.dashboard-stage-projects li strong {
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.dashboard-stage-projects li span {
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.dashboard-stage-projects .muted {
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+
+/* GECC dashboard payment breakdown */
+.dashboard-payment-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #f1f5f9;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.dashboard-payment-breakdown span {
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #334155;
+}
+
+
+/* VERIDIAN Application Theme v1 */
+:root {
+  font-family: var(--veridian-font);
+  color: var(--veridian-text);
+  background: var(--veridian-ivory);
+}
+
+body {
+  background: var(--veridian-ivory);
+  color: var(--veridian-text);
+}
+
+header {
+  background: var(--veridian-navy);
+  color: #ffffff;
+}
+
+h1, h2, h3 {
+  color: var(--veridian-navy);
+}
+
+header .brand {
+  color: #ffffff;
+}
+
+button {
+  background: var(--veridian-teal);
+  border-color: var(--veridian-teal);
+  color: #ffffff;
+}
+
+button.quiet {
+  background: transparent;
+  color: var(--veridian-teal);
+  border-color: var(--veridian-mist);
+}
+
+header button.quiet {
+  color: #ffffff;
+}
+
+input, select, textarea {
+  color: var(--veridian-text);
+  border-color: var(--veridian-mist);
+}
+
+input:focus, select:focus, textarea:focus {
+  outline-color: var(--veridian-teal);
+}
+
+section, aside {
+  border-color: var(--veridian-mist);
+}
+
+.eyebrow, .muted, footer {
+  color: var(--veridian-muted);
+}
+
+.document-row a {
+  color: var(--veridian-teal);
+}
+
+
+/* VERIDIAN Dashboard Theme v1 */
+.dashboard-stage {
+  background: #ffffff;
+  color: var(--veridian-navy);
+  border-color: var(--veridian-mist);
+}
+
+.dashboard-stage:hover,
+.dashboard-stage:focus-visible {
+  border-color: var(--veridian-teal);
+  box-shadow: 0 0 0 2px rgba(8, 127, 117, 0.12);
+}
+
+.dashboard-stage-selected {
+  border-color: var(--veridian-teal);
+  background: #edf7f5;
+}
+
+.dashboard-stage-with-projects:hover {
+  border-color: var(--veridian-mist);
+  box-shadow: none;
+}
+
+.dashboard-stage-projects,
+.dashboard-stage-projects li,
+.dashboard-project-list li {
+  border-color: var(--veridian-mist);
+}
+
+.dashboard-project-list {
+  background: #ffffff;
+  border-color: var(--veridian-mist);
+}
+
+.dashboard-payment-breakdown {
+  background: #edf7f5;
+  border: 1px solid var(--veridian-mist);
+}
+
+.dashboard-payment-breakdown span {
+  color: var(--veridian-navy);
+  font-variant-numeric: tabular-nums;
+}
+
+/* VERIDIAN Login Branding v1 */
+.login .brand { line-height: 1.25; }
+.login .brand span { display: block; margin: 8px 0 0; font-size: 13px; font-weight: 400; letter-spacing: 0; line-height: 1.5; }
+
+
+/* VERIDIAN Shared Navigation Row v1 */
+.veridian-navigation-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin: 0.75rem 0 1rem; }
+.veridian-navigation-row > button:last-child:not(:first-child) { margin-left: auto; }

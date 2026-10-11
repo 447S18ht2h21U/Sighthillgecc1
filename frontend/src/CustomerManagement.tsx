@@ -19,7 +19,7 @@ export function CustomerManagement({api,onChanged,onBack}:{api:API;onChanged:()=
  function closeForms(){setEditCustomer(false);setEditContact(null);setNewContact(false);}
  const replacing=primary&&selected?.primary_contact&&selected.primary_contact.id!==editContact?.id;
  return <section className="customer-management" aria-labelledby="customer-record-heading">
-  <div className="title"><div><h2 id="customer-record-heading">Customer records</h2><p className="muted">Manage the customers you are authorized to access and their contacts. Approved project versions and existing documents keep their recorded details.</p></div><button className="quiet" disabled={busy} onClick={onBack}>Back to projects</button></div>
+  <div className="title"><div><h2 id="customer-record-heading">Customer records</h2><p className="muted">Manage the customers you are authorized to access and their contacts. Approved project versions and existing documents keep their recorded details.</p></div></div>
   {error&&<p role="alert" className="error">{error}</p>}{message&&<p role="status">{message}</p>}
   <button className="quiet" disabled={busy} onClick={()=>void run(refresh)}>Refresh customer records</button>
   <form className="record-filters customer-filters" onSubmit={e=>{e.preventDefault();setPage(1);setFilters({search:query.trim(),status});setSelected(null);closeForms();}}>
