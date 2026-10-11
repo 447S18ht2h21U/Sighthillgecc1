@@ -4,6 +4,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 
 class Role(models.TextChoices):
+    CEO = 'CEO', 'Chief Executive Officer'
     SALES_ASSOCIATE = 'SALES_ASSOCIATE', 'Sales Associate'
     SALES_MANAGER = 'SALES_MANAGER', 'Sales Manager'
     COMPTROLLER = 'COMPTROLLER', 'Comptroller'
@@ -22,6 +23,29 @@ class Entity(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
         abstract = True
+
+class TemporaryDutyAuthorization(Entity):
+    """Independently approved, time-limited temporary operational authority."""
+
+    class Status(models.TextChoices):
+        REQUESTED = 'REQUESTED', 'Requested'
+        APPROVED = 'APPROVED', 'Approved'
+        REJECTED = 'REJECTED', 'Rejected'
+        REVOKED = 'REVOKED', 'Revoked'
+        COMPLETED = 'COMPLETED', 'Completed'
+
+    employee = models.ForeignKey(User, on_delete=models.PROTECT, related_name='temporary_duties')
+    permanent_role = models.CharField(max_length=32, choices=Role.choices)
+    temporary_role = models.CharField(max_length=32, choices=Role.choices)
+    requested_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='temporary_duties_requested')
+    approved_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='temporary_duties_approved', null=True, blank=True)
+    reason = models.TextField()
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.REQUESTED)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
 
 class Customer(Entity):
     legal_name = models.CharField(max_length=250)
@@ -93,6 +117,25 @@ class AuditEvent(Entity):
         super().save(*args, **kwargs)
     def delete(self, *args, **kwargs):
         raise ValidationError('Audit events cannot be deleted.')
+
+class TemporaryDutyActivity(Entity):
+    """Audit-linked record of an action performed under temporary authority."""
+
+    authorization = models.ForeignKey(
+        TemporaryDutyAuthorization,
+        on_delete=models.PROTECT,
+        related_name='activities',
+    )
+    employee = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='temporary_duty_activities',
+    )
+    audit_event = models.OneToOneField(
+        AuditEvent,
+        on_delete=models.PROTECT,
+        related_name='temporary_duty_activity',
+    )
 
 class Outbox(Entity):
     event = models.OneToOneField(AuditEvent, on_delete=models.PROTECT)
