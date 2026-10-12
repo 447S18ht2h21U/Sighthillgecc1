@@ -10,3 +10,9 @@ backend/core/pdf_templates/*.pdf
 
 *.backup
 *.before_*
+
+# Environment files and local credentials
+.env*
+**/.env*
+!.env.example
+!**/.env.example
