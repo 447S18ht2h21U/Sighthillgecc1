@@ -162,6 +162,22 @@ class SigningTestTests(TestCase):
             with override_settings(DEBUG=False),self.assertRaises(ValidationError):flow.begin(self.comptroller,'session',self.test_package.id,flow.OP_SEND,True)
         self.assertFalse(SigningTestAttempt.objects.exists())
 
+    def test_signing_tests_reject_non_development_environments(self):
+        self.setup_test()
+        self.approve_test()
+        for environment in ('staging', 'production'):
+            with self.subTest(environment=environment):
+                with override_settings(ENVIRONMENT=environment, DEBUG=True):
+                    with patch.dict(os.environ, CONFIG):
+                        with self.assertRaises(ValidationError):
+                            flow.begin(
+                                self.comptroller,
+                                'session',
+                                self.test_package.id,
+                                flow.OP_SEND,
+                                True,
+                            )
+                    self.assertFalse(SigningTestAttempt.objects.exists())
     def test_revocation_and_changed_source_or_allowlist_block_before_network(self):
         self.setup_test();self.approve_test();state=self.start()
         release.decide(self.manager,self.package.id,{'decision':'REVOKED','note':'Synthetic source revoke'})

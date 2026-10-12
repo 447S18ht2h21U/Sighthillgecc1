@@ -32,7 +32,7 @@ MAX_RETAINED_BYTES = 24 * 1024 * 1024
 
 
 def development():
-    if not settings.DEBUG:
+    if settings.ENVIRONMENT != 'development' or not settings.DEBUG:
         raise ValidationError('Signing tests are available only in local development. Production sending is disabled.')
 
 
@@ -370,7 +370,7 @@ def finish(actor,challenge,config,token):
             outcome='SUPERSEDED';rows=[];evidence.pop('retained_hashes',None);blockers.append('A newer read was authorized; this result does not change the attempt state.')
         else:
             fresh_actor=User.objects.get(pk=actor.id)
-            if (not fresh_actor.is_active or fresh_actor.role!='COMPTROLLER' or not settings.DEBUG
+            if (not fresh_actor.is_active or fresh_actor.role!='COMPTROLLER' or settings.ENVIRONMENT != 'development' or not settings.DEBUG
                     or docusign.configuration_digest(docusign.configuration())!=challenge.configuration_digest):
                 outcome='READ_FAILED';rows=[];evidence.pop('retained_hashes',None);blockers.append('Authorization or sandbox configuration changed during inspection.')
             item.state=outcome if outcome!='READ_FAILED' else 'READ_REQUIRED';item.save(update_fields=['state'])
