@@ -31,7 +31,7 @@ CHECK_FAILURES = {
 
 def eligible(actor, attempt, config):
     docusign.authorize(actor)
-    if not settings.DEBUG or config['blockers']:
+    if settings.ENVIRONMENT != 'development' or not settings.DEBUG or config['blockers']:
         raise ValidationError('Configure sandbox authorization in local development before checking a draft.')
     if not attempt.envelope_id or attempt.state not in STATES:
         raise ValidationError('No known sandbox envelope is available to check. Do not create a replacement for an ambiguous attempt.')

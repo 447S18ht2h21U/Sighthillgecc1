@@ -145,6 +145,22 @@ class ReconciliationTests(TestCase):
         with patch.dict(os.environ,{**CONFIG,'GECC_DOCUSIGN_ACCOUNT_ID':'44444444-4444-4444-8444-444444444444'}),self.assertRaises(ValidationError):
             reconciliation.begin(self.comptroller,'session',self.package.id,True)
 
+    def test_reconciliation_rejects_non_development_environments(self):
+        self.known_draft()
+        with patch.dict(os.environ, CONFIG):
+            for environment in ('staging', 'production'):
+                with self.subTest(environment=environment):
+                    with override_settings(ENVIRONMENT=environment, DEBUG=True):
+                        with self.assertRaises(ValidationError):
+                            reconciliation.eligible(
+                                self.comptroller,
+                                self.attempt,
+                                docusign.configuration(),
+                            )
+                        with self.assertRaises(ValidationError):
+                            reconciliation.begin(
+                                self.comptroller, 'session', self.package.id, True
+                            )
     def test_unknown_envelope_and_inflight_create_cannot_be_checked(self):
         self.setup_package();self.start()
         with self.assertRaises(ValidationError):self.check_start()
