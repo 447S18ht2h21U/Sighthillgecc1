@@ -36,7 +36,7 @@ def template_path(kind):
     source = TEMPLATE_DIR / TEMPLATES[kind]
     if not source.is_file():
         raise ValidationError('The approved document template is unavailable. Contact the Comptroller.')
-    synthetic = settings.DEBUG and os.getenv('GECC_SYNTHETIC_TEMPLATES') == '1'
+    synthetic = settings.ENVIRONMENT == 'development' and settings.DEBUG and os.getenv('GECC_SYNTHETIC_TEMPLATES') == '1'
     if not synthetic and hashlib.sha256(source.read_bytes()).hexdigest() != APPROVED_TEMPLATES[source.name]['sha256']:
         raise ValidationError('The document template does not match the approved version. Contact the Comptroller.')
     return source

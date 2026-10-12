@@ -87,3 +87,24 @@ class EnvironmentPolicyTests(SimpleTestCase):
                     response = me(request)
                     self.assertEqual(response.status_code, 200)
                     self.assertFalse(response.data['development_auth'])
+
+    def test_synthetic_templates_require_development_environment(self):
+        from django.test import override_settings
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        from rest_framework.exceptions import ValidationError
+        from core import documents
+
+        with TemporaryDirectory() as directory:
+            filename = documents.TEMPLATES['INVOICE']
+            Path(directory, filename).write_bytes(b'Not an approved PDF template')
+            with patch.object(documents, 'TEMPLATE_DIR', Path(directory)):
+                with patch.dict('os.environ', {'GECC_SYNTHETIC_TEMPLATES': '1'}):
+                    for environment in ('staging', 'production'):
+                        with self.subTest(environment=environment):
+                            with override_settings(ENVIRONMENT=environment, DEBUG=True):
+                                with self.assertRaises(ValidationError):
+                                    documents.template_path('INVOICE')
+                    with override_settings(ENVIRONMENT='development', DEBUG=True):
+                        self.assertEqual(documents.template_path('INVOICE'), Path(directory, filename))
