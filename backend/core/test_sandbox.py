@@ -103,6 +103,13 @@ class SandboxTests(TestCase):
         with self.assertRaises(PermissionDenied):sandbox.begin_draft(self.manager,'session',self.package.id,True)
         with patch.dict(os.environ,CONFIG),self.assertRaises(ValidationError):sandbox.begin_draft(self.comptroller,'session',self.package.id,'true')
         with override_settings(DEBUG=False),self.assertRaises(ValidationError):sandbox.prepare_package(self.manager,self.plan.id)
+    def test_sandbox_rejects_non_development_environments(self):
+        self.setup_package()
+        for environment in ('staging', 'production'):
+            with self.subTest(environment=environment):
+                with override_settings(ENVIRONMENT=environment, DEBUG=True):
+                    with self.assertRaises(ValidationError):
+                        sandbox.prepare_package(self.manager, self.plan.id)
     def test_create_and_inspect_exact_draft_no_tokens_stored(self):
         self.setup_package();state=self.start();result,provider=self.finish(state)
         self.assertEqual(result['status'],'SANDBOX_DRAFT_VALIDATED');self.assertEqual(provider.call_count,4)

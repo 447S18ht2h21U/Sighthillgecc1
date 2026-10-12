@@ -20,7 +20,7 @@ MAX_PDF_BYTES = 8 * 1024 * 1024
 
 
 def current(plan):
-    if not settings.DEBUG:
+    if settings.ENVIRONMENT != 'development' or not settings.DEBUG:
         raise ValidationError('Sandbox packages are available only in local development.')
     if signing.status(plan)['status'] != 'PREPARED':
         raise ValidationError('The recipient review is stale, cancelled, changed, or invalid. Prepare a current review.')
