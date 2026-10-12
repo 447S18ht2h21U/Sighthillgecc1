@@ -2,7 +2,24 @@ import os
 from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = Path(__file__).resolve().parent.parent
-DEBUG = os.getenv('GECC_DEV', '0') == '1'
+LEGACY_DEV = os.getenv('GECC_DEV', '0')
+if LEGACY_DEV not in ('0', '1'):
+    raise ImproperlyConfigured('GECC_DEV must be 0 or 1.')
+
+ENVIRONMENT = os.getenv('VERIDIAN_ENVIRONMENT', '').strip().lower()
+if not ENVIRONMENT:
+    if LEGACY_DEV == '1':
+        ENVIRONMENT = 'development'
+    else:
+        raise ImproperlyConfigured('Set VERIDIAN_ENVIRONMENT to development, staging, or production.')
+
+if ENVIRONMENT not in ('development', 'staging', 'production'):
+    raise ImproperlyConfigured('Invalid VERIDIAN_ENVIRONMENT value.')
+
+if (LEGACY_DEV == '1') != (ENVIRONMENT == 'development'):
+    raise ImproperlyConfigured('Development requires both GECC_DEV=1 and VERIDIAN_ENVIRONMENT=development (explicitly or through the legacy fallback).')
+
+DEBUG = ENVIRONMENT == 'development'
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', '')
 if not SECRET_KEY:
     if not DEBUG:

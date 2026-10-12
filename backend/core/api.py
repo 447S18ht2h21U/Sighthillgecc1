@@ -407,7 +407,7 @@ class DirectoryViewSet(viewsets.ReadOnlyModelViewSet):
 
 @api_view(['GET'])
 def me(request):
-    return Response({'id': str(request.user.id), 'username': request.user.username, 'role': request.user.role, 'development_auth': settings.DEBUG, 'payment_options': PAYMENT_OPTIONS, 'signature_workflows': SIGNATURE_WORKFLOWS})
+    return Response({'id': str(request.user.id), 'username': request.user.username, 'role': request.user.role, 'development_auth': settings.ENVIRONMENT == 'development' and settings.DEBUG, 'payment_options': PAYMENT_OPTIONS, 'signature_workflows': SIGNATURE_WORKFLOWS})
 
 @api_view(['POST'])
 def activity(request):
@@ -422,7 +422,7 @@ def csrf(request):
 @csrf_protect
 @require_http_methods(['POST'])
 def dev_login(request):
-    if not settings.DEBUG:
+    if settings.ENVIRONMENT != 'development' or not settings.DEBUG:
         return JsonResponse({'detail': 'Development authentication is disabled.'}, status=404)
     import json
     try:
