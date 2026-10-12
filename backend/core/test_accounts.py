@@ -102,3 +102,13 @@ class AccountManagementTests(TestCase):
         self.assertEqual(self.client.post('/api/accounts/',self.new,format='json').status_code,400)
         self.assertEqual(self.change(first_name='Blocked').status_code,400)
         self.target.refresh_from_db();self.assertEqual(self.target.first_name,'')
+
+    def test_non_development_account_changes_stay_blocked_with_debug_enabled(self):
+        for environment in ('staging', 'production'):
+            with self.subTest(environment=environment):
+                with override_settings(ENVIRONMENT=environment, DEBUG=True, SECURE_SSL_REDIRECT=False):
+                    self.assertEqual(self.client.post('/api/accounts/', self.new, format='json').status_code, 400)
+                    self.assertEqual(self.change(first_name='Blocked').status_code, 400)
+                    self.assertFalse(User.objects.filter(username=self.new['username']).exists())
+                    self.target.refresh_from_db()
+                    self.assertEqual(self.target.first_name, '')

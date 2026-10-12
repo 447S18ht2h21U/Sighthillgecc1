@@ -526,14 +526,14 @@ class AccountViewSet(viewsets.ModelViewSet):
         return super().update(request, *args, **kwargs)
     def perform_create(self, serializer):
         self.get_queryset()
-        if not settings.DEBUG:
+        if settings.ENVIRONMENT != 'development' or not settings.DEBUG:
             raise ValidationError('Production identity provisioning requires the Cognito adapter.')
         with transaction.atomic():
             note = serializer.validated_data['change_note']
             user = serializer.save()
             audit(self.request.user, 'account.created', user.id, {'role': user.role, 'active': user.is_active, 'after': account_values(user), 'note': note})
     def perform_update(self, serializer):
-        if not settings.DEBUG:
+        if settings.ENVIRONMENT != 'development' or not settings.DEBUG:
             raise ValidationError('Production identity provisioning requires the Cognito adapter.')
         if serializer.instance.pk == self.request.user.pk and ('role' in serializer.validated_data or serializer.validated_data.get('is_active') is False):
             raise ValidationError('Self-demotion or self-deactivation is not allowed.')
