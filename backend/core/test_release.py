@@ -119,6 +119,17 @@ class ReleaseTests(TestCase):
         self.assertEqual(self.client.get(path).status_code,200)
         self.client.force_authenticate(self.other);self.assertEqual(self.client.get(path).status_code,404);self.assertEqual(self.client.get(evidence_path).status_code,404)
         self.client.force_authenticate(self.sales);self.assertEqual(self.client.post(f'/api/signing-reviews/{self.plan.id}/release-packages/',{},format='json').status_code,403)
+    def test_release_review_rejects_non_development_environments(self):
+        self.setup_release()
+        for environment in ('staging', 'production'):
+            with self.subTest(environment=environment):
+                with override_settings(ENVIRONMENT=environment, DEBUG=True):
+                    with self.assertRaises(ValidationError):
+                        release.record_evidence(
+                            self.comptroller,
+                            self.approved.id,
+                            self.evidence_data,
+                        )
     def test_production_and_tampered_package_rejected(self):
         self.setup_release()
         with override_settings(DEBUG=False),self.assertRaises(ValidationError):release.record_evidence(self.comptroller,self.approved.id,self.evidence_data)

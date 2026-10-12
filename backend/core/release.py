@@ -22,7 +22,7 @@ def lock_record(msr_id):
     reference = MSR.objects.get(pk=msr_id)
     Project.objects.select_for_update().get(pk=reference.project_id)
     record = MSR.objects.select_related('project').get(pk=msr_id)
-    if not settings.DEBUG:
+    if settings.ENVIRONMENT != 'development' or not settings.DEBUG:
         raise ValidationError('Release review is available only in development; production identity is pending.')
     if record.status != 'APPROVED' or record.project.current_approved_id != record.id or record.project.state == 'CANCELLED':
         raise ValidationError('Verification requires the current approved version of an active project.')
