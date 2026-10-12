@@ -108,3 +108,14 @@ class EnvironmentPolicyTests(SimpleTestCase):
                                     documents.template_path('INVOICE')
                     with override_settings(ENVIRONMENT='development', DEBUG=True):
                         self.assertEqual(documents.template_path('INVOICE'), Path(directory, filename))
+
+    def test_bootstrap_rejects_non_development_environments(self):
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+        from django.test import override_settings
+
+        for environment in ('staging', 'production'):
+            with self.subTest(environment=environment):
+                with override_settings(ENVIRONMENT=environment, DEBUG=True):
+                    with self.assertRaisesMessage(CommandError, 'Development only.'):
+                        call_command('bootstrap_dev')

@@ -6,7 +6,7 @@ from core.models import User, Role
 class Command(BaseCommand):
     help = 'Create local development users; never available in production.'
     def handle(self, *args, **options):
-        if not settings.DEBUG:
+        if settings.ENVIRONMENT != 'development' or not settings.DEBUG:
             raise CommandError('Development only.')
         password = os.environ.get('GECC_DEMO_PASSWORD', '')
         validate_password(password)
