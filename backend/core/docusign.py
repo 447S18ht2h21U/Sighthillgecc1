@@ -33,7 +33,7 @@ def configuration():
     redirect = os.getenv('GECC_DOCUSIGN_REDIRECT_URI', '')
     client_secret = os.getenv('GECC_DOCUSIGN_CLIENT_SECRET', '')
     blockers = []
-    if not settings.DEBUG:
+    if settings.ENVIRONMENT != 'development' or not settings.DEBUG:
         blockers.append('Sandbox verification is development-only; production identity and credential storage are pending.')
     for key, value in [('client_id', client_id), ('account_id', account_id)]:
         try:
@@ -48,7 +48,7 @@ def configuration():
     except ValueError:
         parsed = urlsplit('')
         port = -1
-    local = settings.DEBUG and parsed.hostname in {'localhost', '127.0.0.1'}
+    local = settings.ENVIRONMENT == 'development' and settings.DEBUG and parsed.hostname in {'localhost', '127.0.0.1'}
     if (parsed.path != CALLBACK_PATH or parsed.query or parsed.fragment or parsed.username or parsed.password
             or port == -1 or parsed.hostname not in settings.ALLOWED_HOSTS
             or not (parsed.scheme == 'https' or local and parsed.scheme == 'http')):

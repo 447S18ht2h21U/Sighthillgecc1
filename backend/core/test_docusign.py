@@ -48,6 +48,18 @@ class DocusignTests(TestCase):
         with self.configured(),override_settings(DEBUG=False):
             self.assertFalse(readiness(self.comptroller)['ready_to_verify'])
             with self.assertRaises(ValidationError):self.start()
+    def test_non_development_environment_blocks_sandbox_verification(self):
+        with self.configured():
+            for environment in ('staging', 'production'):
+                with self.subTest(environment=environment):
+                    with override_settings(ENVIRONMENT=environment, DEBUG=True):
+                        config = configuration()
+                        self.assertTrue(config['blockers'])
+                        self.assertTrue(any('development-only' in blocker for blocker in config['blockers']))
+                        self.assertTrue(any('HTTPS is required' in blocker for blocker in config['blockers']))
+                        self.assertFalse(readiness(self.comptroller)['ready_to_verify'])
+                        with self.assertRaises(ValidationError):
+                            self.start()
     def test_verifies_explicit_account_and_discards_tokens(self):
         with self.configured(),patch('core.docusign.request_json',side_effect=[TOKENS,INFO]) as transport:
             proof=finish(self.comptroller,'synthetic-session',self.start(),'synthetic-code')
