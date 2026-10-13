@@ -1,9 +1,10 @@
 ﻿from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from core import api, docusign_api, sandbox_api, release_api, signing_test_api, technical_assignment_api, operational_project_api, dashboard_api
+from core import installation_schedule_api, api, docusign_api, sandbox_api, release_api, signing_test_api, technical_assignment_api, operational_project_api, dashboard_api
 router = DefaultRouter()
 for prefix, view in [('customers', api.CustomerViewSet), ('contacts', api.ContactViewSet), ('projects', api.ProjectViewSet), ('msrs', api.MSRViewSet), ('documents', api.DocumentViewSet), ('audit', api.AuditViewSet), ('directory', api.DirectoryViewSet), ('accounts', api.AccountViewSet)]:
     router.register(prefix, view, basename=prefix)
+router.register('installation-schedules', installation_schedule_api.InstallationScheduleViewSet, basename='installation-schedules')
 router.register('technical-assignments', technical_assignment_api.TechnicalAssignmentViewSet, basename='technical-assignments')
 router.register('operational-projects', operational_project_api.OperationalProjectViewSet, basename='operational-projects')
 urlpatterns = [
