@@ -5,6 +5,7 @@ from .models import (
     InstallationSchedule,
     Role,
 )
+from .operational_visibility import operational_project_scope
 from .services import audit
 
 from django.utils import timezone
@@ -42,6 +43,14 @@ def _authorized_installation_actor(actor):
     return current_actor, authorization
 
 
+
+
+def _require_project_access(actor, project_id):
+    from rest_framework.exceptions import PermissionDenied
+
+    if not operational_project_scope(actor).filter(pk=project_id).exists():
+        raise PermissionDenied('Project is outside the authorized operational scope.')
+
 @transaction.atomic
 def create_installation_schedule(
     actor,
@@ -50,6 +59,7 @@ def create_installation_schedule(
     installation_manager,
 ):
     current_actor, temporary_authorization = _authorized_installation_actor(actor)
+    _require_project_access(current_actor, project.pk)
 
     if installation_manager.role != Role.INSTALLATION_MANAGER:
         raise ValidationError(
@@ -94,6 +104,8 @@ def complete_installation_schedule(
         .get(pk=schedule_id)
     )
 
+    _require_project_access(current_actor, schedule.project_id)
+
     if schedule.status != InstallationSchedule.Status.SCHEDULED:
         raise ValidationError(
             'Only scheduled installations may be completed.'
@@ -134,6 +146,8 @@ def cancel_installation_schedule(
         .select_for_update()
         .get(pk=schedule_id)
     )
+
+    _require_project_access(current_actor, schedule.project_id)
 
     if schedule.status != InstallationSchedule.Status.SCHEDULED:
         raise ValidationError(

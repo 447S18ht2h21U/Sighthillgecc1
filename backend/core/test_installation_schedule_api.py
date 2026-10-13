@@ -206,6 +206,52 @@ class InstallationScheduleAPITests(TestCase):
             ).exists()
         )
 
+    def test_project_access_required_for_all_schedule_actions(self):
+        from datetime import date
+        from unittest.mock import patch
+        from .installation_schedule_services import create_installation_schedule
+
+        schedule = create_installation_schedule(
+            actor=self.manager,
+            project=self.project,
+            scheduled_date=date(2026, 10, 20),
+            installation_manager=self.manager,
+        )
+
+        self.client.force_authenticate(self.manager)
+
+        with patch(
+            "core.installation_schedule_services.operational_project_scope"
+        ) as scope:
+            from .models import Project
+            scope.return_value = Project.objects.none()
+
+            create_response = self.client.post(
+                "/api/installation-schedules/",
+                {
+                    "project": str(self.project.pk),
+                    "scheduled_date": "2026-10-21",
+                    "installation_manager": str(self.manager.pk),
+                },
+                format="json",
+            )
+            self.assertEqual(create_response.status_code, 403)
+
+            for operation in ("complete", "cancel"):
+                with self.subTest(operation=operation):
+                    response = self.client.post(
+                        f"/api/installation-schedules/{schedule.pk}/{operation}/",
+                        {},
+                        format="json",
+                    )
+                    self.assertEqual(response.status_code, 403)
+
+        self.assertEqual(InstallationSchedule.objects.count(), 1)
+        schedule.refresh_from_db()
+        self.assertEqual(schedule.status, InstallationSchedule.Status.SCHEDULED)
+        self.assertIsNone(schedule.completed_at)
+        self.assertIsNone(schedule.cancelled_at)
+
     def test_ceo_without_temporary_authorization_cannot_schedule(self):
         ceo = User.objects.create_user(
             username="schedule_api_ceo_without_authorization",
