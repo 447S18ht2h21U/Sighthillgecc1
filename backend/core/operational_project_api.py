@@ -1,4 +1,6 @@
 ﻿from rest_framework import serializers, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from .models import Project, User
 from .operational_visibility import operational_project_scope
@@ -27,6 +29,25 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
         if actor is None:
             return Project.objects.none()
         return operational_project_scope(actor).select_related('customer').order_by('-created_at', '-id')
+
+
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="installation-eligibility",
+    )
+    def installation_eligibility(self, request, pk=None):
+        project = self.get_object()
+
+        from .installation_readiness import installation_readiness
+
+        result = installation_readiness(project)
+
+        return Response({
+            "project_id": project.id,
+            **result,
+        })
 
     def finalize_response(self, request, response, *args, **kwargs):
         response = super().finalize_response(request, response, *args, **kwargs)

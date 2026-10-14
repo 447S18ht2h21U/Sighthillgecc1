@@ -21,7 +21,7 @@ class FoundationTests(TestCase):
         self.customer = Customer.objects.create(legal_name='Example Customer', billing_address='10 Main Street', created_by=self.sales)
         self.project = create_project(self.sales, self.customer, '12 Main Street', self.sales, self.manager)
         self.snapshot = copy.deepcopy(self.project.pending.snapshot)
-        self.snapshot.update(scope='Install heat pump', equipment=[{'description':'Heat pump', 'quantity':'1'}], materials=[], base_price='10000.00', total_price='10000.00', payment_terms='50% deposit when legally eligible; balance upon completion.')
+        self.snapshot.update(scope='Install heat pump', equipment=[{'description':'Heat pump', 'quantity':'1'}], materials=[], base_price='10000.00', total_price='10000.00', payment_terms='100% due upon completion.')
         self.client = APIClient()
     def edit_submit(self):
         item = transition(self.sales, self.project.pending.id, 'edit', 0, snapshot=self.snapshot)
@@ -147,8 +147,38 @@ class FoundationTests(TestCase):
         token = client.get('/api/csrf/').json()['csrfToken']
         self.assertEqual(client.post('/api/dev-login/', {'username':'sales','password':'LocalPassword123!'}, format='json', HTTP_X_CSRFTOKEN=token).status_code, 200)
     def test_money_validation_and_payment_options(self):
-        for option in ['50_PERCENT_DEPOSIT', '100_PERCENT_COMPLETION']:
-            validate_snapshot({**self.snapshot, 'payment_option':option}, complete=True)
+        valid_combinations = [
+            ('FINANCED', '50_PERCENT_DEPOSIT'),
+            ('NON_FINANCED', '100_PERCENT_COMPLETION'),
+        ]
+        for financing, option in valid_combinations:
+            with self.subTest(financing=financing):
+                validate_snapshot({
+                    **self.snapshot,
+                    'financing_type': financing,
+                    'payment_option': option,
+                }, complete=True)
+        for financing, option in [
+            ('FINANCED', '100_PERCENT_COMPLETION'),
+            ('NON_FINANCED', '50_PERCENT_DEPOSIT'),
+        ]:
+            with self.subTest(financing=financing, option=option):
+                with self.assertRaises(ValidationError):
+                    validate_snapshot({
+                        **self.snapshot,
+                        'financing_type': financing,
+                        'payment_option': option,
+                    }, complete=True)
+        with self.assertRaises(ValidationError):
+            validate_snapshot({
+                **self.snapshot,
+                'financing_type': '',
+            }, complete=True)
+        validate_snapshot({
+            **self.snapshot,
+            'financing_type': 'NON_FINANCED',
+            'payment_option': '50_PERCENT_DEPOSIT',
+        }, complete=False)
         for value in ['NaN', '-1', '1.234']:
             with self.assertRaises(ValidationError):
                 validate_snapshot({**self.snapshot, 'total_price':value}, complete=True)
@@ -212,7 +242,7 @@ class FoundationTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()['pending']['number'], 1)
         self.assertIsNone(response.json()['current_approved'])
-        self.assertEqual(response.json()['pending']['snapshot']['payment_option'], '50_PERCENT_DEPOSIT')
+        self.assertEqual(response.json()['pending']['snapshot']['payment_option'], '100_PERCENT_COMPLETION')
 
 from concurrent.futures import ThreadPoolExecutor
 from unittest import skipUnless

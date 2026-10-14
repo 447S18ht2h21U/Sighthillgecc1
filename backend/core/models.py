@@ -75,6 +75,56 @@ class Project(Entity):
     current_approved = models.ForeignKey('MSR', null=True, blank=True, on_delete=models.PROTECT, related_name='+')
     pending = models.ForeignKey('MSR', null=True, blank=True, on_delete=models.PROTECT, related_name='+')
 
+class TemporaryProjectAccessAuthorization(Entity):
+    """Independently approved, project-specific temporary operational access."""
+
+    class Status(models.TextChoices):
+        REQUESTED = 'REQUESTED', 'Requested'
+        APPROVED = 'APPROVED', 'Approved'
+        REJECTED = 'REJECTED', 'Rejected'
+        REVOKED = 'REVOKED', 'Revoked'
+        COMPLETED = 'COMPLETED', 'Completed'
+
+    temporary_duty = models.ForeignKey(
+        TemporaryDutyAuthorization,
+        on_delete=models.PROTECT,
+        related_name='project_access_authorizations',
+    )
+    employee = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='temporary_project_access',
+    )
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.PROTECT,
+        related_name='temporary_access_authorizations',
+    )
+    requested_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='temporary_project_access_requested',
+    )
+    approved_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='temporary_project_access_approved',
+    )
+    reason = models.TextField()
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.REQUESTED,
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+
 class MSR(Entity):
     project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name='versions')
     number = models.PositiveIntegerField(default=1)
@@ -174,6 +224,71 @@ class Document(Entity):
         super().save(*args, **kwargs)
     def delete(self, *args, **kwargs):
         raise ValidationError('Generated documents cannot be deleted.')
+
+
+class CustomerSignatureEvidence(Entity):
+    """Immutable evidence of a verified customer or GECC signature."""
+
+    class DocumentKind(models.TextChoices):
+        CONTRACT = 'CONTRACT', 'Contract'
+        INVOICE = 'INVOICE', 'Invoice'
+
+    class SignerRole(models.TextChoices):
+        CUSTOMER = 'CUSTOMER', 'Customer'
+        GECC = 'GECC', 'GECC'
+
+    msr = models.ForeignKey(
+        MSR,
+        on_delete=models.PROTECT,
+        related_name='signature_evidence',
+    )
+
+    document_kind = models.CharField(
+        max_length=20,
+        choices=DocumentKind.choices,
+    )
+
+    signer_role = models.CharField(
+        max_length=20,
+        choices=SignerRole.choices,
+    )
+
+    signer_name = models.CharField(
+        max_length=250,
+    )
+
+    signer_email = models.EmailField()
+
+    signed_at = models.DateTimeField()
+
+    provider_reference = models.CharField(
+        max_length=250,
+    )
+
+    digest = models.CharField(
+        max_length=64,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    'msr',
+                    'document_kind',
+                    'signer_role',
+                    'digest',
+                ],
+                name='customer_signature_evidence_unique',
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Signature evidence is immutable.')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Signature evidence cannot be deleted.')
 
 
 class SigningPlan(Entity):
@@ -299,6 +414,15 @@ class InstallationSchedule(Entity):
         null=True,
         blank=True,
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['project'],
+                condition=models.Q(status='SCHEDULED'),
+                name='one_active_installation_schedule_per_project',
+            ),
+        ]
 
 class ProjectTechnicalAssignment(Entity):
     """Controlled assignment of technical responsibility to a project."""

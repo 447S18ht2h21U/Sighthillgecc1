@@ -2,8 +2,7 @@
 
 from django.utils import timezone
 
-from .models import Project, ProjectTechnicalAssignment, Role, TemporaryDutyAuthorization
-from .temporary_duty_services import is_temporary_duty_active
+from .models import Project, ProjectTechnicalAssignment, Role, TemporaryProjectAccessAuthorization
 
 
 def operational_project_scope(user):
@@ -20,16 +19,6 @@ def operational_project_scope(user):
     ):
         return queryset
 
-    authorizations = TemporaryDutyAuthorization.objects.filter(
-        employee=user,
-        permanent_role=user.role,
-        temporary_role=Role.INSTALLATION_MANAGER,
-        status=TemporaryDutyAuthorization.Status.APPROVED,
-    )
-
-    if any(is_temporary_duty_active(item, user) for item in authorizations):
-        return queryset
-
     if user.role == Role.SALES_ASSOCIATE:
         return queryset.filter(sales_associate=user)
 
@@ -40,4 +29,22 @@ def operational_project_scope(user):
             technical_assignments__effective_date__lte=timezone.localdate(),
         ).distinct()
 
-    return queryset.none()
+    now = timezone.now()
+    access_ids = TemporaryProjectAccessAuthorization.objects.filter(
+        employee=user,
+        status=TemporaryProjectAccessAuthorization.Status.APPROVED,
+        starts_at__lte=now,
+        ends_at__gt=now,
+        revoked_at__isnull=True,
+        closed_at__isnull=True,
+        approved_by__is_active=True,
+        temporary_duty__status="APPROVED",
+        temporary_duty__starts_at__lte=now,
+        temporary_duty__ends_at__gt=now,
+        temporary_duty__revoked_at__isnull=True,
+        temporary_duty__closed_at__isnull=True,
+        temporary_duty__employee=user,
+        temporary_duty__approved_by__is_active=True,
+    ).values_list("project_id", flat=True)
+
+    return queryset.filter(pk__in=access_ids)

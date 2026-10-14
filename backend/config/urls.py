@@ -5,6 +5,7 @@ router = DefaultRouter()
 for prefix, view in [('customers', api.CustomerViewSet), ('contacts', api.ContactViewSet), ('projects', api.ProjectViewSet), ('msrs', api.MSRViewSet), ('documents', api.DocumentViewSet), ('audit', api.AuditViewSet), ('directory', api.DirectoryViewSet), ('accounts', api.AccountViewSet)]:
     router.register(prefix, view, basename=prefix)
 router.register('installation-schedules', installation_schedule_api.InstallationScheduleViewSet, basename='installation-schedules')
+router.register('installation-managers', installation_schedule_api.InstallationManagerDirectoryViewSet, basename='installation-managers')
 router.register('technical-assignments', technical_assignment_api.TechnicalAssignmentViewSet, basename='technical-assignments')
 router.register('operational-projects', operational_project_api.OperationalProjectViewSet, basename='operational-projects')
 urlpatterns = [

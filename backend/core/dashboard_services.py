@@ -8,6 +8,7 @@ from .models import (
     CustomerPayment,
     CustomerPaymentAdjustment,
     InstallationSchedule,
+    ReleasePackage,
 )
 from .operational_visibility import operational_project_scope
 from .payment_services import get_project_payment_status
@@ -22,6 +23,37 @@ DASHBOARD_STAGES = {
     'installation_complete': 'Installation Complete',
     'payment_received': 'Payment Received',
 }
+
+
+def installation_completion_verified(project):
+    """Return True only when installation completion has verified release evidence."""
+
+    if not InstallationSchedule.objects.filter(
+        project=project,
+        status=InstallationSchedule.Status.COMPLETED,
+    ).exists():
+        return False
+
+    evidence = project.current_approved.verification_evidence.filter(
+        kind='WORK_COMPLETION',
+    ).order_by('-created_at', '-id').first()
+
+    if not evidence:
+        return False
+
+    if evidence.data.get('verified') is not True:
+        return False
+
+    package = ReleasePackage.objects.filter(
+        plan__msr__project=project,
+    ).order_by('-created_at', '-id').first()
+
+    if not package:
+        return False
+
+    from . import release
+
+    return release.status(package)['status'] == 'APPROVED'
 
 
 def get_project_dashboard_stages(project):
@@ -45,6 +77,9 @@ def get_project_dashboard_stages(project):
         status=InstallationSchedule.Status.SCHEDULED,
     ).exists():
         stages.append('installation_scheduled')
+
+    if installation_completion_verified(project):
+        stages.append('installation_complete')
 
     if project.current_approved_id:
         try:

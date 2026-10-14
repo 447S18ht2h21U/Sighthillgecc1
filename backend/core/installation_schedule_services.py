@@ -7,6 +7,7 @@ from .models import (
 )
 from .operational_visibility import operational_project_scope
 from .services import audit
+from .installation_eligibility import ensure_installation_eligible
 
 from django.utils import timezone
 
@@ -65,6 +66,8 @@ def create_installation_schedule(
         raise ValidationError(
             'Assigned installation manager must have the installation manager role.'
         )
+
+    ensure_installation_eligible(project)
 
     schedule = InstallationSchedule.objects.create(
         project=project,

@@ -82,10 +82,18 @@ def validate_snapshot(data, complete=False):
     if 'financing_type' in result and result['financing_type'] not in {'FINANCED', 'NON_FINANCED'}:
         raise ValidationError({'financing_type': 'Choose financed or non-financed.'})
     if complete:
-        required = SNAPSHOT_FIELDS - {'commercial_notes', 'contact', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip', 'financing_type'}
+        required = SNAPSHOT_FIELDS - {'commercial_notes', 'contact', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip'}
         missing = [key for key in required if key not in result or (isinstance(result[key], str) and not result[key].strip())]
         if missing:
             raise ValidationError({'required': sorted(missing)})
+        expected_option = {
+            'FINANCED': '50_PERCENT_DEPOSIT',
+            'NON_FINANCED': '100_PERCENT_COMPLETION',
+        }[result['financing_type']]
+        if result['payment_option'] != expected_option:
+            raise ValidationError({
+                'payment_option': 'Payment option must match the financing classification.'
+            })
         expected = Decimal(result['base_price']) - Decimal(result['discount']) + Decimal(result['tax'])
         if expected != Decimal(result['total_price']) or expected <= 0:
             raise ValidationError({'total_price': 'Must equal base price minus discount plus tax and be positive.'})
@@ -109,7 +117,7 @@ def create_project(actor, customer, location, associate, reviewer, duplicate_rea
     if duplicates and not duplicate_reason.strip():
         raise ValidationError({'duplicate_warning': 'A project exists for this customer/location. Supply duplicate_reason to continue.'})
     project = Project.objects.create(code=next_code(associate.initials), customer=customer, location=location.strip(), sales_associate=associate, reviewer=reviewer)
-    draft = MSR.objects.create(project=project, created_by=actor, prepared_by=actor, snapshot={'customer': customer.legal_name, 'billing_address': customer.billing_address, 'project_location': project.location, 'contact': '', 'scope': '', 'equipment': [], 'materials': [], 'base_price': '0.00', 'discount': '0.00', 'tax': '0.00', 'total_price': '0.00', 'payment_option': '50_PERCENT_DEPOSIT', 'payment_terms': '', 'commercial_notes': '', 'financing_type': 'NON_FINANCED', 'customer_phone': customer.phone, 'customer_email': customer.email, 'project_city': '', 'project_state': '', 'project_zip': ''})
+    draft = MSR.objects.create(project=project, created_by=actor, prepared_by=actor, snapshot={'customer': customer.legal_name, 'billing_address': customer.billing_address, 'project_location': project.location, 'contact': '', 'scope': '', 'equipment': [], 'materials': [], 'base_price': '0.00', 'discount': '0.00', 'tax': '0.00', 'total_price': '0.00', 'payment_option': '100_PERCENT_COMPLETION', 'payment_terms': '', 'commercial_notes': '', 'financing_type': 'NON_FINANCED', 'customer_phone': customer.phone, 'customer_email': customer.email, 'project_city': '', 'project_state': '', 'project_zip': ''})
     project.pending = draft
     project.save()
     audit(actor, 'project.created', project.id, {'code': project.code, 'version': 1, 'duplicate_override': duplicate_reason})

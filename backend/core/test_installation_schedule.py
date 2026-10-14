@@ -8,6 +8,10 @@ from .models import (
     User,
     Role,
     InstallationSchedule,
+    MSR,
+    CustomerSignatureEvidence,
+    ProjectEvidence,
+    CustomerPayment,
 )
 
 from .installation_schedule_services import (
@@ -15,6 +19,8 @@ from .installation_schedule_services import (
     complete_installation_schedule,
     cancel_installation_schedule,
 )
+
+from .services import create_project
 
 
 class InstallationScheduleTests(TestCase):
@@ -35,22 +41,140 @@ class InstallationScheduleTests(TestCase):
             initials='CC',
         )
 
+        self.sales = User.objects.create_user(
+            username='installation_sales_test',
+            password='test-password',
+            role=Role.SALES_ASSOCIATE,
+            initials='SA',
+        )
+
+        self.sales_manager = User.objects.create_user(
+            username='installation_sales_manager_test',
+            password='test-password',
+            role=Role.SALES_MANAGER,
+            initials='SM',
+        )
+
         self.customer = Customer.objects.create(
             legal_name='Installation Test Customer',
             billing_address='123 Installation Road',
-            created_by=self.comptroller,
+            created_by=self.sales,
         )
 
-        self.project = Project.objects.create(
-            code='INSTALL-TEST-001',
-            customer=self.customer,
-            location='Installation Test Location',
-            sales_associate=self.comptroller,
-            reviewer=self.comptroller,
-            state='APPROVED',
+        self.project = create_project(
+            self.sales,
+            self.customer,
+            'Installation Test Location',
+            self.sales,
+            self.sales_manager,
         )
+
+    def make_installation_eligible(self, financed=True):
+        from datetime import timedelta
+        from django.utils import timezone
+        from .services import transition
+
+        self.project.refresh_from_db()
+
+        if self.project.current_approved:
+            msr = self.project.current_approved
+        else:
+            msr = self.project.pending
+
+            msr.snapshot.update({
+            'scope': 'Install HVAC equipment',
+            'payment_terms': '50% deposit when eligible; balance upon completion.' if financed else '100% due upon completion.',
+            'base_price': '10000.00',
+            'discount': '0.00',
+            'tax': '0.00',
+            'total_price': '10000.00',
+            'financing_type': 'FINANCED' if financed else 'NON_FINANCED',
+            'payment_option': '50_PERCENT_DEPOSIT' if financed else '100_PERCENT_COMPLETION',
+        })
+
+            msr = transition(
+                self.sales,
+                msr.id,
+                'edit',
+                msr.edit_sequence,
+                snapshot=msr.snapshot,
+            )
+
+            msr = transition(
+                self.sales,
+                msr.id,
+                'submit',
+                msr.edit_sequence,
+            )
+
+            msr = transition(
+                self.sales_manager,
+                msr.id,
+                'approve',
+                msr.edit_sequence,
+            )
+
+            self.project.refresh_from_db()
+            msr = self.project.current_approved
+
+        signed_at = timezone.now() - timedelta(days=10)
+
+        for kind in (
+            CustomerSignatureEvidence.DocumentKind.CONTRACT,
+            CustomerSignatureEvidence.DocumentKind.INVOICE,
+        ):
+            CustomerSignatureEvidence.objects.get_or_create(
+                msr=msr,
+                document_kind=kind,
+                signer_role=CustomerSignatureEvidence.SignerRole.CUSTOMER,
+                digest=f'{kind}-DIGEST',
+                defaults={
+                    'signer_name': 'Test Customer',
+                    'signer_email': 'customer@example.com',
+                    'signed_at': signed_at,
+                    'provider_reference': 'TEST-ENVELOPE',
+                },
+            )
+
+        deadline = signed_at + timedelta(days=1)
+
+        ProjectEvidence.objects.create(
+            msr=msr,
+            kind='CANCELLATION_DEADLINE',
+            created_by=self.comptroller,
+            data={
+                'verified': True,
+                'deadline': deadline.isoformat(),
+                'snapshot_sha256': 'TEST',
+            },
+            digest='TEST-DEADLINE-DIGEST',
+        )
+
+        if financed:
+            payment, created = CustomerPayment.objects.get_or_create(
+                project=self.project,
+                msr=msr,
+                payment_reference='TEST-DEPOSIT',
+                defaults={
+                    'kind': CustomerPayment.Kind.DEPOSIT,
+                    'amount': '5000.00',
+                    'received_date': timezone.localdate(),
+                    'status': CustomerPayment.Status.PENDING,
+                    'recorded_by': self.comptroller,
+                },
+            )
+
+            if payment.status == CustomerPayment.Status.PENDING:
+                from .payment_services import verify_customer_payment
+                verify_customer_payment(
+                    self.comptroller,
+                    payment.id,
+                )
+
+        return msr
 
     def test_installation_can_be_scheduled(self):
+        self.make_installation_eligible()
 
         schedule = create_installation_schedule(
             self.manager,
@@ -75,6 +199,7 @@ class InstallationScheduleTests(TestCase):
         )
 
     def test_installation_can_be_completed(self):
+        self.make_installation_eligible()
 
         schedule = create_installation_schedule(
             self.manager,
@@ -98,6 +223,7 @@ class InstallationScheduleTests(TestCase):
         )
 
     def test_installation_can_be_cancelled(self):
+        self.make_installation_eligible()
 
         schedule = create_installation_schedule(
             self.manager,
@@ -121,6 +247,7 @@ class InstallationScheduleTests(TestCase):
         )
 
     def test_completed_installation_cannot_be_reopened(self):
+        self.make_installation_eligible()
 
         schedule = create_installation_schedule(
             self.manager,
@@ -139,6 +266,7 @@ class InstallationScheduleTests(TestCase):
         with self.assertRaises(Exception):
             schedule.save()
     def test_unauthorized_employee_cannot_complete_or_cancel(self):
+        self.make_installation_eligible()
         from rest_framework.exceptions import PermissionDenied
 
         associate = User.objects.create_user(
@@ -191,6 +319,10 @@ class InstallationScheduleTests(TestCase):
             authorization_id=authorization.pk,
             approver=self.comptroller,
         )
+        self.make_installation_eligible()
+
+        self.make_installation_eligible()
+
         schedule = create_installation_schedule(
             self.manager, self.project, date(2026, 10, 20), self.manager,
         )
@@ -228,6 +360,10 @@ class InstallationScheduleTests(TestCase):
             authorization_id=authorization.pk,
             approver=self.comptroller,
         )
+        self.make_installation_eligible()
+
+        self.make_installation_eligible()
+
         schedule = create_installation_schedule(
             self.manager, self.project, date(2026, 10, 20), self.manager,
         )
@@ -269,6 +405,10 @@ class InstallationScheduleTests(TestCase):
             authorization_id=authorization.pk,
             approver=self.comptroller,
         )
+        self.make_installation_eligible()
+
+        self.make_installation_eligible()
+
         schedule = create_installation_schedule(
             self.manager, self.project, date(2026, 10, 20), self.manager,
         )
@@ -290,6 +430,10 @@ class InstallationScheduleTests(TestCase):
 
     def test_inactive_installation_manager_cannot_modify_schedules(self):
         from rest_framework.exceptions import PermissionDenied
+
+        self.make_installation_eligible()
+
+        self.make_installation_eligible()
 
         schedule = create_installation_schedule(
             self.manager, self.project, date(2026, 10, 20), self.manager,
@@ -336,6 +480,8 @@ class InstallationScheduleTests(TestCase):
             authorization_id=authorization.pk,
             approver=self.comptroller,
         )
+        self.make_installation_eligible()
+
         schedule = create_installation_schedule(
             ceo, self.project, date(2026, 10, 20), self.manager,
         )

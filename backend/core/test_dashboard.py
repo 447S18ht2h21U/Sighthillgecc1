@@ -1,15 +1,18 @@
 ﻿from datetime import date
 from decimal import Decimal
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from . import tests as foundation
 from .dashboard_services import get_project_dashboard_stages
 from .documents import generate
-from .models import CustomerPayment, InstallationSchedule
+from .models import CustomerPayment, InstallationSchedule, ProjectEvidence
 from .payment_services import verify_customer_payment
+from . import release, test_signing as signing_tests
+from .signing import prepare
 
 
+@override_settings(DEBUG=True)
 class DashboardTests(TestCase):
     setUp = foundation.FoundationTests.setUp
     edit_submit = foundation.FoundationTests.edit_submit
@@ -80,3 +83,79 @@ class DashboardTests(TestCase):
         self.assertNotIn('contracted_for_work', stages)
         self.assertNotIn('invoice_signed', stages)
         self.assertNotIn('installation_complete', stages)
+
+    def test_verified_completion_release_qualifies_as_installation_complete(self):
+        approved = self.approve()
+
+        InstallationSchedule.objects.create(
+            project=self.project,
+            scheduled_date=date(2026, 10, 20),
+            status=InstallationSchedule.Status.COMPLETED,
+            installation_manager=self.manager,
+            scheduled_by=self.manager,
+        )
+
+        self.manager.first_name = 'Review'
+        self.manager.last_name = 'Manager'
+        self.manager.email = 'manager@example.invalid'
+        self.manager.save()
+
+        self.comptroller.first_name = 'Review'
+        self.comptroller.last_name = 'Comptroller'
+        self.comptroller.email = 'comptroller@example.invalid'
+        self.comptroller.save()
+
+        data = {
+            'group': 'COMPLETION_NON_FINANCED',
+            'customer_name': 'Authorized Customer',
+            'customer_email': 'customer@example.invalid',
+            'gecc_signer': str(self.comptroller.id),
+            'authority_note': 'Synthetic test identity and signing authority reviewed.',
+            'substitute_reason': 'Synthetic test scenario',
+        }
+
+        for kind in ['CONTRACT', 'INVOICE', 'COMPLETION_NON_FINANCED']:
+            generate(self.manager, approved.id, kind)
+
+        plan, _ = prepare(
+            self.manager,
+            approved.id,
+            data,
+        )
+
+        release.record_evidence(
+            self.comptroller,
+            approved.id,
+            {
+                'kind': 'WORK_COMPLETION',
+                'verified': True,
+                'source_reference': 'TEST-COMPLETION',
+                'verification_note': 'Synthetic completion verification.',
+                'completion_date': '2026-10-08',
+                'work_verified': True,
+                'permits_inspections_checked': True,
+                'exceptions_resolved': True,
+                'substitute_reason': 'Synthetic test scenario',
+            },
+        )
+
+        package, _ = release.prepare_package(
+            self.comptroller,
+            plan.id,
+        )
+
+        release.decide(
+            self.manager,
+            package.id,
+            {
+                'decision': 'APPROVED',
+                'note': 'Reviewed completion documents and evidence.',
+                'documents_and_evidence_reviewed': True,
+            },
+        )
+
+        self.assertIn(
+            'installation_complete',
+            self.stages(),
+        )
+

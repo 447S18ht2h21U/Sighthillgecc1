@@ -141,14 +141,17 @@ class OperationalVisibilityTests(TestCase):
         ceo = User.objects.create_user(username='visibility_ceo', role=Role.CEO, initials='CE')
         now = timezone.now()
         authorization = request_temporary_duty(employee=ceo, temporary_role=Role.INSTALLATION_MANAGER, requested_by=ceo, reason='Temporary operational coverage', starts_at=now - timedelta(minutes=1), ends_at=now + timedelta(days=2))
-        expected = {self.project.id, self.other_project.id}
         self.assertEqual(self.visible_ids(ceo), set())
         approved = approve_temporary_duty(authorization_id=authorization.pk, approver=self.comptroller)
-        self.assertEqual(self.visible_ids(ceo), expected)
+        self.assertEqual(
+            self.visible_ids(ceo),
+            set(),
+            'Temporary duty authorization must not independently grant project access.',
+        )
         self.assertEqual(ceo.role, Role.CEO)
         with patch('django.utils.timezone.now', return_value=approved.ends_at):
             self.assertEqual(self.visible_ids(ceo), set())
-        self.assertEqual(self.visible_ids(ceo), expected)
+        self.assertEqual(self.visible_ids(ceo), set())
         revoke_temporary_duty(authorization_id=approved.pk, revoked_by=self.comptroller, reason='Coverage ended')
         self.assertEqual(self.visible_ids(ceo), set())
 
