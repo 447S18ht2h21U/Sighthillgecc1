@@ -1762,3 +1762,53 @@ class EmployeePayrollPaymentIssuance(Entity):
 
     def __str__(self):
         return f'Payroll payment issuance {self.payroll_record_id}'
+
+class CustomerSignerAuthorization(Entity):
+    """Immutable, independently approved customer signing authority."""
+
+    class Group(models.TextChoices):
+        COMMERCIAL = 'COMMERCIAL', 'Contract and invoice'
+        COMPLETION_FINANCED = 'COMPLETION_FINANCED', 'Financed completion'
+        COMPLETION_NON_FINANCED = 'COMPLETION_NON_FINANCED', 'Non-financed completion'
+
+    project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name='customer_signer_authorizations')
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='signer_authorizations')
+    group = models.CharField(max_length=32, choices=Group.choices)
+    signer_name = models.CharField(max_length=250)
+    signer_email = models.EmailField()
+    authority_basis = models.TextField()
+    evidence_reference = models.TextField()
+    requested_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='customer_signer_requests')
+    approved_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='customer_signer_approvals')
+    approved_at = models.DateTimeField()
+    digest = models.CharField(max_length=64)
+
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Customer signer authorizations are immutable.')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Customer signer authorizations cannot be deleted.')
+
+
+class CustomerSignerRevocation(Entity):
+    """Immutable revocation; the original approval remains preserved."""
+
+    authorization = models.OneToOneField(
+        CustomerSignerAuthorization,
+        on_delete=models.PROTECT,
+        related_name='revocation',
+    )
+    revoked_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='customer_signer_revocations')
+    revoked_at = models.DateTimeField()
+    reason = models.TextField()
+    digest = models.CharField(max_length=64)
+
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Customer signer revocations are immutable.')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Customer signer revocations cannot be deleted.')
