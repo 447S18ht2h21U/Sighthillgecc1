@@ -583,6 +583,28 @@ class CompletionSignatureVerification(Entity):
     def delete(self, *args, **kwargs):
         raise ValidationError('Completion signature verification records cannot be deleted.')
 
+class CompletionSignatureDocument(Entity):
+    """Immutable retained completion-signature PDF; not independently proof of completion."""
+    verification = models.ForeignKey(CompletionSignatureVerification, on_delete=models.PROTECT, related_name='retained_documents')
+    document_id = models.CharField(max_length=20)
+    kind = models.CharField(max_length=32)
+    filename = models.CharField(max_length=250)
+    content = models.BinaryField()
+    pdf_sha256 = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['verification', 'document_id'], name='completion_signature_document_unique')
+        ]
+
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Retained completion-signature documents are immutable.')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Retained completion-signature documents cannot be deleted.')
+
 class Contractor(Entity):
     """Permanent identity for a GECC independent contractor."""
 
