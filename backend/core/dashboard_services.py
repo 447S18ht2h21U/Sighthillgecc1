@@ -51,9 +51,10 @@ def installation_completion_verified(project):
     if not package:
         return False
 
-    from . import release
 
-    return release.status(package)['status'] == 'APPROVED'
+    # Release approval is not evidence of a signed completion certificate.
+    # Keep this stage blocked until trusted provider-verified signatures exist.
+    return False
 
 
 def get_project_dashboard_stages(project):

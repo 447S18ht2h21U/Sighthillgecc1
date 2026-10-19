@@ -84,7 +84,7 @@ class DashboardTests(TestCase):
         self.assertNotIn('invoice_signed', stages)
         self.assertNotIn('installation_complete', stages)
 
-    def test_verified_completion_release_qualifies_as_installation_complete(self):
+    def test_approved_completion_release_without_signature_does_not_qualify(self):
         approved = self.approve()
 
         InstallationSchedule.objects.create(
@@ -154,7 +154,7 @@ class DashboardTests(TestCase):
             },
         )
 
-        self.assertIn(
+        self.assertNotIn(
             'installation_complete',
             self.stages(),
         )
