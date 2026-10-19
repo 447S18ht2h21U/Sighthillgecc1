@@ -566,6 +566,23 @@ class SigningTestDocument(ImmutableSigningTestRecord):
     class Meta:
         constraints = [models.UniqueConstraint(fields=['attempt','document_id'], name='signing_test_document_unique')]
 
+class CompletionSignatureVerification(Entity):
+    """Immutable provider-verification observation; not independently proof of completion."""
+    release_package = models.ForeignKey(ReleasePackage, on_delete=models.PROTECT, related_name='completion_signature_verifications')
+    verified_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    provider_account_id = models.CharField(max_length=100)
+    provider_envelope_id = models.CharField(max_length=100)
+    evidence = models.JSONField()
+    digest = models.CharField(max_length=64)
+
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Completion signature verification records are immutable.')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Completion signature verification records cannot be deleted.')
+
 class Contractor(Entity):
     """Permanent identity for a GECC independent contractor."""
 
