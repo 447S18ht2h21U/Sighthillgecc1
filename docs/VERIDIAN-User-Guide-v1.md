@@ -170,6 +170,24 @@ Installation readiness does not itself authorize an employee to schedule install
 
 If a project is blocked, review the reported reasons and resolve the underlying requirement through the authorized workflow. Do not alter approved historical records or immutable verification evidence to bypass a blocking condition.
 
+### 6.8 Installation Scheduling and Operational Completion
+
+Installation scheduling is a separate authorized action. The scheduling service checks installation eligibility when a schedule is created. The actor must have Installation Manager or Comptroller authority, including valid temporary Installation Manager authority where applicable, and independent project-access permission. Temporary duty authorization does not itself grant project access.
+
+A scheduled installation may subsequently be marked operationally completed or cancelled by an authorized actor with project access. The inspected service permits these transitions from a scheduled state and records an audit event. Operational completion does not establish that the completion certificate has been signed.
+
+The scheduling and completion API paths and end-to-end user interface remain subject to further verification. No additional scheduling-date restriction or mandatory cancellation-reason policy is established by this guidance.
+
+### 6.9 Completion-Signature Verification and Dashboard Status
+
+VERIDIAN has immutable database records for completion-signature verification observations and retained PDF documents. These records preserve evidence but do not independently prove that a signature is authentic.
+
+Existing DocuSign development functions can verify sandbox account identity, inspect signing-test envelope status and recipients, and retain signed sandbox PDFs and provider certificates with SHA-256 hashes. Fictional sandbox signing tests, generated unsigned PDFs, and approved release packages must not be treated as production signatures.
+
+The Installation Complete dashboard stage currently remains blocked even when an installation schedule is operationally completed and supporting work-completion or release evidence exists. Trusted completion-certificate signature verification has not yet been connected to the operational backend.
+
+Future activation requires a separately authorized verification workflow that validates the correct approved MSR and release package, expected customer and authorized GECC signers, completed provider envelope, signed-document identity and integrity, retained provider certificate, and immutable audited evidence. Production signing and verification remain pending implementation, security review, and end-to-end tests.
+
 ## Appendix A. Git Repository and Version References
 
 VERIDIAN source code is maintained using Git. The following references identify the development repository and a verified local checkpoint.
