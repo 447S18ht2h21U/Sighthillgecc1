@@ -169,3 +169,18 @@ Approved payment adjustments reduce the amount counted toward the financed depos
 Installation readiness does not itself authorize an employee to schedule installation. Scheduling remains subject to the separate role, project-access, and operational authorization controls.
 
 If a project is blocked, review the reported reasons and resolve the underlying requirement through the authorized workflow. Do not alter approved historical records or immutable verification evidence to bypass a blocking condition.
+
+## Appendix A. Git Repository and Version References
+
+VERIDIAN source code is maintained using Git. The following references identify the development repository and a verified local checkpoint.
+
+- **GitHub repository:** https://github.com/447S18ht2h21U/Sighthillgecc1
+- **Local development directory:** C:\Users\whody\GECC-local
+- **Development branch:** `gecc/contractor-compensation-2026-10-08`
+- **Verified local commit:** `383a821`
+- **Commit description:** Verify installation readiness safeguards and update VERIDIAN user guidance
+- **User Guide source file:** `docs/VERIDIAN-User-Guide-v1.md`
+
+**Publication status:** Commit `383a821` has been verified locally. Its publication to GitHub has not been authorized or confirmed. Do not assume that the remote repository contains this checkpoint.
+
+**Version control practice:** Record significant development milestones using approved local Git commits. A GitHub push requires separate authorization. Diagnostic regression logs are excluded from this checkpoint.
