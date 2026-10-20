@@ -322,7 +322,7 @@ class FinancialReportTests(TestCase):
         report = create_income_statement(
             self.comptroller,
             date(2026, 10, 1),
-            date(2026, 10, 15),
+            max(date(2026, 10, 15), timezone.localdate()),
         )
 
         self.assertEqual(
@@ -547,7 +547,7 @@ class FinancialReportTests(TestCase):
         report = create_cash_flow_statement(
             self.comptroller,
             date(2026, 10, 1),
-            date(2026, 10, 15),
+            max(date(2026, 10, 15), timezone.localdate()),
         )
 
         self.assertEqual(

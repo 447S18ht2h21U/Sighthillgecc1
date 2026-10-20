@@ -14,6 +14,7 @@ class CompletionSignatureVerificationTests(TestCase):
     approve = release_tests.ReleaseTests.approve
     setup_review = release_tests.ReleaseTests.setup_review
     setup_release = release_tests.ReleaseTests.setup_release
+    authorize_test_customer = release_tests.ReleaseTests.authorize_test_customer
     def make_verification(self):
         self.setup_release(completion=True)
         return CompletionSignatureVerification.objects.create(
@@ -57,6 +58,7 @@ class CompletionSignatureDocumentTests(TestCase):
     approve = release_tests.ReleaseTests.approve
     setup_review = release_tests.ReleaseTests.setup_review
     setup_release = release_tests.ReleaseTests.setup_release
+    authorize_test_customer = release_tests.ReleaseTests.authorize_test_customer
     make_verification = CompletionSignatureVerificationTests.make_verification
 
     def make_document(self):

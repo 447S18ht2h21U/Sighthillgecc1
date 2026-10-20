@@ -386,6 +386,7 @@ class InstallationScheduleTests(TestCase):
         from django.utils import timezone
         from .models import AuditEvent, TemporaryDutyActivity
         from .temporary_duty_services import request_temporary_duty, approve_temporary_duty
+        from .temporary_project_access_services import request_temporary_project_access, approve_temporary_project_access
 
         ceo = User.objects.create_user(
             username='audited_installation_ceo',
@@ -405,8 +406,19 @@ class InstallationScheduleTests(TestCase):
             authorization_id=authorization.pk,
             approver=self.comptroller,
         )
-        self.make_installation_eligible()
-
+        access = request_temporary_project_access(
+            employee=ceo,
+            temporary_duty=approved,
+            project=self.project,
+            requested_by=ceo,
+            reason="Project-specific temporary installation coverage.",
+            starts_at=now,
+            ends_at=now + timedelta(days=1),
+        )
+        approve_temporary_project_access(
+            authorization_id=access.pk,
+            approver=self.comptroller,
+        )
         self.make_installation_eligible()
 
         schedule = create_installation_schedule(
@@ -461,6 +473,7 @@ class InstallationScheduleTests(TestCase):
         from django.utils import timezone
         from .models import AuditEvent, TemporaryDutyActivity
         from .temporary_duty_services import request_temporary_duty, approve_temporary_duty
+        from .temporary_project_access_services import request_temporary_project_access, approve_temporary_project_access
 
         ceo = User.objects.create_user(
             username='scheduling_temporary_ceo',
@@ -478,6 +491,19 @@ class InstallationScheduleTests(TestCase):
         )
         approved = approve_temporary_duty(
             authorization_id=authorization.pk,
+            approver=self.comptroller,
+        )
+        access = request_temporary_project_access(
+            employee=ceo,
+            temporary_duty=approved,
+            project=self.project,
+            requested_by=ceo,
+            reason="Project-specific temporary installation coverage.",
+            starts_at=now,
+            ends_at=now + timedelta(days=1),
+        )
+        approve_temporary_project_access(
+            authorization_id=access.pk,
             approver=self.comptroller,
         )
         self.make_installation_eligible()

@@ -171,10 +171,28 @@ class PayrollSummaryTests(TestCase):
         )
 
     def test_creates_payroll_summary_from_paid_records(self):
+        from django.utils import timezone
+
+        contractor_dates = [
+            timezone.localtime(record.paid_at).date()
+            for record in ContractorPaymentRecord.objects.filter(
+                status=ContractorPaymentRecord.Status.PAID
+            )
+        ]
+        employee_dates = [
+            timezone.localtime(record.paid_at).date()
+            for record in EmployeePayrollRecord.objects.filter(
+                status=EmployeePayrollRecord.Status.PAID
+            )
+        ]
+        self.assertEqual(len(contractor_dates), 1)
+        self.assertEqual(len(employee_dates), 1)
+        payment_dates = contractor_dates + employee_dates
+
         summary = create_payroll_summary(
             self.comptroller,
-            date(2026, 10, 1),
-            date(2026, 10, 15),
+            min(payment_dates),
+            max(payment_dates),
         )
 
         self.assertEqual(

@@ -25,6 +25,7 @@ class SigningTestTests(TestCase):
     approve=fixtures.ReleaseTests.approve
     setup_review=fixtures.ReleaseTests.setup_review
     setup_release=fixtures.ReleaseTests.setup_release
+    authorize_test_customer=fixtures.ReleaseTests.authorize_test_customer
     approval=fixtures.ReleaseTests.approval
     oauth_responses=sandbox_fixtures.SandboxTests.oauth_responses
 

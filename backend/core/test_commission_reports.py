@@ -154,10 +154,22 @@ class CommissionReportTests(TestCase):
             )
 
     def test_creates_biweekly_commission_report(self):
+        from django.utils import timezone
+
+        approved_dates = [
+            timezone.localtime(record.approved_at).date()
+            for record in CommissionRecord.objects.filter(
+                status=CommissionRecord.Status.APPROVED
+            )
+        ]
+        self.assertEqual(len(approved_dates), 2)
+        period_start = min(approved_dates)
+        period_end = max(approved_dates)
+
         report = create_commission_report(
             self.sales_manager,
-            date(2026, 10, 1),
-            date(2026, 10, 15),
+            period_start,
+            period_end,
         )
 
         self.assertEqual(
@@ -167,12 +179,12 @@ class CommissionReportTests(TestCase):
 
         self.assertEqual(
             report.period_start,
-            date(2026, 10, 1),
+            period_start,
         )
 
         self.assertEqual(
             report.period_end,
-            date(2026, 10, 15),
+            period_end,
         )
 
         self.assertEqual(

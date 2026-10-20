@@ -23,7 +23,7 @@ class DocumentTests(TestCase):
         doc, created = generate(self.manager,approved.id,'INVOICE')
         self.assertTrue(created)
         reader = PdfReader(BytesIO(bytes(doc.content)));fields = reader.get_fields()
-        for key, value in {'customer_name':'Example Customer','subtotal':'9,500.00','sales_tax':'570.00','invoice_total':'10,070.00','line_2_amount':'-500.00','payment_option':'/A','msr_version':'1.0'}.items():
+        for key, value in {'customer_name':'Example Customer','subtotal':'9,500.00','sales_tax':'570.00','invoice_total':'10,070.00','line_2_amount':'-500.00','payment_option':'/B','msr_version':'1.0'}.items():
             self.assertEqual(str(fields[key]['/V']),value)
         for key in ['customer_signature','gecc_signature']:
             self.assertEqual(fields[key]['/FT'],'/Sig')
@@ -37,7 +37,7 @@ class DocumentTests(TestCase):
         doc,_ = generate(self.manager,approved.id,'CONTRACT')
         reader = PdfReader(BytesIO(bytes(doc.content)));fields = reader.get_fields()
         self.assertGreaterEqual(len(reader.pages),4)
-        self.assertEqual(fields['payment_option']['/V'],'50% deposit / 50% balance')
+        self.assertEqual(fields['payment_option']['/V'],'100% on completion')
         self.assertEqual(fields['financing_type']['/V'],'Non-financed')
         self.assertFalse(fields['cancellation_deadline'].get('/V'))
         self.assertIn('five calendar days',' '.join(p.extract_text() for p in reader.pages).lower())
@@ -55,7 +55,7 @@ class DocumentTests(TestCase):
         for kind in ['INVOICE','CONTRACT','COMPLETION_NON_FINANCED']:
             generate(self.manager,approved.id,kind)
         revised = revise(self.sales,self.project.id,'Customer selected financing',str(approved.id))
-        snap = {**revised.snapshot,'financing_type':'FINANCED'}
+        snap = {**revised.snapshot,'financing_type':'FINANCED','payment_option':'50_PERCENT_DEPOSIT','payment_terms':'50% deposit / 50% balance.'}
         revised = transition(self.sales,revised.id,'edit',0,snapshot=snap)
         revised = transition(self.sales,revised.id,'submit',revised.edit_sequence)
         revised = transition(self.manager,revised.id,'approve',revised.edit_sequence)
@@ -148,14 +148,10 @@ class DocumentTests(TestCase):
                 with override_settings(DEBUG=False):
                     with self.assertRaises(ValidationError):
                         generate(self.manager,approved.id,'INVOICE')
-    def test_legacy_approval_requires_revision_for_financing(self):
+    def test_missing_financing_classification_blocks_approval(self):
         self.snapshot.pop('financing_type',None)
-        approved=self.approve()
         with self.assertRaises(ValidationError):
-            generate(self.manager,approved.id,'CONTRACT')
-        with self.assertRaises(ValidationError):
-            generate(self.manager,approved.id,'COMPLETION_NON_FINANCED')
-        generate(self.manager,approved.id,'INVOICE')
+            self.approve()
 
 
 from unittest import skipUnless
