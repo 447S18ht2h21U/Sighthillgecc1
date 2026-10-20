@@ -62,6 +62,7 @@ class InstallationEligibilityTests(TestCase):
         deposit=True,
         financed=True,
         signed_days_ago=10,
+        cancellation_days_after_signature=1,
     ):
         from datetime import timedelta
         from django.utils import timezone
@@ -147,7 +148,7 @@ class InstallationEligibilityTests(TestCase):
                 data={
                     'verified': True,
                     'deadline': (
-                        signed_at + timedelta(days=1)
+                        signed_at + timedelta(days=cancellation_days_after_signature)
                     ).isoformat(),
                 },
                 digest='TEST-CANCELLATION-DIGEST',
@@ -258,3 +259,16 @@ class InstallationEligibilityTests(TestCase):
             ensure_installation_eligible(self.project)
 
 
+    def test_cancellation_deadline_parser_rejects_invalid_values(self):
+        from .installation_eligibility import parse_verified_cancellation_deadline
+
+        invalid_values = (
+            "invalid",
+            "2026-10-20T23:59:00",
+            "2026-99-99T23:59:00-04:00",
+            None,
+        )
+        for value in invalid_values:
+            with self.subTest(value=value):
+                with self.assertRaises(ValidationError):
+                    parse_verified_cancellation_deadline(value)

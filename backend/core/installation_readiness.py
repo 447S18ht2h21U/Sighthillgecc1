@@ -9,6 +9,8 @@ from .models import (
     CustomerSignatureEvidence,
     ProjectEvidence,
 )
+from rest_framework.exceptions import ValidationError
+from .installation_eligibility import parse_verified_cancellation_deadline
 from .rules import EASTERN
 
 
@@ -63,10 +65,19 @@ def installation_readiness(project):
     cancellation = ProjectEvidence.objects.filter(
         msr=msr,
         kind="CANCELLATION_DEADLINE",
-    ).order_by("-created_at").first()
+    ).order_by("-created_at", "-id").first()
 
-    if cancellation and cancellation.data.get("verified") is True:
-        result["requirements"]["cancellation_complete"] = True
+    if cancellation and cancellation.data.get("verified") is True and cancellation.data.get("deadline"):
+        try:
+            deadline = parse_verified_cancellation_deadline(cancellation.data["deadline"])
+        except ValidationError:
+            deadline = None
+        if deadline is None:
+            result["blocking_reasons"].append("Valid cancellation deadline with UTC offset is required.")
+        elif timezone.now().astimezone(EASTERN) >= deadline:
+            result["requirements"]["cancellation_complete"] = True
+        else:
+            result["blocking_reasons"].append("Cancellation deadline has not expired.")
     else:
         result["blocking_reasons"].append(
             "Verified cancellation deadline evidence is required."
@@ -100,7 +111,16 @@ def installation_readiness(project):
             Decimal("0.00"),
         )
 
-        if received >= (
+        adjustments = CustomerPaymentAdjustment.objects.filter(
+            payment__in=payments,
+            status=CustomerPaymentAdjustment.Status.APPROVED,
+        )
+        adjusted = sum(
+            (item.amount for item in adjustments),
+            Decimal("0.00"),
+        )
+
+        if received - adjusted >= (
             Decimal(str(msr.snapshot["total_price"]))
             * Decimal("0.50")
         ):
@@ -110,8 +130,12 @@ def installation_readiness(project):
                 "Verified 50% deposit is required before installation."
             )
 
-    else:
+    elif msr.snapshot.get("financing_type") == "NON_FINANCED":
         result["requirements"]["deposit_verified"] = True
+    else:
+        result["blocking_reasons"].append(
+            "Approved MSR requires a valid financing classification."
+        )
 
     result["eligible"] = (
         all(result["requirements"].values())

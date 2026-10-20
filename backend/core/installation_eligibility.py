@@ -13,6 +13,20 @@ from .models import (
 from .rules import EASTERN
 
 
+def parse_verified_cancellation_deadline(value):
+    from django.utils.dateparse import parse_datetime
+
+    try:
+        parsed = parse_datetime(value) if isinstance(value, str) else None
+    except (TypeError, ValueError, OverflowError):
+        parsed = None
+
+    if parsed is None or timezone.is_naive(parsed):
+        raise ValidationError("Valid cancellation deadline with UTC offset is required.")
+
+    return parsed.astimezone(EASTERN)
+
+
 def require_current_approved_msr(project):
     msr = project.current_approved
     if msr is None or msr.status != 'APPROVED':
@@ -49,9 +63,7 @@ def cancellation_deadline(msr):
             'Verified cancellation deadline evidence is required.'
         )
 
-    return timezone.datetime.fromisoformat(
-        evidence.data['deadline']
-    ).astimezone(EASTERN)
+    return parse_verified_cancellation_deadline(evidence.data['deadline'])
 
 
 def require_financed_deposit(project, msr):
