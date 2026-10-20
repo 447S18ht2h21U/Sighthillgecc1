@@ -65,3 +65,23 @@ class OperationalProjectAPITests(TestCase):
         self.client.force_authenticate(self.comptroller)
         response = self.client.post("/api/operational-projects/", {}, format="json")
         self.assertEqual(response.status_code, 405)
+
+    def test_completion_signature_status_access_and_safety(self):
+        url = f"/api/operational-projects/{self.project.pk}/completion-signature-status/"
+        self.client.force_authenticate(user=None)
+        self.assertIn(self.client.get(url).status_code, (401, 403))
+        for user in (self.comptroller, self.manager, self.sales):
+            with self.subTest(role=user.role):
+                self.client.force_authenticate(user)
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(str(response.data["project_id"]), str(self.project.pk))
+                self.assertEqual(response.data["status"], "VERIFICATION_PENDING")
+                self.assertIs(response.data["provider_verified"], False)
+                self.assertIs(response.data["installation_complete_qualified"], False)
+                self.assertEqual(response["Cache-Control"], "private, no-store")
+                self.assertEqual(self.client.post(url, {}, format="json").status_code, 405)
+        self.client.force_authenticate(self.other_sales)
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.client.force_authenticate(self.unrelated)
+        self.assertEqual(self.client.get(url).status_code, 404)

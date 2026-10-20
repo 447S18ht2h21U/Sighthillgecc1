@@ -49,6 +49,21 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
             **result,
         })
 
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="completion-signature-status",
+    )
+    def completion_signature_status(self, request, pk=None):
+        project = self.get_object()
+        return Response({
+            "project_id": project.id,
+            "status": "VERIFICATION_PENDING",
+            "provider_verified": False,
+            "installation_complete_qualified": False,
+            "reason": "Trusted completion-signature verification is not yet available.",
+        })
+
     def finalize_response(self, request, response, *args, **kwargs):
         response = super().finalize_response(request, response, *args, **kwargs)
         response['Cache-Control'] = 'private, no-store'
