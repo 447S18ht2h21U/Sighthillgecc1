@@ -19,6 +19,7 @@ class ReconciliationTests(TestCase):
     edit_submit = fixtures.SandboxTests.edit_submit
     approve = fixtures.SandboxTests.approve
     setup_review = fixtures.SandboxTests.setup_review
+    authorize_test_customer = fixtures.SandboxTests.authorize_test_customer
     setup_package = fixtures.SandboxTests.setup_package
     start = fixtures.SandboxTests.start
     finish = fixtures.SandboxTests.finish
@@ -100,14 +101,46 @@ class ReconciliationTests(TestCase):
 
     def test_superseded_local_review_still_inspected_but_not_validated(self):
         self.known_draft()
+        self.authorize_test_customer(name="Replacement Customer")
         prepare(self.manager,self.approved.id,{**self.input,'customer_name':'Replacement Customer'})
         result,remote=self.check_finish(self.check_start())
         self.assertEqual(result['status'],'SANDBOX_RECONCILIATION_BLOCKED');self.assertEqual(remote.call_count,4)
         self.assertTrue(SandboxObservation.objects.get().evidence['metadata_matched'])
         self.attempt.refresh_from_db();self.assertEqual(self.attempt.state,'RECONCILIATION_REQUIRED')
 
+    def test_revoked_customer_authorization_blocks_reconciliation(self):
+        from .customer_signer_authorization_services import revoke_customer_signer
+
+        self.known_draft()
+        original_digest = self.package.digest
+        original_plan_digest = self.plan.digest
+
+        revoke_customer_signer(
+            authorization_id=self.commercial_authorization.pk,
+            revoked_by=self.manager,
+            reason="Synthetic revocation before reconciliation.",
+        )
+
+        state = self.check_start()
+        result, remote = self.check_finish(state)
+
+        self.assertEqual(result["status"], "SANDBOX_RECONCILIATION_BLOCKED")
+        self.assertEqual(remote.call_count, 4)
+
+        observation = SandboxObservation.objects.get()
+        self.assertTrue(observation.evidence["metadata_matched"])
+        self.assertFalse(observation.evidence["send_available"])
+
+        self.attempt.refresh_from_db()
+        self.assertEqual(self.attempt.state, "RECONCILIATION_REQUIRED")
+
+        self.package.refresh_from_db()
+        self.plan.refresh_from_db()
+        self.assertEqual(self.package.digest, original_digest)
+        self.assertEqual(self.plan.digest, original_plan_digest)
     def test_local_change_during_network_cannot_restore_validation(self):
         self.known_draft();data=iter(self.readings());count=0
+        self.authorize_test_customer(name="Replacement Customer")
         def hook(*args,**kwargs):
             nonlocal count
             count+=1

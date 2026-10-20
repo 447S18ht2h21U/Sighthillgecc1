@@ -115,6 +115,13 @@ def prepare(actor, msr_id, data):
     reason = ''
     if group != 'COMMERCIAL' and signer.role == Role.COMPTROLLER:
         reason = required_text(data, 'substitute_reason', 2000)
+    from .customer_signer_authorization_services import require_approved_customer_signer
+    customer_authorization = require_approved_customer_signer(
+        msr=record,
+        group=group,
+        signer_name=customer['name'],
+        signer_email=customer['email'],
+    )
     docs = []
     for kind in GROUPS[group]:
         doc = Document.objects.filter(msr=record, kind=kind).order_by('-created_at').first()
@@ -125,7 +132,7 @@ def prepare(actor, msr_id, data):
         docs.append(doc)
     review = {'schema_version': 1, 'msr_id': str(record.id), 'msr_version': record.number,
               'snapshot_sha256': canonical_hash(record.snapshot), 'group': group,
-              'customer': customer, 'gecc': gecc, 'authority_note': authority,
+              'customer': customer, 'gecc': gecc, 'authority_note': authority, 'customer_authorization_id': str(customer_authorization.id), 'customer_authorization_digest': customer_authorization.digest,
               'substitute_reason': reason,
               'documents': [{'id': str(d.id), 'kind': d.kind, 'pdf_sha256': d.pdf_sha256, 'template_sha256': d.template_sha256} for d in docs],
               'envelope_preview': envelope_preview(docs, customer, gecc, group == 'COMMERCIAL')}
@@ -138,11 +145,64 @@ def prepare(actor, msr_id, data):
     return plan, True
 
 
+def validate_plan_customer_authorization(plan):
+    """Validate the immutable authorization referenced by a signing review."""
+    from .models import CustomerSignerAuthorization
+    from .customer_signer_authorization_services import verify_customer_signer_integrity
+
+    review = plan.review
+    if not isinstance(review, dict):
+        raise ValidationError("Signing review authorization evidence is invalid.")
+
+    authorization_id = review.get("customer_authorization_id")
+    authorization_digest = review.get("customer_authorization_digest")
+    customer = review.get("customer")
+
+    if not isinstance(customer, dict) or not authorization_id or not authorization_digest:
+        raise ValidationError("Signing review customer authorization evidence is missing.")
+
+    try:
+        authorization_uuid = UUID(str(authorization_id))
+    except (ValueError, TypeError, AttributeError):
+        raise ValidationError("Signing review customer authorization identifier is invalid.")
+
+    authorization = CustomerSignerAuthorization.objects.filter(pk=authorization_uuid).first()
+    if authorization is None:
+        raise ValidationError("Signing review customer authorization is missing.")
+
+    project = plan.msr.project
+    if (
+        authorization.approved_msr_id != plan.msr_id
+        or authorization.project_id != project.pk
+        or authorization.customer_id != project.customer_id
+        or authorization.group != plan.group
+        or authorization.signer_name != customer.get("name")
+        or authorization.signer_email.casefold() != str(customer.get("email", "")).casefold()
+        or authorization.digest != authorization_digest
+    ):
+        raise ValidationError("Signing review customer authorization does not match.")
+
+    verify_customer_signer_integrity(authorization)
+
+    if CustomerSignerAuthorization.objects.filter(
+        pk=authorization.pk,
+        revocation__isnull=False,
+    ).exists():
+        raise ValidationError("Signing review customer authorization has been revoked.")
+
+    return authorization
+
 def status(plan):
     project = plan.msr.project
     blockers = ['Docusign account connection is pending.', 'Signer-ready PDFs and release approval are pending.', 'Provider status reconciliation and signed-document retention are pending.']
     if canonical_hash(plan.review) != plan.digest:
         blockers.insert(0, 'Signing review integrity verification failed.')
+    authorization_invalid = False
+    try:
+        validate_plan_customer_authorization(plan)
+    except ValidationError:
+        authorization_invalid = True
+        blockers.insert(0, 'Customer signing authorization is invalid or revoked; prepare a new review.')
     stale = project.current_approved_id != plan.msr_id
     replaced = SigningPlan.objects.filter(msr=plan.msr, group=plan.group, created_at__gt=plan.created_at).exists()
     cancelled = project.state == 'CANCELLED'
@@ -159,6 +219,6 @@ def status(plan):
         blockers.insert(0, 'Project is cancelled.')
     if plan.group != 'COMMERCIAL':
         blockers.append('Work completion must be verified before certificate signing.')
-    return {'status': 'CANCELLED' if cancelled else 'SUPERSEDED' if stale or replaced else 'REVIEW_REQUIRED' if changed else 'PREPARED',
+    return {'status': 'CANCELLED' if cancelled else 'SUPERSEDED' if stale or replaced else 'REVIEW_REQUIRED' if changed or authorization_invalid else 'PREPARED',
             'provider_status': None, 'send_available': False, 'release_blockers': blockers,
             'expiration_days_after_first_send': 75, 'installation_wait_calendar_days': 5}

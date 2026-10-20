@@ -117,6 +117,8 @@ class DashboardTests(TestCase):
         for kind in ['CONTRACT', 'INVOICE', 'COMPLETION_NON_FINANCED']:
             generate(self.manager, approved.id, kind)
 
+        signing_tests.SigningTests.authorize_test_customer(self, group="COMPLETION_NON_FINANCED")
+
         plan, _ = prepare(
             self.manager,
             approved.id,

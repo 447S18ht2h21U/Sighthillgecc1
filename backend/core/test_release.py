@@ -16,6 +16,7 @@ class ReleaseTests(TestCase):
     edit_submit=foundation.FoundationTests.edit_submit
     approve=foundation.FoundationTests.approve
     setup_review=signing_tests.SigningTests.setup_review
+    authorize_test_customer=signing_tests.SigningTests.authorize_test_customer
     def setup_release(self,completion=False):
         self.setup_review();data={**self.input}
         if completion:data.update(group='COMPLETION_NON_FINANCED',gecc_signer=str(self.comptroller.id),substitute_reason='Synthetic IM unavailable')
@@ -85,6 +86,35 @@ class ReleaseTests(TestCase):
         self.assertEqual(release.status(new)['status'],'BLOCKED')
         with self.assertRaises(ValidationError):release.prepare_package(self.comptroller,self.plan.id)
         release.validate_package(self.package,check_current=False)
+    def test_customer_authorization_revocation_blocks_release(self):
+        from .customer_signer_authorization_services import revoke_customer_signer
+
+        self.setup_release()
+        self.approval()
+
+        self.assertEqual(release.status(self.package)["status"], "APPROVED")
+        original_digest = self.package.digest
+        original_payload = self.package.payload.copy()
+
+        revoke_customer_signer(
+            authorization_id=self.commercial_authorization.pk,
+            revoked_by=self.manager,
+            reason="Synthetic withdrawal before release.",
+        )
+
+        result = release.status(self.package)
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertFalse(result["send_available"])
+
+        with self.assertRaises(ValidationError):
+            release.validate_package(self.package)
+
+        with self.assertRaises(ValidationError):
+            release.prepare_package(self.comptroller, self.plan.id)
+
+        self.package.refresh_from_db()
+        self.assertEqual(self.package.digest, original_digest)
+        self.assertEqual(self.package.payload, original_payload)
     def test_revocation_is_new_immutable_decision(self):
         self.setup_release();first,_=self.approval()
         revoked,_=release.decide(self.comptroller,self.package.id,{'decision':'REVOKED','note':'Synthetic withdrawal'})
@@ -94,6 +124,7 @@ class ReleaseTests(TestCase):
         self.setup_release();self.approval();self.manager.is_active=False;self.manager.save()
         self.assertEqual(release.status(self.package)['status'],'BLOCKED')
         self.manager.is_active=True;self.manager.save()
+        self.authorize_test_customer(name="New Customer")
         prepare(self.manager,self.approved.id,{**self.input,'customer_name':'New Customer'})
         self.assertEqual(release.status(self.package)['status'],'BLOCKED')
         change_project_state(self.comptroller,self.project.id,'cancel','Synthetic cancellation','APPROVED')

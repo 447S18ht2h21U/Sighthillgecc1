@@ -28,6 +28,7 @@ class SandboxTests(TestCase):
     edit_submit = foundation.FoundationTests.edit_submit
     approve = foundation.FoundationTests.approve
     setup_review = signing_tests.SigningTests.setup_review
+    authorize_test_customer = signing_tests.SigningTests.authorize_test_customer
     def setup_package(self, completion=False):
         self.setup_review()
         data={**self.input}
@@ -81,6 +82,7 @@ class SandboxTests(TestCase):
         self.assertFalse(created);self.assertEqual(again.id,self.package.id);self.assertEqual(count,AuditEvent.objects.count())
         with self.assertRaises(DatabaseError),transaction.atomic():SandboxPackage.objects.filter(pk=self.package.id).update(payload={})
         with self.assertRaises(DatabaseError),transaction.atomic():SandboxPackage.objects.filter(pk=self.package.id).delete()
+        self.authorize_test_customer(name="Other Customer")
         other,_=prepare(self.manager,self.approved.id,{**self.input,'customer_name':'Other Customer'})
         with patch('core.sandbox.audit',side_effect=RuntimeError('audit unavailable')),self.assertRaises(RuntimeError):sandbox.prepare_package(self.manager,other.id)
         self.assertEqual(SandboxPackage.objects.count(),1)
@@ -91,11 +93,42 @@ class SandboxTests(TestCase):
         with patch.dict(os.environ,CONFIG),self.assertRaises(ValidationError):sandbox.begin_draft(self.comptroller,'session',self.package.id,True)
         # Historical package bytes remain readable, but cannot be sent to Docusign.
         sandbox.validate_package(self.package,check_current=False)
+    def test_revoked_customer_authorization_blocks_sandbox(self):
+        from copy import deepcopy
+        from .customer_signer_authorization_services import revoke_customer_signer
+
+        self.setup_package()
+        original_payload = deepcopy(self.package.payload)
+        original_digest = self.package.digest
+
+        revoke_customer_signer(
+            authorization_id=self.commercial_authorization.pk,
+            revoked_by=self.manager,
+            reason="Synthetic withdrawal before sandbox draft creation.",
+        )
+
+        with self.assertRaises(ValidationError):
+            sandbox.prepare_package(self.manager, self.plan.id)
+
+        with self.assertRaises(ValidationError):
+            sandbox.validate_package(self.package)
+
+        with patch.dict(os.environ, CONFIG), self.assertRaises(ValidationError):
+            sandbox.begin_draft(
+                self.comptroller, "synthetic-session", self.package.id, True
+            )
+
+        sandbox.validate_package(self.package, check_current=False)
+        self.package.refresh_from_db()
+        self.assertEqual(self.package.payload, original_payload)
+        self.assertEqual(self.package.digest, original_digest)
     def test_package_integrity_rejects_memory_tamper(self):
         self.setup_package();self.package.payload['documents'][0]['pdf_sha256']='0'*64
         with self.assertRaises(ValidationError):sandbox.validate_package(self.package)
     def test_names_not_silently_replaced_with_detail(self):
-        self.setup_review();plan,_=prepare(self.manager,self.approved.id,{**self.input,'customer_name':'W'*200})
+        self.setup_review()
+        self.authorize_test_customer(name='W'*200)
+        plan,_=prepare(self.manager,self.approved.id,{**self.input,'customer_name':'W'*200})
         with self.assertRaisesMessage(ValidationError,'does not fit'):sandbox.prepare_package(self.manager,plan.id)
         self.assertFalse(SandboxPackage.objects.exists())
     def test_local_permissions_explicit_confirmation_and_production_disabled(self):
@@ -151,6 +184,7 @@ class SandboxTests(TestCase):
         self.setup_package();old=self.start();new=self.start()
         with patch.dict(os.environ,CONFIG),patch('core.docusign.request_json',side_effect=self.oauth_responses()),patch('core.sandbox.provider') as remote,self.assertRaises(ValidationError):docusign.finish(self.comptroller,'synthetic-session',old,'code')
         remote.assert_not_called()
+        self.authorize_test_customer(name="Replacement Customer")
         prepare(self.manager,self.approved.id,{**self.input,'customer_name':'Replacement Customer'})
         with patch.dict(os.environ,CONFIG),patch('core.docusign.request_json',side_effect=self.oauth_responses()),patch('core.sandbox.provider') as remote,self.assertRaises(ValidationError):docusign.finish(self.comptroller,'synthetic-session',new,'code')
         remote.assert_not_called()

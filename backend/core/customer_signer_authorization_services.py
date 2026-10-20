@@ -175,6 +175,7 @@ def approve_customer_signer(
 
         authorization = CustomerSignerAuthorization.objects.create(
             project=locked_project,
+            approved_msr_id=locked_project.current_approved_id,
             customer=customer,
             group=group,
             requested_by=requested_by,
@@ -295,3 +296,85 @@ def revoke_customer_signer(*, authorization_id, revoked_by, reason):
         )
 
         return revocation
+
+def require_approved_customer_signer(*, msr, group, signer_name, signer_email):
+    """Locate one approved, MSR-bound, non-revoked customer signer."""
+    if msr is None or msr.status != "APPROVED":
+        raise ValidationError("An approved Master Sales Record is required.")
+
+    if msr.project.current_approved_id != msr.pk:
+        raise ValidationError("Customer signing authority requires the current approved MSR.")
+
+    if group not in APPROVER_ROLES:
+        raise ValidationError("Unknown customer-signer document group.")
+
+    if not isinstance(signer_name, str) or not signer_name.strip():
+        raise ValidationError("An authorized customer signer name is required.")
+
+    if not isinstance(signer_email, str) or not signer_email.strip():
+        raise ValidationError("An authorized customer signer email is required.")
+
+    matches = list(
+        CustomerSignerAuthorization.objects.filter(
+            approved_msr=msr,
+            project_id=msr.project_id,
+            customer_id=msr.project.customer_id,
+            group=group,
+            signer_name=signer_name.strip(),
+            signer_email__iexact=signer_email.strip(),
+            revocation__isnull=True,
+        )[:2]
+    )
+
+    if len(matches) != 1:
+        raise ValidationError(
+            "Exactly one approved, non-revoked customer-signer authorization is required."
+        )
+
+    return verify_customer_signer_integrity(matches[0])
+
+def verify_customer_signer_integrity(authorization):
+    """Verify immutable approval fields, digest, and matching audit evidence."""
+    import hashlib
+    import hmac
+    import json
+
+    from .models import AuditEvent
+
+    if authorization is None or authorization.approved_msr_id is None:
+        raise ValidationError("Customer-signer approval evidence is incomplete.")
+
+    payload = {
+        "project_id": str(authorization.project_id),
+        "customer_id": str(authorization.customer_id),
+        "approved_msr_id": str(authorization.approved_msr_id),
+        "group": authorization.group,
+        "requested_by_id": str(authorization.requested_by_id),
+        "approved_by_id": str(authorization.approved_by_id),
+        "approved_at": authorization.approved_at.isoformat(),
+        "signer_name": authorization.signer_name,
+        "signer_email": authorization.signer_email,
+        "authority_basis": authorization.authority_basis,
+        "evidence_reference": authorization.evidence_reference,
+    }
+
+    digest = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+    if not hmac.compare_digest(digest, authorization.digest):
+        raise ValidationError("Customer-signer authorization integrity verification failed.")
+
+    events = list(AuditEvent.objects.filter(
+        entity_id=authorization.pk,
+        action="CUSTOMER_SIGNER_AUTHORIZATION_APPROVED",
+    )[:2])
+
+    if len(events) != 1:
+        raise ValidationError("Customer-signer approval audit evidence is missing or ambiguous.")
+
+    expected_audit_payload = {**payload, "digest": digest}
+    if events[0].payload != expected_audit_payload or events[0].actor_id != authorization.approved_by_id:
+        raise ValidationError("Customer-signer approval audit evidence does not match.")
+
+    return authorization

@@ -46,6 +46,7 @@ class CustomerSignerAuthorizationTests(TestCase):
             ).exists()
         )
         self.assertEqual(len(authorization.digest), 64)
+        self.assertEqual(authorization.approved_msr_id, self.project.current_approved_id)
         self.assertEqual(AuditEvent.objects.count(), before + 1)
         self.assertTrue(
             AuditEvent.objects.filter(
@@ -558,3 +559,244 @@ class CustomerSignerAuthorizationTests(TestCase):
             ).exists()
         )
         self.assertEqual(AuditEvent.objects.count(), before)
+
+    def test_approved_signer_lookup_matches_current_msr(self):
+        from .customer_signer_authorization_services import require_approved_customer_signer
+
+        arguments = self.authorization_arguments()
+        authorization = approve_customer_signer(**arguments)
+
+        selected = require_approved_customer_signer(
+            msr=self.project.current_approved,
+            group=arguments["group"],
+            signer_name=arguments["signer_name"],
+            signer_email=arguments["signer_email"],
+        )
+
+        self.assertEqual(selected.pk, authorization.pk)
+        self.assertEqual(selected.approved_msr_id, self.project.current_approved_id)
+
+    def test_signer_lookup_rejects_missing_authorization(self):
+        from .customer_signer_authorization_services import require_approved_customer_signer
+
+        arguments = self.authorization_arguments()
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Exactly one approved, non-revoked customer-signer authorization is required."
+        ):
+            require_approved_customer_signer(
+                msr=self.project.current_approved,
+                group=arguments["group"],
+                signer_name=arguments["signer_name"],
+                signer_email=arguments["signer_email"],
+            )
+
+        self.assertFalse(CustomerSignerAuthorization.objects.exists())
+
+    def test_signer_lookup_rejects_revoked_authorization(self):
+        from .customer_signer_authorization_services import require_approved_customer_signer
+
+        arguments = self.authorization_arguments()
+        authorization = approve_customer_signer(**arguments)
+
+        revoke_customer_signer(
+            authorization_id=authorization.pk,
+            revoked_by=self.manager,
+            reason="Synthetic signer authority withdrawn",
+        )
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Exactly one approved, non-revoked customer-signer authorization is required."
+        ):
+            require_approved_customer_signer(
+                msr=self.project.current_approved,
+                group=arguments["group"],
+                signer_name=arguments["signer_name"],
+                signer_email=arguments["signer_email"],
+            )
+
+        self.assertTrue(CustomerSignerAuthorization.objects.filter(pk=authorization.pk).exists())
+        self.assertTrue(CustomerSignerRevocation.objects.filter(authorization=authorization).exists())
+
+    def test_signer_lookup_rejects_identity_and_group_mismatches(self):
+        from .customer_signer_authorization_services import require_approved_customer_signer
+
+        arguments = self.authorization_arguments()
+        authorization = approve_customer_signer(**arguments)
+
+        cases = (
+            {"signer_name": "Different Customer"},
+            {"signer_email": "different@example.com"},
+            {"group": "COMPLETION_NON_FINANCED"},
+        )
+
+        for changes in cases:
+            with self.subTest(changes=changes):
+                lookup = {
+                    "msr": self.project.current_approved,
+                    "group": arguments["group"],
+                    "signer_name": arguments["signer_name"],
+                    "signer_email": arguments["signer_email"],
+                }
+                lookup.update(changes)
+
+                with self.assertRaises(ValidationError):
+                    require_approved_customer_signer(**lookup)
+
+        self.assertTrue(
+            CustomerSignerAuthorization.objects.filter(pk=authorization.pk).exists()
+        )
+        self.assertFalse(CustomerSignerRevocation.objects.exists())
+
+    def test_signer_lookup_rejects_superseded_msr(self):
+        from .customer_signer_authorization_services import require_approved_customer_signer
+        from .services import revise, transition
+
+        arguments = self.authorization_arguments()
+        authorization = approve_customer_signer(**arguments)
+        original_msr = self.project.current_approved
+
+        draft = revise(
+            self.sales, self.project.id,
+            "Synthetic revised commercial scope", str(original_msr.id)
+        )
+        submitted = transition(self.sales, draft.id, "submit", 0)
+        transition(
+            self.comptroller, submitted.id,
+            "approve", submitted.edit_sequence
+        )
+        self.project.refresh_from_db()
+        revised_msr = self.project.current_approved
+
+        self.assertNotEqual(original_msr.id, revised_msr.id)
+        self.assertEqual(authorization.approved_msr_id, original_msr.id)
+
+        for msr in (original_msr, revised_msr):
+            with self.subTest(msr_id=str(msr.id)):
+                with self.assertRaises(ValidationError):
+                    require_approved_customer_signer(
+                        msr=msr,
+                        group=arguments["group"],
+                        signer_name=arguments["signer_name"],
+                        signer_email=arguments["signer_email"],
+                    )
+
+        self.assertTrue(
+            CustomerSignerAuthorization.objects.filter(
+                pk=authorization.pk
+            ).exists()
+        )
+        self.assertFalse(CustomerSignerRevocation.objects.exists())
+
+    def test_signer_lookup_rejects_duplicate_authorizations(self):
+        from .customer_signer_authorization_services import require_approved_customer_signer
+
+        arguments = self.authorization_arguments()
+        first = approve_customer_signer(**arguments)
+        second = approve_customer_signer(**arguments)
+
+        self.assertNotEqual(first.pk, second.pk)
+        self.assertEqual(
+            CustomerSignerAuthorization.objects.filter(
+                approved_msr=self.project.current_approved,
+                group=arguments["group"],
+            ).count(),
+            2,
+        )
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Exactly one approved, non-revoked customer-signer authorization is required."
+        ):
+            require_approved_customer_signer(
+                msr=self.project.current_approved,
+                group=arguments["group"],
+                signer_name=arguments["signer_name"],
+                signer_email=arguments["signer_email"],
+            )
+
+        self.assertFalse(CustomerSignerRevocation.objects.exists())
+
+    def test_customer_signer_integrity_accepts_valid_approval(self):
+        from .customer_signer_authorization_services import verify_customer_signer_integrity
+
+        arguments = self.authorization_arguments()
+        authorization = approve_customer_signer(**arguments)
+
+        verified = verify_customer_signer_integrity(authorization)
+
+        self.assertEqual(verified.pk, authorization.pk)
+        self.assertEqual(
+            verified.approved_msr_id,
+            self.project.current_approved_id,
+        )
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                entity_id=authorization.pk,
+                action="CUSTOMER_SIGNER_AUTHORIZATION_APPROVED",
+            ).exists()
+        )
+
+    def test_customer_signer_integrity_rejects_tampered_evidence(self):
+        from .customer_signer_authorization_services import verify_customer_signer_integrity
+
+        arguments = self.authorization_arguments()
+        authorization = approve_customer_signer(**arguments)
+
+        cases = (
+            ("signer_name", "Altered Customer"),
+            ("signer_email", "altered@example.com"),
+            ("authority_basis", "Altered authority evidence"),
+            ("evidence_reference", "ALTERED-REFERENCE"),
+            ("digest", "0" * 64),
+        )
+
+        for field, invalid_value in cases:
+            with self.subTest(field=field):
+                original_value = getattr(authorization, field)
+                try:
+                    setattr(authorization, field, invalid_value)
+                    with self.assertRaises(ValidationError):
+                        verify_customer_signer_integrity(authorization)
+                finally:
+                    setattr(authorization, field, original_value)
+
+        authorization.refresh_from_db()
+        self.assertEqual(
+            verify_customer_signer_integrity(authorization).pk,
+            authorization.pk,
+        )
+
+    def test_customer_signer_integrity_rejects_audit_mismatch(self):
+        from .customer_signer_authorization_services import verify_customer_signer_integrity
+
+        arguments = self.authorization_arguments()
+        authorization = approve_customer_signer(**arguments)
+
+        event = AuditEvent.objects.get(
+            entity_id=authorization.pk,
+            action="CUSTOMER_SIGNER_AUTHORIZATION_APPROVED",
+        )
+
+        original_payload = event.payload
+        altered_payload = {
+            **original_payload,
+            "evidence_reference": "ALTERED-AUDIT-EVIDENCE",
+        }
+
+        with patch(
+            "core.models.AuditEvent.objects.filter",
+            return_value=[event],
+        ):
+            event.payload = altered_payload
+            with self.assertRaises(ValidationError):
+                verify_customer_signer_integrity(authorization)
+
+        event.refresh_from_db()
+        self.assertEqual(event.payload, original_payload)
+        self.assertEqual(
+            verify_customer_signer_integrity(authorization).pk,
+            authorization.pk,
+        )

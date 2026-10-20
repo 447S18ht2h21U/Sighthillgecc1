@@ -1772,6 +1772,7 @@ class CustomerSignerAuthorization(Entity):
         COMPLETION_NON_FINANCED = 'COMPLETION_NON_FINANCED', 'Non-financed completion'
 
     project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name='customer_signer_authorizations')
+    approved_msr = models.ForeignKey(MSR, null=True, blank=True, on_delete=models.PROTECT, related_name='customer_signer_authorizations')
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='signer_authorizations')
     group = models.CharField(max_length=32, choices=Group.choices)
     signer_name = models.CharField(max_length=250)

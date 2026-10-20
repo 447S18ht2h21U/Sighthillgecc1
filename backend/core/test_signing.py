@@ -13,6 +13,20 @@ class SigningTests(TestCase):
     setUp = foundation.FoundationTests.setUp
     edit_submit = foundation.FoundationTests.edit_submit
     approve = foundation.FoundationTests.approve
+    def authorize_test_customer(self, group="COMMERCIAL", name="Authorized Customer", email="customer@example.invalid"):
+        from .customer_signer_authorization_services import approve_customer_signer
+        approver = self.manager if group == "COMMERCIAL" else self.comptroller
+        return approve_customer_signer(
+            project=self.project,
+            customer=self.project.customer,
+            group=group,
+            signer_name=name,
+            signer_email=email,
+            authority_basis="Synthetic documented customer signing authority",
+            evidence_reference="SYNTHETIC-SIGNING-TEST",
+            requested_by=self.sales,
+            approved_by=approver,
+        )
     def setup_review(self):
         self.manager.first_name='Review';self.manager.last_name='Manager';self.manager.email='manager@example.invalid';self.manager.save()
         self.comptroller.first_name='Review';self.comptroller.last_name='Comptroller';self.comptroller.email='comptroller@example.invalid';self.comptroller.save()
@@ -21,6 +35,124 @@ class SigningTests(TestCase):
         for kind in ['CONTRACT','INVOICE','COMPLETION_NON_FINANCED']:
             generate(self.manager,self.approved.id,kind)
         self.input={'group':'COMMERCIAL','customer_name':'Authorized Customer','customer_email':'customer@example.invalid','gecc_signer':str(self.manager.id),'authority_note':'Synthetic test identity and signing authority reviewed.'}
+        self.commercial_authorization = self.authorize_test_customer()
+        self.completion_authorization = self.authorize_test_customer(group="COMPLETION_NON_FINANCED")
+    def test_plan_customer_authorization_valid(self):
+        from .signing import validate_plan_customer_authorization
+
+        self.setup_review()
+        plan, created = prepare(self.manager, self.approved.id, self.input)
+
+        self.assertTrue(created)
+        authorization = validate_plan_customer_authorization(plan)
+        self.assertEqual(authorization.pk, self.commercial_authorization.pk)
+        self.assertEqual(
+            plan.review["customer_authorization_id"],
+            str(authorization.pk),
+        )
+        self.assertEqual(
+            plan.review["customer_authorization_digest"],
+            authorization.digest,
+        )
+    def test_plan_customer_authorization_revoked(self):
+        from .customer_signer_authorization_services import revoke_customer_signer
+        from .signing import validate_plan_customer_authorization
+
+        self.setup_review()
+        plan, created = prepare(self.manager, self.approved.id, self.input)
+        self.assertTrue(created)
+        self.assertEqual(
+            validate_plan_customer_authorization(plan).pk,
+            self.commercial_authorization.pk,
+        )
+
+        original_review = plan.review.copy()
+        original_digest = plan.digest
+
+        revocation = revoke_customer_signer(
+            authorization_id=self.commercial_authorization.pk,
+            revoked_by=self.manager,
+            reason="Synthetic withdrawal of customer signing authority.",
+        )
+
+        self.assertEqual(
+            revocation.authorization_id,
+            self.commercial_authorization.pk,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "revoked"):
+            validate_plan_customer_authorization(plan)
+
+        plan.refresh_from_db()
+        self.assertEqual(plan.review, original_review)
+        self.assertEqual(plan.digest, original_digest)
+    def test_plan_customer_authorization_mismatch(self):
+        from copy import deepcopy
+        from uuid import uuid4
+        from .signing import validate_plan_customer_authorization
+
+        self.setup_review()
+        plan, _ = prepare(self.manager, self.approved.id, self.input)
+        original_review = deepcopy(plan.review)
+        original_group = plan.group
+
+        cases = (
+            ("authorization_id", {"customer_authorization_id": str(uuid4())}),
+            ("authorization_digest", {"customer_authorization_digest": "0" * 64}),
+            ("customer_name", {"customer": {**original_review["customer"], "name": "Different Customer"}}),
+            ("customer_email", {"customer": {**original_review["customer"], "email": "different@example.invalid"}}),
+        )
+
+        try:
+            for label, changes in cases:
+                with self.subTest(case=label):
+                    plan.review = {**original_review, **changes}
+                    with self.assertRaises(ValidationError):
+                        validate_plan_customer_authorization(plan)
+
+            plan.review = original_review
+            plan.group = "COMPLETION_NON_FINANCED"
+            with self.assertRaises(ValidationError):
+                validate_plan_customer_authorization(plan)
+        finally:
+            plan.review = original_review
+            plan.group = original_group
+
+        self.assertEqual(
+            validate_plan_customer_authorization(plan).pk,
+            self.commercial_authorization.pk,
+        )
+        plan.refresh_from_db()
+        self.assertEqual(plan.review, original_review)
+    def test_revoked_customer_authorization_blocks_signing_status(self):
+        from copy import deepcopy
+        from .customer_signer_authorization_services import revoke_customer_signer
+
+        self.setup_review()
+        plan, created = prepare(self.manager, self.approved.id, self.input)
+        self.assertTrue(created)
+        self.assertEqual(status(plan)["status"], "PREPARED")
+
+        original_review = deepcopy(plan.review)
+        original_digest = plan.digest
+
+        revoke_customer_signer(
+            authorization_id=self.commercial_authorization.pk,
+            revoked_by=self.manager,
+            reason="Synthetic withdrawal before document signing.",
+        )
+
+        result = status(plan)
+        self.assertEqual(result["status"], "REVIEW_REQUIRED")
+        self.assertFalse(result["send_available"])
+        self.assertTrue(
+            any("authorization is invalid or revoked" in blocker
+                for blocker in result["release_blockers"])
+        )
+
+        plan.refresh_from_db()
+        self.assertEqual(plan.review, original_review)
+        self.assertEqual(plan.digest, original_digest)
     def test_commercial_bundles_both_documents_customer_first(self):
         self.setup_review();plan,created=prepare(self.manager,self.approved.id,self.input)
         self.assertTrue(created)
@@ -60,6 +192,7 @@ class SigningTests(TestCase):
         with self.assertRaisesMessage(ValidationError,'current approved'):
             prepare(self.manager,self.project.pending.id,data)
         approved=self.approve()
+        self.authorize_test_customer(name="Customer", email="c@example.invalid")
         with self.assertRaisesMessage(ValidationError,'Prepare the contract'):
             prepare(self.manager,approved.id,data)
         generate(self.manager,approved.id,'CONTRACT')
@@ -109,6 +242,7 @@ class SigningTests(TestCase):
 
     def test_changed_recipient_review_supersedes_previous(self):
         self.setup_review();first,_=prepare(self.manager,self.approved.id,self.input)
+        self.authorize_test_customer(email="replacement@example.invalid")
         second,_=prepare(self.manager,self.approved.id,{**self.input,'customer_email':'replacement@example.invalid'})
         self.assertEqual(status(first)['status'],'SUPERSEDED')
         self.assertEqual(status(second)['status'],'PREPARED')
