@@ -417,7 +417,16 @@ export function TechnicianAssignments({ api }: { api: Api }) {
       {items.map(assignment => <li key={assignment.id}>
         <strong>{technicianLabel(assignment)}</strong>
         <p>Effective date: {assignment.effective_date}</p>
-        <p>Status: {assignment.status === 'ACTIVE' ? 'Active' : 'Ended'}</p>
+        <div
+          className={`veridian-guide-banner ${assignment.status === "ACTIVE"
+            ? "veridian-guide-banner--success"
+            : "veridian-guide-banner--info"}`}
+        >
+          <strong>Assignment status: {assignment.status}</strong>
+          <p>{assignment.status === "ACTIVE"
+            ? "This Technician is currently assigned to this project."
+            : "This assignment has ended. Its record is kept for history."}</p>
+        </div>
         {assignment.ended_at && <p>
           Ended: {new Date(assignment.ended_at).toLocaleString()}
         </p>}
@@ -703,6 +712,10 @@ export function TechnicianAssignments({ api }: { api: Api }) {
           assignment.id === endingAssignmentId
         ).map(assignment => <div key={assignment.id} className="documents">
           <h3>Review the selected assignment</h3>
+          <div className="veridian-guide-banner veridian-guide-banner--success" role="status">
+            <strong>Assignment status: {assignment.status}</strong>
+            <p>This Technician is currently assigned to this project.</p>
+          </div>
           <p><strong>Technician:</strong> {technicianLabel(assignment)}</p>
           <p><strong>Project:</strong> {
             projects.find(project => project.id === assignment.project)?.code
