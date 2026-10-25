@@ -154,7 +154,7 @@ class InstallationEligibilityTests(TestCase):
                 digest='TEST-CANCELLATION-DIGEST',
             )
 
-        if financed and deposit:
+        if deposit:
             payment = CustomerPayment.objects.create(
                 project=self.project,
                 msr=msr,
@@ -169,6 +169,19 @@ class InstallationEligibilityTests(TestCase):
             verify_customer_payment(
                 self.comptroller,
                 payment.id,
+            )
+
+            from .customer_payment_bank_confirmation_services import (
+                confirm_customer_payment_bank_availability,
+            )
+
+            confirm_customer_payment_bank_availability(
+                actor=self.comptroller,
+                payment_id=payment.id,
+                bank_reference="TEST-BANK-DEPOSIT",
+                confirmation_date=timezone.localdate(),
+                confirmation_method="Bank transaction reviewed",
+                confirmation_note="Test funds confirmed available.",
             )
 
         return msr
@@ -239,15 +252,14 @@ class InstallationEligibilityTests(TestCase):
             ensure_installation_eligible(self.project)
 
 
-    def test_non_financed_project_does_not_require_deposit(self):
+    def test_non_financed_project_requires_deposit(self):
         self.prepare_installation_state(
             financed=False,
             deposit=False,
         )
 
-        self.assertTrue(
+        with self.assertRaises(ValidationError):
             ensure_installation_eligible(self.project)
-        )
 
 
     def test_waiting_period_blocks_early_installation(self):

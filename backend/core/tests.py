@@ -7,13 +7,15 @@ from django.db import DatabaseError, connection, transaction
 from django.core.management import call_command
 from rest_framework.test import APIClient
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from .models import User, Role, Customer, MSR, AuditEvent, Outbox, Project
+from .models import User, Role, Customer, MSR, AuditEvent, Outbox, Project, AuditHead, LocalCounter
 from .services import create_project, transition, revise, validate_snapshot, change_project_state
 from .rules import installation_eligible_at
 
 @override_settings(DEBUG=True)
 class FoundationTests(TestCase):
     def setUp(self):
+        AuditHead.objects.get_or_create(pk=1)
+        LocalCounter.objects.get_or_create(pk=1)
         self.sales = User.objects.create_user(username='sales', role=Role.SALES_ASSOCIATE, initials='HS', password='LocalPassword123!')
         self.manager = User.objects.create_user(username='manager', role=Role.SALES_MANAGER, initials='SM', password='LocalPassword123!')
         self.comptroller = User.objects.create_user(username='comptroller', role=Role.COMPTROLLER, initials='CP', password='LocalPassword123!')

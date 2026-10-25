@@ -45,12 +45,12 @@ class InstallationReadinessTests(TestCase):
 
         self.assertFalse(result["eligible"])
         self.assertIn(
-            "Verified 50% deposit is required before installation.",
+            "Deposit required: $5,000.00. Bank-confirmed funds remaining: $0.00. Additional funds needed: $5,000.00.",
             result["blocking_reasons"],
         )
 
 
-    def test_non_financed_project_without_deposit_reports_ready(self):
+    def test_non_financed_project_without_deposit_reports_blocked(self):
         self.fixture.prepare_installation_state(
             financed=False,
             deposit=False,
@@ -58,7 +58,14 @@ class InstallationReadinessTests(TestCase):
 
         result = installation_readiness(self.project)
 
-        self.assertTrue(result["eligible"])
+        self.assertFalse(result["eligible"])
+        self.assertFalse(result["requirements"]["deposit_verified"])
+        self.assertTrue(
+            any(
+                "Deposit required:" in reason
+                for reason in result["blocking_reasons"]
+            )
+        )
 
     def test_future_cancellation_deadline_reports_blocker(self):
         self.fixture.prepare_installation_state(cancellation_days_after_signature=12)
@@ -92,7 +99,7 @@ class InstallationReadinessTests(TestCase):
         result = installation_readiness(self.project)
         self.assertFalse(result["eligible"])
         self.assertFalse(result["requirements"]["deposit_verified"])
-        self.assertIn("Verified 50% deposit is required before installation.", result["blocking_reasons"])
+        self.assertIn("Deposit required: $5,000.00. Bank-confirmed funds remaining: $4,000.00. Additional funds needed: $1,000.00.", result["blocking_reasons"])
         with self.assertRaises(ValidationError):
             ensure_installation_eligible(self.project)
 
@@ -110,7 +117,7 @@ class InstallationReadinessTests(TestCase):
                         result = installation_readiness(self.project)
                 self.assertFalse(result["eligible"])
                 self.assertFalse(result["requirements"]["deposit_verified"])
-                self.assertIn("Approved MSR requires a valid financing classification.", result["blocking_reasons"])
+                self.assertIn("The approved Master Sales Record needs a valid financing classification.", result["blocking_reasons"])
 
     def test_invalid_cancellation_dates_block_readiness(self):
         from unittest.mock import patch

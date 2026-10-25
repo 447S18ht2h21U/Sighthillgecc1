@@ -72,7 +72,13 @@ export function ProjectStatusDashboard() {
         </button>
       </div>
 
-      {error && <p role="alert" className="error">{error}</p>}
+      <div className="veridian-guide-banner veridian-guide-banner--info">
+        <strong>Project Status Dashboard - How to use this screen</strong>
+        <p><strong>Step 1 - Choose a stage.</strong> Select a stage to see the projects listed there. Select it again to close the list.</p>
+        <p><strong>Step 2 - Read the project list.</strong> Check the project number, customer name, and installation address. A project may appear in more than one stage.</p>
+        <p><strong>Step 3 - Check payments.</strong> In Payment Received, deposits, final payments, and full payments are shown separately.</p>
+        <p><strong>Step 4 - Refresh or return.</strong> Select Refresh dashboard to load updated information. Select Return to Customers &amp; Projects to leave this screen.</p>
+      </div>      {error && <p role="alert" className="error">{error}</p>}
       {loading && <p>Loading project stages...</p>}
 
       {!loading && !error && (

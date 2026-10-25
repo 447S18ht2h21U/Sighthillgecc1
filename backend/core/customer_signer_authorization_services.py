@@ -134,7 +134,7 @@ def approve_customer_signer(
     with transaction.atomic():
         locked_project = (
             type(project).objects
-            .select_for_update()
+            .select_for_update(of=("self",))
             .select_related("customer", "current_approved")
             .get(pk=project.pk)
         )

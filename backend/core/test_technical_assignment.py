@@ -221,6 +221,25 @@ class TechnicalAssignmentTests(TestCase):
             TemporaryDutyAuthorization.Status.APPROVED,
         )
 
+        from .temporary_project_access_services import (
+            request_temporary_project_access,
+            approve_temporary_project_access,
+        )
+
+        access = request_temporary_project_access(
+            employee=ceo,
+            temporary_duty=authorization,
+            project=self.project,
+            requested_by=ceo,
+            reason="Project-specific Technician assignment coverage.",
+            starts_at=now,
+            ends_at=now + timedelta(days=1),
+        )
+        approve_temporary_project_access(
+            authorization_id=access.pk,
+            approver=self.comptroller,
+        )
+
         assignment = create_technical_assignment(
             ceo,
             self.project,
@@ -448,6 +467,25 @@ class TechnicalAssignmentTests(TestCase):
 
         approved = approve_temporary_duty(
             authorization_id=authorization.pk,
+            approver=self.comptroller,
+        )
+
+        from .temporary_project_access_services import (
+            request_temporary_project_access,
+            approve_temporary_project_access,
+        )
+
+        access = request_temporary_project_access(
+            employee=ceo,
+            temporary_duty=authorization,
+            project=self.project,
+            requested_by=ceo,
+            reason="Project-specific Technician assignment coverage.",
+            starts_at=now,
+            ends_at=now + timedelta(days=1),
+        )
+        approve_temporary_project_access(
+            authorization_id=access.pk,
             approver=self.comptroller,
         )
 

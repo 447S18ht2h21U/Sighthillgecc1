@@ -326,3 +326,94 @@ section, aside {
 /* VERIDIAN Shared Navigation Row v1 */
 .veridian-navigation-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin: 0.75rem 0 1rem; }
 .veridian-navigation-row > button:last-child:not(:first-child) { margin-left: auto; }
+
+/* Reusable guidance banners for Technician and Sales workflows. */
+.veridian-guide-banner {
+  border: 1px solid var(--veridian-mist);
+  border-left: 4px solid var(--veridian-teal);
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin: 16px 0;
+  background: var(--veridian-ivory);
+  color: var(--veridian-text);
+  line-height: 1.5;
+}
+
+.veridian-guide-banner strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.veridian-guide-banner p {
+  margin: 0;
+}
+
+.veridian-guide-banner p + p {
+  margin-top: 8px;
+}
+
+.veridian-guide-banner--info {
+  border-left-color: var(--veridian-teal);
+}
+
+.veridian-guide-banner--caution {
+  border-left-color: var(--veridian-warning);
+}
+
+.veridian-guide-banner--success {
+  border-left-color: var(--veridian-success);
+}
+
+/* VERIDIAN Installation Schedules Table v1 */
+.installation-schedules-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  color: var(--veridian-text);
+}
+
+.installation-schedules-table th,
+.installation-schedules-table td {
+  padding: 12px 16px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--veridian-mist);
+}
+
+.installation-schedules-table th {
+  background: var(--veridian-ivory);
+  color: var(--veridian-navy);
+  font-weight: 700;
+}
+
+.installation-schedules-table td:first-child {
+  min-width: 230px;
+}
+
+.installation-schedules-table td:nth-child(2),
+.installation-schedules-table td:nth-child(4) {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.installation-schedules-table td:nth-child(3) {
+  min-width: 180px;
+}
+
+.installation-schedules-table td:last-child {
+  min-width: 150px;
+}
+
+.installation-schedules-table tbody tr:hover {
+  background: var(--veridian-ivory);
+}
+
+@media (max-width: 900px) {
+  .installation-schedules-table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+}

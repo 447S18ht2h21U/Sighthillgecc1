@@ -84,13 +84,13 @@ class InstallationScheduleAPITests(TestCase):
 
             msr.snapshot.update({
                 'scope': 'Install HVAC equipment',
-                'payment_terms': '50% deposit when eligible; balance upon completion.' if financed else '100% due upon completion.',
+                'payment_terms': '50% deposit before equipment pickup; balance upon completion.',
                 'base_price': '10000.00',
                 'discount': '0.00',
                 'tax': '0.00',
                 'total_price': '10000.00',
                 'financing_type': 'FINANCED' if financed else 'NON_FINANCED',
-                'payment_option': '50_PERCENT_DEPOSIT' if financed else '100_PERCENT_COMPLETION',
+                'payment_option': '50_PERCENT_DEPOSIT',
             })
 
             msr = transition(
@@ -150,25 +150,39 @@ class InstallationScheduleAPITests(TestCase):
             },
         )
 
-        if financed:
-            payment, _ = CustomerPayment.objects.get_or_create(
-                project=project,
-                msr=msr,
-                payment_reference='TEST-DEPOSIT',
-                defaults={
-                    'kind': CustomerPayment.Kind.DEPOSIT,
-                    'amount': '5000.00',
-                    'received_date': timezone.localdate(),
-                    'status': CustomerPayment.Status.PENDING,
-                    'recorded_by': self.comptroller,
-                },
+        # Standard deposit applies to both financing classifications.
+        payment, _ = CustomerPayment.objects.get_or_create(
+            project=project,
+            msr=msr,
+            payment_reference='TEST-DEPOSIT',
+            defaults={
+                'kind': CustomerPayment.Kind.DEPOSIT,
+                'amount': '5000.00',
+                'received_date': timezone.localdate(),
+                'status': CustomerPayment.Status.PENDING,
+                'recorded_by': self.comptroller,
+            },
+        )
+
+        if payment.status == CustomerPayment.Status.PENDING:
+            verify_customer_payment(
+                self.comptroller,
+                payment.id,
             )
 
-            if payment.status == CustomerPayment.Status.PENDING:
-                verify_customer_payment(
-                    self.comptroller,
-                    payment.id,
-                )
+        from .customer_payment_bank_confirmation_services import (
+            confirm_customer_payment_bank_availability,
+        )
+
+        if not hasattr(payment, "bank_confirmation"):
+            confirm_customer_payment_bank_availability(
+                actor=self.comptroller,
+                payment_id=payment.id,
+                bank_reference="TEST-BANK-" + str(payment.pk),
+                confirmation_date=timezone.localdate(),
+                confirmation_method="Bank transaction reviewed",
+                confirmation_note="Test funds confirmed available.",
+            )
 
         return msr
 
@@ -232,6 +246,75 @@ class InstallationScheduleAPITests(TestCase):
             str(visible_schedule.pk),
         )
 
+    def test_historical_inactive_manager_name_remains_on_visible_schedule(self):
+        from datetime import date
+        from .installation_schedule_services import create_installation_schedule
+
+        self.make_installation_eligible()
+        self.manager.first_name = "Avery"
+        self.manager.last_name = "Example"
+        self.manager.save(update_fields=["first_name", "last_name"])
+
+        schedule = create_installation_schedule(
+            actor=self.manager,
+            project=self.project,
+            scheduled_date=date(2026, 10, 20),
+            installation_manager=self.manager,
+        )
+
+        self.manager.is_active = False
+        self.manager.save(update_fields=["is_active"])
+
+        self.client.force_authenticate(self.comptroller)
+        response = self.client.get("/api/installation-schedules/")
+
+        self.assertEqual(response.status_code, 200)
+        record = next(
+            item for item in response.data["results"]
+            if item["id"] == str(schedule.pk)
+        )
+        self.assertEqual(
+            record["installation_manager_display"],
+            "Avery Example (schedule_api_manager)",
+        )
+        self.assertEqual(
+            str(record["installation_manager"]),
+            str(self.manager.pk),
+        )
+
+    def test_historical_manager_name_survives_role_change(self):
+        from datetime import date
+        from .installation_schedule_services import create_installation_schedule
+
+        self.make_installation_eligible()
+
+        schedule = create_installation_schedule(
+            actor=self.manager,
+            project=self.project,
+            scheduled_date=date(2026, 10, 20),
+            installation_manager=self.manager,
+        )
+
+        self.manager.role = Role.SALES_ASSOCIATE
+        self.manager.save(update_fields=["role"])
+
+        self.client.force_authenticate(self.comptroller)
+        response = self.client.get("/api/installation-schedules/")
+
+        self.assertEqual(response.status_code, 200)
+        record = next(
+            item for item in response.data["results"]
+            if item["id"] == str(schedule.pk)
+        )
+        self.assertEqual(
+            record["installation_manager_display"],
+            "schedule_api_manager",
+        )
+        self.assertEqual(
+            str(record["installation_manager"]),
+            str(self.manager.pk),
+        )
+
     def test_installation_manager_directory_allows_authorized_manager(self):
         self.client.force_authenticate(self.manager)
         response = self.client.get("/api/installation-managers/")
@@ -273,6 +356,66 @@ class InstallationScheduleAPITests(TestCase):
         self.client.force_authenticate(user=None)
         response = self.client.get("/api/installation-schedules/")
         self.assertIn(response.status_code, (401, 403))
+
+    def test_verified_payment_without_bank_confirmation_blocks_api_scheduling(self):
+        from unittest.mock import patch
+
+        from .models import CustomerPaymentBankConfirmation
+
+        # Keep the payment verified but omit the bank confirmation.
+        with patch(
+            "core.customer_payment_bank_confirmation_services."
+            "confirm_customer_payment_bank_availability"
+        ) as skipped_confirmation:
+            self.make_installation_eligible()
+
+        skipped_confirmation.assert_called_once()
+        self.project.refresh_from_db()
+
+        payment = CustomerPayment.objects.get(
+            project=self.project,
+            msr=self.project.current_approved,
+            payment_reference="TEST-DEPOSIT",
+        )
+
+        self.assertEqual(
+            payment.status,
+            CustomerPayment.Status.VERIFIED,
+        )
+        self.assertFalse(
+            CustomerPaymentBankConfirmation.objects.filter(
+                payment=payment,
+            ).exists()
+        )
+
+        self.client.force_authenticate(self.manager)
+
+        response = self.client.get(
+            f"/api/operational-projects/{self.project.pk}/installation-eligibility/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["eligible"])
+        self.assertFalse(
+            response.data["requirements"]["deposit_verified"]
+        )
+
+        response = self.client.post(
+            "/api/installation-schedules/",
+            {
+                "project": str(self.project.pk),
+                "scheduled_date": "2026-10-20",
+                "installation_manager": str(self.manager.pk),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            InstallationSchedule.objects.filter(
+                project=self.project,
+            ).exists()
+        )
 
     def test_installation_manager_can_schedule(self):
         self.client.force_authenticate(self.manager)

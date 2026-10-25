@@ -161,6 +161,19 @@ class InstallationReadinessAPITests(TestCase):
             payment.id,
         )
 
+        from .customer_payment_bank_confirmation_services import (
+            confirm_customer_payment_bank_availability,
+        )
+
+        confirm_customer_payment_bank_availability(
+            actor=self.comptroller,
+            payment_id=payment.id,
+            bank_reference="TEST-BANK-READINESS",
+            confirmation_date=timezone.localdate(),
+            confirmation_method="Bank transaction reviewed",
+            confirmation_note="Test funds confirmed available.",
+        )
+
     def test_installation_manager_can_view_project_readiness(self):
         self.prepare_ready_project()
 

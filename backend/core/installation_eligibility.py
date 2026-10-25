@@ -126,12 +126,11 @@ def ensure_installation_eligible(project):
             'Installation waiting period has not expired.'
         )
 
-    if msr.snapshot.get('financing_type') == 'FINANCED':
-        require_financed_deposit(project, msr)
+    from .installation_payment_readiness import installation_payment_readiness
 
-    elif msr.snapshot.get('financing_type') != 'NON_FINANCED':
-        raise ValidationError(
-            'Approved MSR requires a valid financing classification.'
-        )
+    payment = installation_payment_readiness(project)
+
+    if not payment["payment_ready"]:
+        raise ValidationError(payment["explanation"])
 
     return True

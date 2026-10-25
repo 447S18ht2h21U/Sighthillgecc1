@@ -98,44 +98,21 @@ def installation_readiness(project):
                 "Installation waiting period has not expired."
             )
 
-    if msr.snapshot.get("financing_type") == "FINANCED":
+    from .installation_payment_readiness import installation_payment_readiness
 
-        payments = CustomerPayment.objects.filter(
-            project=project,
-            msr=msr,
-            status=CustomerPayment.Status.VERIFIED,
-        )
-
-        received = sum(
-            (payment.amount for payment in payments),
-            Decimal("0.00"),
-        )
-
-        adjustments = CustomerPaymentAdjustment.objects.filter(
-            payment__in=payments,
-            status=CustomerPaymentAdjustment.Status.APPROVED,
-        )
-        adjusted = sum(
-            (item.amount for item in adjustments),
-            Decimal("0.00"),
-        )
-
-        if received - adjusted >= (
-            Decimal(str(msr.snapshot["total_price"]))
-            * Decimal("0.50")
-        ):
+    try:
+        payment = installation_payment_readiness(project)
+    except ValidationError as exc:
+        detail = exc.detail
+        if isinstance(detail, (list, tuple)):
+            result["blocking_reasons"].extend(str(item) for item in detail)
+        else:
+            result["blocking_reasons"].append(str(detail))
+    else:
+        if payment["payment_ready"]:
             result["requirements"]["deposit_verified"] = True
         else:
-            result["blocking_reasons"].append(
-                "Verified 50% deposit is required before installation."
-            )
-
-    elif msr.snapshot.get("financing_type") == "NON_FINANCED":
-        result["requirements"]["deposit_verified"] = True
-    else:
-        result["blocking_reasons"].append(
-            "Approved MSR requires a valid financing classification."
-        )
+            result["blocking_reasons"].append(payment["explanation"])
 
     result["eligible"] = (
         all(result["requirements"].values())

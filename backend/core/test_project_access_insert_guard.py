@@ -1,62 +1,102 @@
-from django.db import IntegrityError, connection, transaction
+from django.db import DatabaseError, connection, transaction
 from django.test import TestCase
 
-from .test_temporary_project_access import TemporaryProjectAccessTests
+from . import test_temporary_project_access as temporary_access_fixtures
 from .models import TemporaryProjectAccessAuthorization
 
 
-class ProjectAccessInsertGuardTest(TemporaryProjectAccessTests):
+class ProjectAccessInsertGuardTest(TestCase):
+
+    def setUp(self):
+        temporary_access_fixtures.TemporaryProjectAccessTests.setUp(self)
+
+    def _pending_project_access(self):
+        return (
+            temporary_access_fixtures.TemporaryProjectAccessTests
+            ._pending_project_access(self)
+        )
     def test_direct_approved_insert_is_rejected(self):
         access = self._pending_project_access()
         table = "core_temporaryprojectaccessauthorization"
+        trigger_name = "gecc_temporary_project_access_insert_guard"
 
         with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT sql FROM sqlite_master WHERE type = %s AND name = %s",
-                ["trigger", "gecc_temporary_project_access_insert_guard"],
-            )
-            trigger = cursor.fetchone()
+            if connection.vendor == "sqlite":
+                cursor.execute(
+                    "SELECT sql FROM sqlite_master WHERE type = %s AND name = %s",
+                    ["trigger", trigger_name],
+                )
+                trigger = cursor.fetchone()
+            elif connection.vendor == "postgresql":
+                cursor.execute(
+                    """
+                    SELECT 1 FROM pg_trigger
+                    WHERE tgrelid = %s::regclass
+                      AND tgname = %s
+                      AND NOT tgisinternal
+                      AND tgenabled = 'O'
+                    """,
+                    [table, trigger_name],
+                )
+                trigger = cursor.fetchone()
+            else:
+                self.fail("Unsupported database for project-access trigger test.")
 
-        self.assertIsNotNone(trigger)
+            self.assertIsNotNone(trigger)
 
-        with connection.cursor() as cursor:
-            cursor.execute(f"PRAGMA table_info({table})")
             columns = [
-                row[1] for row in cursor.fetchall()
-                if row[1] != "id"
+                field.name
+                for field in connection.introspection.get_table_description(
+                    cursor, table
+                )
+                if field.name != "id"
             ]
 
-        with connection.cursor() as cursor:
-            column_sql = ", ".join(f'"{column}"' for column in columns)
-            cursor.execute(
-                f"SELECT {column_sql} FROM {table} WHERE id = %s",
-                [access.pk.hex],
+            column_sql = ", ".join(
+                connection.ops.quote_name(column) for column in columns
             )
-            values = list(cursor.fetchone())
 
+            cursor.execute(
+                f"SELECT {column_sql} FROM {connection.ops.quote_name(table)} "
+                "WHERE id = %s",
+                [access.pk.hex if connection.vendor == "sqlite" else access.pk],
+            )
+            row = cursor.fetchone()
+
+        self.assertIsNotNone(row)
+        values = list(row)
         values[columns.index("status")] = "APPROVED"
 
-        column_sql = ", ".join(f'"{column}"' for column in columns)
         placeholders = ", ".join(["%s"] * len(columns))
 
         with self.assertRaisesRegex(
-            IntegrityError,
+            DatabaseError,
             "Temporary project access must begin as an unapproved request",
         ):
             with transaction.atomic():
                 with connection.cursor() as cursor:
                     cursor.execute(
-                        f"INSERT INTO {table} ({column_sql}) VALUES ({placeholders})",
+                        f"INSERT INTO {connection.ops.quote_name(table)} "
+                        f"({column_sql}) VALUES ({placeholders})",
                         values,
                     )
 
 
-class ProjectAccessUpdateGuardTest(TemporaryProjectAccessTests):
+class ProjectAccessUpdateGuardTest(TestCase):
+
+    def setUp(self):
+        temporary_access_fixtures.TemporaryProjectAccessTests.setUp(self)
+
+    def _pending_project_access(self):
+        return (
+            temporary_access_fixtures.TemporaryProjectAccessTests
+            ._pending_project_access(self)
+        )
     def test_project_assignment_is_immutable(self):
         access = self._pending_project_access()
 
         with self.assertRaisesRegex(
-            IntegrityError,
+            DatabaseError,
             "Project-access request details are immutable",
         ):
             with transaction.atomic():
@@ -68,7 +108,7 @@ class ProjectAccessUpdateGuardTest(TemporaryProjectAccessTests):
         access = self._pending_project_access()
 
         with self.assertRaisesRegex(
-            IntegrityError,
+            DatabaseError,
             "Independent project-access approval required|Project-access approver or temporary duty is not authorized",
         ):
             with transaction.atomic():
@@ -80,7 +120,7 @@ class ProjectAccessUpdateGuardTest(TemporaryProjectAccessTests):
         access = self._pending_project_access()
 
         with self.assertRaisesRegex(
-            IntegrityError,
+            DatabaseError,
             "Invalid project-access status transition",
         ):
             with transaction.atomic():
@@ -92,7 +132,7 @@ class ProjectAccessUpdateGuardTest(TemporaryProjectAccessTests):
         access = self._pending_project_access()
 
         with self.assertRaisesRegex(
-            IntegrityError,
+            DatabaseError,
             "Project-access authorizations cannot be deleted",
         ):
             with transaction.atomic():
@@ -106,7 +146,7 @@ class ProjectAccessUpdateGuardTest(TemporaryProjectAccessTests):
         access = self._pending_project_access()
 
         with self.assertRaisesRegex(
-            IntegrityError,
+            DatabaseError,
             "Project-access approver or temporary duty is not authorized",
         ):
             with transaction.atomic():
@@ -132,7 +172,7 @@ class ProjectAccessUpdateGuardTest(TemporaryProjectAccessTests):
         )
 
         with self.assertRaisesRegex(
-            IntegrityError,
+            DatabaseError,
             "Project-access approver or temporary duty is not authorized",
         ):
             with transaction.atomic():

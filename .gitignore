@@ -16,3 +16,25 @@ backend/core/pdf_templates/*.pdf
 **/.env*
 !.env.example
 !**/.env.example
+
+VERIDIAN-full-backend-regression-*.log
+backend-startup.log
+frontend/src/main.tsx.pre-encoding-repair-*.bak
+
+# SQLite transaction support files
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
+
+# Numbered regression-test backups
+backend/core/*.py.bak-1907P-*
+
+# Preserve local Git configuration backups
+.gitignore.bak-1907P-*
+
+# Local PostgreSQL validation evidence and migration backups
+backend/postgresql-regression-*.log
+backend/core/migrations/*.py.bak-1907P-*
+
+# Generated Playwright browser test results
+/frontend/test-results/

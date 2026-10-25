@@ -58,3 +58,4 @@ LOGGING = {
     'loggers': {'django.server': {'handlers': ['safe_console'], 'level': 'INFO', 'propagate': False},
                 'django.request': {'handlers': ['safe_console'], 'level': 'WARNING', 'propagate': False}},
 }
+TEST_RUNNER = 'config.test_runner.VeridianTestRunner' if DEBUG else 'django.test.runner.DiscoverRunner'

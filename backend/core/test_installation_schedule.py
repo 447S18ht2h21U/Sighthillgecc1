@@ -83,13 +83,13 @@ class InstallationScheduleTests(TestCase):
 
             msr.snapshot.update({
             'scope': 'Install HVAC equipment',
-            'payment_terms': '50% deposit when eligible; balance upon completion.' if financed else '100% due upon completion.',
+            'payment_terms': '50% deposit before equipment pickup; balance upon completion.',
             'base_price': '10000.00',
             'discount': '0.00',
             'tax': '0.00',
             'total_price': '10000.00',
             'financing_type': 'FINANCED' if financed else 'NON_FINANCED',
-            'payment_option': '50_PERCENT_DEPOSIT' if financed else '100_PERCENT_COMPLETION',
+            'payment_option': '50_PERCENT_DEPOSIT',
         })
 
             msr = transition(
@@ -150,28 +150,109 @@ class InstallationScheduleTests(TestCase):
             digest='TEST-DEADLINE-DIGEST',
         )
 
-        if financed:
-            payment, created = CustomerPayment.objects.get_or_create(
-                project=self.project,
-                msr=msr,
-                payment_reference='TEST-DEPOSIT',
-                defaults={
-                    'kind': CustomerPayment.Kind.DEPOSIT,
-                    'amount': '5000.00',
-                    'received_date': timezone.localdate(),
-                    'status': CustomerPayment.Status.PENDING,
-                    'recorded_by': self.comptroller,
-                },
+        # Standard deposit applies to both financing classifications.
+        payment, created = CustomerPayment.objects.get_or_create(
+            project=self.project,
+            msr=msr,
+            payment_reference='TEST-DEPOSIT',
+            defaults={
+                'kind': CustomerPayment.Kind.DEPOSIT,
+                'amount': '5000.00',
+                'received_date': timezone.localdate(),
+                'status': CustomerPayment.Status.PENDING,
+                'recorded_by': self.comptroller,
+            },
+        )
+
+        if payment.status == CustomerPayment.Status.PENDING:
+            from .payment_services import verify_customer_payment
+            verify_customer_payment(
+                self.comptroller,
+                payment.id,
             )
 
-            if payment.status == CustomerPayment.Status.PENDING:
-                from .payment_services import verify_customer_payment
-                verify_customer_payment(
-                    self.comptroller,
-                    payment.id,
-                )
+        from .customer_payment_bank_confirmation_services import (
+            confirm_customer_payment_bank_availability,
+        )
+
+        if not hasattr(payment, "bank_confirmation"):
+            confirm_customer_payment_bank_availability(
+                actor=self.comptroller,
+                payment_id=payment.id,
+                bank_reference="TEST-BANK-DEPOSIT",
+                confirmation_date=timezone.localdate(),
+                confirmation_method="Bank transaction reviewed",
+                confirmation_note="Test funds confirmed available.",
+            )
 
         return msr
+
+    def test_bank_confirmation_required_before_scheduling(self):
+        from datetime import date
+        from unittest.mock import patch
+
+        from rest_framework.exceptions import ValidationError
+
+        from .installation_readiness import installation_readiness
+        from .models import CustomerPaymentBankConfirmation
+
+        # Build valid installation evidence and verify the payment,
+        # but omit only the separate bank-availability confirmation.
+        with patch(
+            "core.customer_payment_bank_confirmation_services."
+            "confirm_customer_payment_bank_availability"
+        ) as skipped_confirmation:
+            self.make_installation_eligible()
+
+        skipped_confirmation.assert_called_once()
+
+        self.project.refresh_from_db()
+
+        payment = CustomerPayment.objects.get(
+            project=self.project,
+            msr=self.project.current_approved,
+            payment_reference="TEST-DEPOSIT",
+        )
+
+        self.assertEqual(
+            payment.status,
+            CustomerPayment.Status.VERIFIED,
+        )
+
+        self.assertFalse(
+            CustomerPaymentBankConfirmation.objects.filter(
+                payment=payment,
+            ).exists()
+        )
+
+        readiness = installation_readiness(self.project)
+
+        self.assertFalse(readiness["eligible"])
+        self.assertFalse(
+            readiness["requirements"]["deposit_verified"]
+        )
+        self.assertTrue(
+            any(
+                "Deposit required:" in reason
+                for reason in readiness["blocking_reasons"]
+            )
+        )
+
+        # Valid manager authority must never override missing funds.
+        with self.assertRaises(ValidationError):
+            create_installation_schedule(
+                actor=self.manager,
+                project=self.project,
+                scheduled_date=date(2026, 10, 20),
+                installation_manager=self.manager,
+            )
+
+        self.assertFalse(
+            InstallationSchedule.objects.filter(
+                project=self.project,
+            ).exists()
+        )
+
 
     def test_installation_can_be_scheduled(self):
         self.make_installation_eligible()

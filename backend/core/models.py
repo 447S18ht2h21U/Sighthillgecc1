@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.exceptions import ValidationError
@@ -147,6 +147,63 @@ class MSR(Entity):
         if old and old.status == 'SUBMITTED' and old.snapshot != self.snapshot:
             raise ValidationError('Submitted commercial fields are frozen.')
         super().save(*args, **kwargs)
+
+class CEOPaymentException(Entity):
+    """Project- and MSR-specific authorization for payment after completion."""
+
+    class Status(models.TextChoices):
+        REQUESTED = 'REQUESTED', 'Requested'
+        APPROVED = 'APPROVED', 'Approved'
+        REJECTED = 'REJECTED', 'Rejected'
+        REVOKED = 'REVOKED', 'Revoked'
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.PROTECT,
+        related_name='ceo_payment_exceptions',
+    )
+    msr = models.ForeignKey(
+        MSR,
+        on_delete=models.PROTECT,
+        related_name='ceo_payment_exceptions',
+    )
+    requested_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='payment_exceptions_requested',
+    )
+    request_reason = models.TextField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.REQUESTED,
+    )
+    decided_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='payment_exceptions_decided',
+    )
+    decision_reason = models.TextField(blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    revoked_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='payment_exceptions_revoked',
+    )
+    revocation_reason = models.TextField(blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['msr'],
+                name='unique_ceo_payment_exception_per_msr',
+            ),
+        ]
 
 class AuditHead(models.Model):
     id = models.PositiveIntegerField(primary_key=True, default=1)
@@ -462,6 +519,15 @@ class ProjectTechnicalAssignment(Entity):
         blank=True,
     )
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['project', 'technical_associate'],
+                condition=models.Q(status='ACTIVE'),
+                name='unique_active_technician_per_project',
+            ),
+        ]
+
 class ReleasePackage(Entity):
     plan = models.ForeignKey(SigningPlan, on_delete=models.PROTECT, related_name='release_packages')
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
@@ -565,6 +631,15 @@ class SigningTestDocument(ImmutableSigningTestRecord):
     pdf_sha256 = models.CharField(max_length=64)
     class Meta:
         constraints = [models.UniqueConstraint(fields=['attempt','document_id'], name='signing_test_document_unique')]
+
+class CompletionEnvelopeAttempt(Entity):
+    """Production envelope attempt foundation; no send capability."""
+    release_package = models.OneToOneField(ReleasePackage, on_delete=models.PROTECT, related_name="completion_envelope_attempt")
+    initiated_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    provider_account_id = models.CharField(max_length=100)
+    provider_envelope_id = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=32, default="AUTH_PENDING")
+    first_send_started_at = models.DateTimeField(null=True)
 
 class CompletionSignatureVerification(Entity):
     """Immutable provider-verification observation; not independently proof of completion."""
@@ -906,6 +981,29 @@ class CustomerPaymentAdjustment(Entity):
             f'{self.payment.payment_reference} - '
             f'{self.kind} - ${self.amount}'
         )
+
+class CustomerPaymentBankConfirmation(Entity):
+    """Auditable bank availability confirmation for one customer payment."""
+
+    payment = models.OneToOneField(
+        CustomerPayment,
+        on_delete=models.PROTECT,
+        related_name='bank_confirmation',
+    )
+    bank_reference = models.CharField(max_length=150)
+    confirmation_date = models.DateField()
+    confirmation_method = models.CharField(max_length=100)
+    confirmation_note = models.TextField()
+    confirmed_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='customer_payment_bank_confirmations',
+    )
+    confirmed_at = models.DateTimeField()
+
+    def __str__(self):
+        return f'Bank confirmation for payment {self.payment_id}'
+
 
 class ProjectCostRecord(Entity):
     """Versioned project costs linked to an approved MSR."""

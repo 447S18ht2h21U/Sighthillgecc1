@@ -130,6 +130,25 @@ class TechnicalAssignmentAPITests(TestCase):
             approver=self.comptroller,
         )
 
+        from .temporary_project_access_services import (
+            request_temporary_project_access,
+            approve_temporary_project_access,
+        )
+
+        access = request_temporary_project_access(
+            employee=temporary_manager,
+            temporary_duty=authorization,
+            project=self.project,
+            requested_by=temporary_manager,
+            reason="Project-specific Technician assignment coverage.",
+            starts_at=now,
+            ends_at=now + timedelta(days=1),
+        )
+        approve_temporary_project_access(
+            authorization_id=access.pk,
+            approver=self.comptroller,
+        )
+
         self.client.force_authenticate(temporary_manager)
         response = self.client.post(
             "/api/technical-assignments/",

@@ -23,6 +23,12 @@ class InstallationScheduleInput(serializers.Serializer):
 
 
 class InstallationScheduleSerializer(serializers.ModelSerializer):
+    installation_manager_display = serializers.SerializerMethodField()
+
+    def get_installation_manager_display(self, obj):
+        manager = obj.installation_manager
+        full_name = f'{manager.first_name} {manager.last_name}'.strip()
+        return f'{full_name} ({manager.username})' if full_name else manager.username
     class Meta:
         model = InstallationSchedule
         fields = [
@@ -30,6 +36,7 @@ class InstallationScheduleSerializer(serializers.ModelSerializer):
             "project",
             "scheduled_date",
             "installation_manager",
+            "installation_manager_display",
             "scheduled_by",
             "status",
             "completed_at",
