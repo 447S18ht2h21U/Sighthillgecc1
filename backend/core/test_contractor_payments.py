@@ -38,6 +38,13 @@ class ContractorPaymentTests(TestCase):
             initials='SM',
         )
 
+        self.ceo = User.objects.create_user(
+            username='payment_ceo',
+            password='test-password',
+            role=Role.CEO,
+            initials='CEO',
+        )
+
         self.contractor = Contractor.objects.create(
             contractor_number='CTR-001',
             legal_name='Test Contractor',
@@ -73,7 +80,7 @@ class ContractorPaymentTests(TestCase):
 
     def test_creates_draft_contractor_payment_record(self):
         record = create_contractor_payment_record(
-            self.sales_manager,
+            self.comptroller,
             self.engagement,
             self.compensation_plan,
             ContractorPaymentRecord.Kind.FIXED_COMPENSATION,
@@ -120,7 +127,7 @@ class ContractorPaymentTests(TestCase):
 
         with self.assertRaises(ValidationError):
             create_contractor_payment_record(
-                self.sales_manager,
+                self.comptroller,
                 self.engagement,
                 draft_plan,
                 ContractorPaymentRecord.Kind.FIXED_COMPENSATION,
@@ -136,7 +143,7 @@ class ContractorPaymentTests(TestCase):
 
     def test_authorized_user_can_approve_contractor_payment(self):
         record = create_contractor_payment_record(
-            self.sales_manager,
+            self.comptroller,
             self.engagement,
             self.compensation_plan,
             ContractorPaymentRecord.Kind.FIXED_COMPENSATION,
@@ -151,7 +158,7 @@ class ContractorPaymentTests(TestCase):
         )
 
         approved = approve_contractor_payment_record(
-            self.sales_manager,
+            self.ceo,
             record.id,
         )
 
@@ -162,7 +169,7 @@ class ContractorPaymentTests(TestCase):
 
         self.assertEqual(
             approved.approved_by_id,
-            self.sales_manager.id,
+            self.ceo.id,
         )
 
         self.assertIsNotNone(
@@ -171,7 +178,7 @@ class ContractorPaymentTests(TestCase):
 
     def test_approved_contractor_payment_can_be_marked_paid(self):
         record = create_contractor_payment_record(
-            self.sales_manager,
+            self.comptroller,
             self.engagement,
             self.compensation_plan,
             ContractorPaymentRecord.Kind.FIXED_COMPENSATION,
@@ -186,10 +193,32 @@ class ContractorPaymentTests(TestCase):
         )
 
         approve_contractor_payment_record(
-            self.sales_manager,
+            self.ceo,
             record.id,
         )
 
+        from django.utils import timezone
+        from .contractor_payment_issuance_services import issue_contractor_payment
+        from .contractor_payment_settlement_services import (
+            verify_contractor_payment_settlement,
+        )
+
+        issue_contractor_payment(
+            self.ceo,
+            record.id,
+            record.final_amount,
+            "ACH",
+            "LEGACY-TEST-test_approved_contractor_payment_can_be_marked_paid",
+            "Temporary legacy test issuance evidence",
+        )
+
+        verify_contractor_payment_settlement(
+            self.comptroller,
+            record.id,
+            timezone.localdate(),
+            record.final_amount,
+            "LEGACY-BANK-test_approved_contractor_payment_can_be_marked_paid",
+        )
         paid = mark_contractor_payment_paid(
             self.comptroller,
             record.id,
@@ -208,7 +237,7 @@ class ContractorPaymentTests(TestCase):
         from django.db import DatabaseError, transaction
 
         record = create_contractor_payment_record(
-            self.sales_manager,
+            self.comptroller,
             self.engagement,
             self.compensation_plan,
             ContractorPaymentRecord.Kind.FIXED_COMPENSATION,
@@ -223,7 +252,7 @@ class ContractorPaymentTests(TestCase):
         )
 
         approve_contractor_payment_record(
-            self.sales_manager,
+            self.ceo,
             record.id,
         )
 
@@ -251,7 +280,7 @@ class ContractorPaymentTests(TestCase):
         from django.db import DatabaseError, transaction
 
         record = create_contractor_payment_record(
-            self.sales_manager,
+            self.comptroller,
             self.engagement,
             self.compensation_plan,
             ContractorPaymentRecord.Kind.FIXED_COMPENSATION,
@@ -266,10 +295,32 @@ class ContractorPaymentTests(TestCase):
         )
 
         approve_contractor_payment_record(
-            self.sales_manager,
+            self.ceo,
             record.id,
         )
 
+        from django.utils import timezone
+        from .contractor_payment_issuance_services import issue_contractor_payment
+        from .contractor_payment_settlement_services import (
+            verify_contractor_payment_settlement,
+        )
+
+        issue_contractor_payment(
+            self.ceo,
+            record.id,
+            record.final_amount,
+            "ACH",
+            "LEGACY-TEST-test_paid_contractor_payment_cannot_be_modified_or_deleted",
+            "Temporary legacy test issuance evidence",
+        )
+
+        verify_contractor_payment_settlement(
+            self.comptroller,
+            record.id,
+            timezone.localdate(),
+            record.final_amount,
+            "LEGACY-BANK-test_paid_contractor_payment_cannot_be_modified_or_deleted",
+        )
         paid = mark_contractor_payment_paid(
             self.comptroller,
             record.id,

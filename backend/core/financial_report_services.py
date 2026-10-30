@@ -1,4 +1,4 @@
-﻿"""GECC corporate financial reporting services."""
+"""GECC corporate financial reporting services."""
 
 from decimal import Decimal
 
@@ -18,6 +18,10 @@ from .models import (
 )
 
 from .services import audit
+from .financial_reporting_authorization import (
+    require_financial_reporting_role,
+)
+from .models import Role
 
 @transaction.atomic
 def create_income_statement(
@@ -28,6 +32,10 @@ def create_income_statement(
     """
     Create a draft income statement snapshot.
     """
+
+    actor = require_financial_reporting_role(
+        actor, Role.COMPTROLLER
+    )
 
     existing = FinancialReport.objects.filter(
         kind=FinancialReport.Kind.INCOME_STATEMENT,
@@ -156,6 +164,10 @@ def approve_financial_report(
     Approve a draft financial report.
     """
 
+    actor = require_financial_reporting_role(
+        actor, Role.COMPTROLLER
+    )
+
     report = (
         FinancialReport.objects
         .select_for_update()
@@ -200,6 +212,10 @@ def create_balance_sheet(
     """
     Create a draft balance sheet snapshot.
     """
+
+    actor = require_financial_reporting_role(
+        actor, Role.COMPTROLLER
+    )
 
     existing = FinancialReport.objects.filter(
         kind=FinancialReport.Kind.BALANCE_SHEET,
@@ -286,6 +302,10 @@ def create_cash_flow_statement(
     """
     Create a draft cash flow statement snapshot.
     """
+
+    actor = require_financial_reporting_role(
+        actor, Role.COMPTROLLER
+    )
 
     existing = FinancialReport.objects.filter(
         kind=FinancialReport.Kind.CASH_FLOW,
@@ -387,6 +407,10 @@ def create_project_profitability_report(
     """
     Create a project profitability snapshot.
     """
+
+    actor = require_financial_reporting_role(
+        actor, Role.COMPTROLLER
+    )
 
     existing = FinancialReport.objects.filter(
         kind=FinancialReport.Kind.PROJECT_PROFITABILITY,

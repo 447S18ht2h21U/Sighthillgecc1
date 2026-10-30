@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from core import completion_envelope_api, installation_schedule_api, api, docusign_api, sandbox_api, release_api, signing_test_api, technical_assignment_api, operational_project_api, dashboard_api
+from core import completion_envelope_api, installation_schedule_api, api, docusign_api, sandbox_api, release_api, signing_test_api, technical_assignment_api, operational_project_api, dashboard_api, financial_reporting_api, contractor_directory_api
 router = DefaultRouter()
 for prefix, view in [('customers', api.CustomerViewSet), ('contacts', api.ContactViewSet), ('projects', api.ProjectViewSet), ('msrs', api.MSRViewSet), ('documents', api.DocumentViewSet), ('audit', api.AuditViewSet), ('directory', api.DirectoryViewSet), ('accounts', api.AccountViewSet)]:
     router.register(prefix, view, basename=prefix)
@@ -10,7 +10,22 @@ router.register('technical-assignments', technical_assignment_api.TechnicalAssig
 router.register('technicians', technical_assignment_api.TechnicianDirectoryViewSet, basename='technicians')
 router.register('technical-assignment-history', technical_assignment_api.TechnicalAssignmentHistoryViewSet, basename='technical-assignment-history')
 router.register('operational-projects', operational_project_api.OperationalProjectViewSet, basename='operational-projects')
+router.register('contractors', contractor_directory_api.ContractorDirectoryViewSet, basename='contractors')
+from core.marketing_msr_api import MarketingMSRViewSet
+router.register('marketing-msrs', MarketingMSRViewSet, basename='marketing-msrs')
 urlpatterns = [
+    path(
+        'api/financial-reports/',
+        financial_reporting_api.financial_reports,
+    ),
+    path(
+        'api/financial-reports/<uuid:report_id>/approve/',
+        financial_reporting_api.financial_report_approve,
+    ),
+    path(
+        'api/financial-reports/<uuid:report_id>/',
+        financial_reporting_api.financial_report_detail,
+    ),
     path('api/completion-envelope-attempts/<uuid:attempt_id>/', completion_envelope_api.detail),
     path('api/project-dashboard/', dashboard_api.project_dashboard),
     path('api/release-packages/<uuid:source_id>/signing-tests/', signing_test_api.packages),

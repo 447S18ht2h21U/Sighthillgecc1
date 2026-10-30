@@ -53,6 +53,10 @@ from .contractor_payment_services import (
     approve_contractor_payment_record,
     mark_contractor_payment_paid,
 )
+from .contractor_payment_issuance_services import issue_contractor_payment
+from .contractor_payment_settlement_services import (
+    verify_contractor_payment_settlement,
+)
 
 from .employee_payroll_services import (
     create_employee_payroll_record,
@@ -226,10 +230,26 @@ class FinancialReportTests(TestCase):
         )
 
         approve_contractor_payment_record(
-            self.comptroller,
+            self.ceo,
             payment.id,
         )
 
+        issue_contractor_payment(
+            self.ceo,
+            payment.id,
+            payment.final_amount,
+            "ACH",
+            f"FINANCIAL-REPORT-ISSUANCE-{payment.pk}",
+            "Financial report test issuance evidence",
+        )
+
+        verify_contractor_payment_settlement(
+            self.comptroller,
+            payment.id,
+            timezone.localdate(),
+            payment.final_amount,
+            f"FINANCIAL-REPORT-BANK-{payment.pk}",
+        )
         mark_contractor_payment_paid(
             self.comptroller,
             payment.id,

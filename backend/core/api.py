@@ -1,4 +1,5 @@
 import time
+import uuid
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.password_validation import validate_password
@@ -541,7 +542,14 @@ class AccountViewSet(viewsets.ModelViewSet):
             before = account_values(serializer.instance)
             note = serializer.validated_data['change_note']
             password_changed = 'password' in serializer.validated_data
+            deactivating = (
+                serializer.instance.is_active
+                and serializer.validated_data.get('is_active') is False
+            )
             user = serializer.save()
+            if deactivating:
+                user.session_security_token = uuid.uuid4()
+                user.save(update_fields=['session_security_token'])
             audit(self.request.user, 'account.updated', user.id, {'role': user.role, 'active': user.is_active, 'before': before, 'after': account_values(user), 'note': note, 'password_changed': password_changed})
 
 

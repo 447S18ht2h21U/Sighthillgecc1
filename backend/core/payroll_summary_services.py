@@ -6,6 +6,9 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from .financial_reporting_authorization import require_financial_reporting_role
+from .models import Role
+
 from .models import (
     ContractorPaymentRecord,
     EmployeePayrollRecord,
@@ -25,6 +28,8 @@ def create_payroll_summary(
     """
     Create a draft payroll summary from paid payroll records.
     """
+
+    actor = require_financial_reporting_role(actor, Role.COMPTROLLER)
 
     if period_end < period_start:
         raise ValidationError(
@@ -129,6 +134,8 @@ def approve_payroll_summary(
     """
     Approve a draft payroll summary.
     """
+
+    actor = require_financial_reporting_role(actor, Role.COMPTROLLER)
 
     summary = (
         PayrollSummary.objects

@@ -51,6 +51,67 @@ def create_employee_payroll_record(
             'An approved employee compensation plan is required.'
         )
 
+    # Validate the plan against current, authoritative compensation history.
+    from .access_employee_payroll_plan_policy import validate_payroll_plan
+
+    employee_id = getattr(employee, 'pk', None)
+    plan_id = getattr(compensation_plan, 'pk', None)
+
+    if employee_id is None or plan_id is None:
+        raise ValidationError('Employee and compensation plan are required.')
+
+    current_plan = (
+        EmployeeCompensationPlan.objects
+        .select_for_update()
+        .filter(pk=plan_id)
+        .first()
+    )
+
+    if current_plan is None:
+        raise ValidationError('The compensation plan was not found.')
+
+    approved_plans = list(
+        EmployeeCompensationPlan.objects
+        .filter(
+            employee_id=employee_id,
+            status=EmployeeCompensationPlan.Status.APPROVED,
+        )
+        .order_by('effective_date', 'version', 'pk')
+        .values_list('pk', 'effective_date')
+    )
+
+    approved_dates = [effective for _, effective in approved_plans]
+    if len(approved_dates) != len(set(approved_dates)):
+        raise ValidationError(
+            'Conflicting approved compensation effective dates require review.'
+        )
+
+    next_effective_date = next(
+        (
+            effective for _, effective in approved_plans
+            if effective > current_plan.effective_date
+        ),
+        None,
+    )
+
+    try:
+        validate_payroll_plan(
+            employee_id=employee_id,
+            plan_employee_id=current_plan.employee_id,
+            plan_status=current_plan.status,
+            plan_effective_date=current_plan.effective_date,
+            period_start=payroll_period_start,
+            period_end=payroll_period_end,
+            next_approved_effective_date=next_effective_date,
+        )
+    except ValueError as exc:
+        raise ValidationError(str(exc)) from exc
+
+    if current_plan.pk not in [pk for pk, _ in approved_plans]:
+        raise ValidationError(
+            'The selected plan is not approved for this employee.'
+        )
+
     if gross_amount < Decimal('0.00'):
         raise ValidationError(
             'Employee payroll cannot be negative.'

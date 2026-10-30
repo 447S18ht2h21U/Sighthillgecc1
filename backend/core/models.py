@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 
 class Role(models.TextChoices):
     CEO = 'CEO', 'Chief Executive Officer'
+    MARKETING = 'MARKETING', 'Marketing'
     SALES_ASSOCIATE = 'SALES_ASSOCIATE', 'Sales Associate'
     SALES_MANAGER = 'SALES_MANAGER', 'Sales Manager'
     COMPTROLLER = 'COMPTROLLER', 'Comptroller'
@@ -17,6 +18,19 @@ class User(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     role = models.CharField(max_length=32, choices=Role.choices)
     initials = models.CharField(max_length=8)
+    session_security_token = models.UUIDField(default=uuid.uuid4, editable=False)
+
+    def _get_session_auth_hash(self, secret=None):
+        from django.utils.crypto import salted_hmac
+
+        key_salt = "django.contrib.auth.models.AbstractBaseUser.get_session_auth_hash"
+        value = f"{self.password}:{self.session_security_token}"
+        return salted_hmac(
+            key_salt,
+            value,
+            secret=secret,
+            algorithm="sha256",
+        ).hexdigest()
 
 class Entity(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -1356,6 +1370,71 @@ class ContractorPaymentRecord(Entity):
             f'{self.engagement.engagement_code} '
             f'{self.kind} ${self.final_amount}'
         )
+
+class ContractorPaymentIssuance(Entity):
+    """CEO-recorded contractor payment issuance evidence."""
+
+    class Method(models.TextChoices):
+        ACH = 'ACH', 'ACH'
+        WIRE = 'WIRE', 'Wire transfer'
+        CHECK = 'CHECK', 'Check'
+        OTHER = 'OTHER', 'Other'
+
+    payment_record = models.OneToOneField(
+        ContractorPaymentRecord,
+        on_delete=models.PROTECT,
+        related_name='payment_issuance',
+    )
+    issued_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='contractor_payments_issued',
+    )
+    issued_at = models.DateTimeField()
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+    payment_method = models.CharField(
+        max_length=16,
+        choices=Method.choices,
+    )
+    transaction_reference = models.CharField(max_length=200)
+    supporting_evidence = models.TextField(blank=True)
+
+    def __str__(self):
+        return f'Contractor payment issuance {self.payment_record_id}'
+
+
+class ContractorPaymentSettlementVerification(Entity):
+    """Independent Comptroller verification of contractor payment settlement."""
+
+    payment_record = models.OneToOneField(
+        ContractorPaymentRecord,
+        on_delete=models.PROTECT,
+        related_name='settlement_verification',
+    )
+    issuance = models.OneToOneField(
+        ContractorPaymentIssuance,
+        on_delete=models.PROTECT,
+        related_name='settlement_verification',
+    )
+    verified_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='contractor_settlements_verified',
+    )
+    verified_at = models.DateTimeField()
+    settlement_date = models.DateField()
+    cleared_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+    evidence_reference = models.TextField()
+
+    def __str__(self):
+        return f'Contractor settlement verification {self.payment_record_id}'
+
 
 class Employee(Entity):
     """GECC employee payroll identity."""

@@ -96,8 +96,7 @@ def activate_contractor_engagement(actor, engagement_id):
         ContractorOnboardingDocument.objects.filter(
             engagement=engagement,
             status=ContractorOnboardingDocument.Status.APPROVED,
-            reviewed_by__is_active=True,
-            reviewed_by__role=Role.COMPTROLLER,
+            reviewed_by__isnull=False,
             reviewed_at__isnull=False,
         ).values_list('kind', flat=True)
     )

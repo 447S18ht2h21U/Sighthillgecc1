@@ -38,3 +38,28 @@ backend/core/migrations/*.py.bak-1907P-*
 
 # Generated Playwright browser test results
 /frontend/test-results/
+
+# VERIDIAN checkpoint safeguards - Step 1907P-3390
+# Local recovery files must remain outside source control.
+/backups/
+*.dump
+*.backup
+*.sql.gz
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+
+# Local secrets and private key material
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.credentials
+
+# Numbered development snapshots and temporary files
+*.bak-1907P-*
+*.tmp-1907P-*

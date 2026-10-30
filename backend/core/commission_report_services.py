@@ -4,6 +4,9 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from .financial_reporting_authorization import require_financial_reporting_role
+from .models import Role
+
 from .models import (
     CommissionRecord,
     CommissionReport,
@@ -24,6 +27,8 @@ def create_commission_report(
     Create a draft biweekly commission report
     from approved commission records.
     """
+
+    actor = require_financial_reporting_role(actor, Role.SALES_MANAGER)
 
     if period_end < period_start:
         raise ValidationError(
@@ -107,6 +112,8 @@ def approve_commission_report(
     """
     Approve a draft commission report.
     """
+
+    actor = require_financial_reporting_role(actor, Role.SALES_MANAGER)
 
     report = (
         CommissionReport.objects

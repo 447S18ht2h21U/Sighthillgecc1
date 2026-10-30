@@ -10,6 +10,10 @@ from .contractor_payment_services import (
     mark_contractor_payment_paid,
     create_contractor_payment_record,
 )
+from .contractor_payment_issuance_services import issue_contractor_payment
+from .contractor_payment_settlement_services import (
+    verify_contractor_payment_settlement,
+)
 from .employee_payroll_services import (
     approve_employee_payroll_record,
     mark_employee_payroll_paid,
@@ -38,6 +42,7 @@ class PayrollSummaryTests(TestCase):
 
     def setUp(self):
 
+        from django.utils import timezone
         self.comptroller = User.objects.create_user(
             username='payroll_summary_comptroller',
             password='test-password',
@@ -101,10 +106,26 @@ class PayrollSummaryTests(TestCase):
         )
 
         approve_contractor_payment_record(
-            self.comptroller,
+            self.ceo,
             contractor_payment.id,
         )
 
+        issue_contractor_payment(
+            self.ceo,
+            contractor_payment.id,
+            contractor_payment.final_amount,
+            "ACH",
+            f"PAYROLL-SUMMARY-CONTRACTOR-{contractor_payment.pk}",
+            "Payroll summary test issuance evidence",
+        )
+
+        verify_contractor_payment_settlement(
+            self.comptroller,
+            contractor_payment.id,
+            timezone.localdate(),
+            contractor_payment.final_amount,
+            f"PAYROLL-SUMMARY-BANK-{contractor_payment.pk}",
+        )
         mark_contractor_payment_paid(
             self.comptroller,
             contractor_payment.id,
