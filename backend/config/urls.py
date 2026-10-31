@@ -14,6 +14,8 @@ router.register('operational-projects', operational_project_api.OperationalProje
 router.register('contractors', contractor_directory_api.ContractorDirectoryViewSet, basename='contractors')
 from core.marketing_msr_api import MarketingMSRViewSet
 router.register('marketing-msrs', MarketingMSRViewSet, basename='marketing-msrs')
+from core.visible_msr_api import VisibleMSRViewSet
+router.register('visible-msrs', VisibleMSRViewSet, basename='visible-msrs')
 urlpatterns = [
     path(
         'api/own-contractor-payments/',
