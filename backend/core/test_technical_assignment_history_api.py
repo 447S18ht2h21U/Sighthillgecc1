@@ -210,6 +210,7 @@ class TechnicalAssignmentHistoryAPITests(TestCase):
             self.make_assignment(
                 self.project,
                 date(2026, 1, 1) + timedelta(days=index),
+                ended=True,
             )
 
         response = self.history(self.manager)
