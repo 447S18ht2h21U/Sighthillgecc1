@@ -1,4 +1,5 @@
 from django.urls import path, include
+from core import own_contractor_payment_api
 from rest_framework.routers import DefaultRouter
 from core import completion_envelope_api, installation_schedule_api, api, docusign_api, sandbox_api, release_api, signing_test_api, technical_assignment_api, operational_project_api, dashboard_api, financial_reporting_api, contractor_directory_api
 router = DefaultRouter()
@@ -14,6 +15,12 @@ router.register('contractors', contractor_directory_api.ContractorDirectoryViewS
 from core.marketing_msr_api import MarketingMSRViewSet
 router.register('marketing-msrs', MarketingMSRViewSet, basename='marketing-msrs')
 urlpatterns = [
+    path(
+        'api/own-contractor-payments/',
+        own_contractor_payment_api.own_contractor_payment_history,
+        name='own-contractor-payments',
+    ),
+
     path(
         'api/financial-reports/',
         financial_reporting_api.financial_reports,
