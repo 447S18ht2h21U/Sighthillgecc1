@@ -4,20 +4,21 @@ import hashlib
 import json
 from io import BytesIO
 from pathlib import Path
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from xml.sax.saxutils import escape
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from pypdf import PdfReader, PdfWriter
-from pypdf.generic import NameObject, NumberObject
+from pypdf.generic import ContentStream, NameObject, NumberObject, TextStringObject
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from .models import Document, MSR, Project
+from .equipment_catalog_snapshot import customer_equipment_description
 from .services import authorize, audit, validate_snapshot
 from .rules import EASTERN
 
@@ -41,6 +42,16 @@ def template_path(kind):
         raise ValidationError('The document template does not match the approved version. Contact the Comptroller.')
     return source
 
+
+def completion_renderer_version(kind):
+    """Retain existing renderer IDs except for revised certificates."""
+    if kind in ("COMPLETION_FINANCED", "COMPLETION_NON_FINANCED"):
+        return "0.2.2"
+    if kind in ("CONTRACT", "INVOICE"):
+        return "0.2.3"
+    return RENDERER_VERSION
+
+
 def canonical_hash(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
@@ -58,6 +69,33 @@ def field_values(kind, record, prepared_at):
     if kind == 'CONTRACT':
         return {**common, 'customer_name':s['customer'], 'payment_option':'50% deposit / 50% balance' if s['payment_option']=='50_PERCENT_DEPOSIT' else '100% on completion', 'financing_type':'Financed' if s['financing_type']=='FINANCED' else 'Non-financed'}
     return {**common, 'project_city':s.get('project_city',''), 'project_state':s.get('project_state',''), 'project_zip':s.get('project_zip','')}
+
+def format_customer_equipment_line(item):
+    """Render detached equipment details without modifying the snapshot."""
+    if type(item) is not dict:
+        raise ValueError("Equipment line must be an object.")
+    quantity = item.get("quantity")
+    if set(item) == {"description", "quantity"}:
+        # Legacy MSRs store validated quantities as decimal strings.
+        # Never rewrite approved historical snapshots.
+        try:
+            legacy_quantity = Decimal(str(quantity))
+            if (
+                type(quantity) not in (str, int)
+                or not legacy_quantity.is_finite()
+                or legacy_quantity <= 0
+                or legacy_quantity > 100000
+            ):
+                raise ValueError()
+        except (InvalidOperation, ValueError, TypeError):
+            raise ValueError("Invalid legacy equipment quantity.")
+    elif type(quantity) is not int or not 1 <= quantity <= 999:
+        raise ValueError("Equipment quantity must be from 1 to 999.")
+    return (
+        f"{customer_equipment_description(item)} "
+        f"(quantity {quantity})"
+    )
+
 
 def appendix(record, kind, prepared_at, signing_test=False):
     """Full snapshot details flow over pages, without truncating scope or item lists."""
@@ -82,8 +120,12 @@ def appendix(record, kind, prepared_at, signing_test=False):
         if value:
             text(label, value)
     for label,key in [('Equipment','equipment'),('Materials','materials')]:
-        text(label, '\n'.join(f"{item['description']} (quantity {item['quantity']})" for item in s[key]) or 'None specified in the approved record.')
-    rows = [['Approved price','USD'],['Base price',money(s['base_price'])],['Discount','-'+money(s['discount'])],['Sales tax',money(s['tax'])],['Total price',money(s['total_price'])]]
+        if key == 'equipment':
+            items = [format_customer_equipment_line(item) for item in s[key]]
+        else:
+            items = [f"{item['description']} (quantity {item['quantity']})" for item in s[key]]
+        text(label, '\n'.join(items) or 'None specified in the approved record.')
+    rows = [['Approved price','USD'],['Base price',money(s['base_price'])],['Discount',('0.00' if Decimal(str(s['discount'])) == 0 else '-'+money(s['discount']))],['Sales tax',money(s['tax'])],['Total price',money(s['total_price'])]]
     table = Table(rows, colWidths=[350,130]);table.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#e7eee7')),('GRID',(0,0),(-1,-1),.5,colors.HexColor('#c9d4cb')),('ALIGN',(1,1),(1,-1),'RIGHT'),('TOPPADDING',(0,0),(-1,-1),8),('BOTTOMPADDING',(0,0),(-1,-1),8)]));content += [Spacer(1,16),table]
     text('Payment option','50% deposit / 50% at completion' if s['payment_option']=='50_PERCENT_DEPOSIT' else '100% at completion')
     text('Payment terms',s['payment_terms'])
@@ -91,11 +133,231 @@ def appendix(record, kind, prepared_at, signing_test=False):
         text('Financing','Financed' if s['financing_type']=='FINANCED' else 'Non-financed')
     if s.get('commercial_notes'):
         text('Commercial notes',s['commercial_notes'])
-    text('Installation eligibility','Five Eastern calendar days after the later customer contract/invoice signature, and after any later applicable cancellation deadline. Required signatures and verified deposit also apply. No eligibility date has been calculated in this preparation copy.')
+    text('Installation eligibility','Five Eastern calendar days after the verified customer Contract signature, and after any later applicable cancellation deadline. Verified Contract signature, required payment verification or an approved exception, and other installation prerequisites still apply. The customer Invoice signature is not a pre-installation requirement. No eligibility date has been calculated in this preparation copy.')
     def footer(c, doc):
         c.setFont('Helvetica',8);c.setFillColor(colors.HexColor('#647a6b'));c.drawString(48,25,f'{record.project.code} | MSR {record.number}.0 | Approved detail');c.drawRightString(564,25,f'Page {doc.page}')
     SimpleDocTemplate(stream,pagesize=(612,792),leftMargin=48,rightMargin=48,topMargin=48,bottomMargin=48).build(content,onFirstPage=footer,onLaterPages=footer)
     return PdfReader(BytesIO(stream.getvalue()))
+
+
+def refresh_completion_identity(writer, kind):
+    """Update new certificate copies without changing approved templates."""
+    if kind not in ("COMPLETION_FINANCED", "COMPLETION_NON_FINANCED"):
+        return
+
+    from io import BytesIO
+    from pypdf import PdfReader
+    from pypdf.generic import ContentStream, NameObject, TextStringObject
+    from reportlab.pdfgen import canvas
+    from reportlab.pdfbase import pdfmetrics
+
+    # Reposition the printed title and project label without modifying
+    # the approved PDF template or any previously generated document.
+    title = "COMPLETION CERTIFICATE"
+    subtitle = (
+        "FINANCED PROJECT" if kind == "COMPLETION_FINANCED"
+        else "NON-FINANCED PROJECT"
+    )
+    measured = {}
+
+    def capture_header(text, cm, tm, font_dict, font_size):
+        label = str(text).strip()
+        if label in (title, subtitle):
+            measured.setdefault(label, []).append(
+                (float(tm[5]), float(font_size))
+            )
+
+    old_header = (
+        "20906 Frederick Road Ste A 1010",
+        "Germantown, MD 20876",
+        "Email: geccmd@gmail.com",
+    )
+    old_warning = (
+        "PLEASE DO NOT SIGN THIS DOCUMENT UNTIL THE WORK IS COMPLETE"
+    )
+    targets = (*old_header, old_warning, title, subtitle)
+    counts = {value: 0 for value in targets}
+
+    page = writer.pages[0]
+    page.extract_text(visitor_text=capture_header)
+    for label in (title, subtitle):
+        locations = measured.get(label, [])
+        if len(locations) != 1:
+            raise ValueError(
+                "STOP: Certificate label location not unique: " + label
+            )
+        y, size = locations[0]
+        if not (650 < y < 790 and 7 <= size <= 25):
+            raise ValueError(
+                "STOP: Unexpected certificate label geometry: "
+                + repr((label, y, size))
+            )
+
+    stream = ContentStream(page.get_contents(), writer)
+
+    for operands, operator in stream.operations:
+        if operator == b"Tj" and operands:
+            value = str(operands[0])
+            if value in counts:
+                counts[value] += 1
+                operands[0] = TextStringObject("")
+        elif operator == b"TJ" and operands:
+            for index, item in enumerate(operands[0]):
+                if isinstance(item, (str, TextStringObject)):
+                    value = str(item)
+                    if value in counts:
+                        counts[value] += 1
+                        operands[0][index] = TextStringObject("")
+
+    if any(count != 1 for count in counts.values()):
+        raise ValueError(
+            "STOP: Template printed text was not uniquely found: "
+            + repr(counts)
+        )
+
+    page[NameObject("/Contents")] = writer._add_object(stream)
+
+    width = float(page.mediabox.width)
+    height = float(page.mediabox.height)
+    company = "Green Energy Contracting Corporation"
+    contact = (
+        "Office Phone: 888-977-1711    "
+        "Email: care@gecc.cloud"
+    )
+
+    if pdfmetrics.stringWidth(contact, "Helvetica", 10.0) > 365:
+        raise ValueError("STOP: Contact line too wide.")
+
+    # Center within the space between the two original logo areas.
+    # The logos remain in the original approved template.
+    center_x = (113.0 + 459.0) / 2.0
+    available_width = 459.0 - 113.0
+    if pdfmetrics.stringWidth(contact, "Helvetica", 10.0) > available_width - 12:
+        raise ValueError("STOP: Contact line overlaps the logo areas.")
+
+    overlay = BytesIO()
+    drawing = canvas.Canvas(overlay, pagesize=(width, height))
+    drawing.setFillColorRGB(0, 0, 0)
+    drawing.setFont("Helvetica-Bold", measured[title][0][1])
+    drawing.drawCentredString(center_x, measured[title][0][0], title)
+    drawing.setFont("Helvetica", 12)
+    drawing.drawCentredString(center_x, 736, company)
+    drawing.setFont("Helvetica", 10)
+    drawing.drawCentredString(center_x, 718, contact)
+    drawing.setFont("Helvetica-Bold", measured[subtitle][0][1])
+    drawing.drawCentredString(
+        center_x, measured[subtitle][0][0], subtitle
+    )
+    drawing.save()
+    overlay.seek(0)
+    page.merge_page(PdfReader(overlay).pages[0])
+
+
+
+
+def refresh_other_document_identity(writer, kind):
+    """Clean headers for newly prepared Contracts and Invoices only."""
+    if kind not in ("CONTRACT", "INVOICE"):
+        return
+
+    from PIL import Image, ImageDraw
+    from pypdf.generic import ContentStream, NameObject, TextStringObject
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+
+    page = writer.pages[0]
+    width = float(page.mediabox.width)
+    height = float(page.mediabox.height)
+    if (width, height) != (612.0, 792.0):
+        raise ValueError("STOP: Unexpected document dimensions.")
+
+    company = "Green Energy Contracting Corporation"
+    contact = "Office Phone: 888-977-1711    Email: care@gecc.cloud"
+    old_text = (
+        ("HVAC INVOICE",
+         "20906 Frederick Road Ste A 1010",
+         "Germantown, MD 20876",
+         "Email: geccmd@gmail.com",
+         "Phone: 702-782-3863")
+        if kind == "INVOICE" else ("Email: geccmd@gmail.com",)
+    )
+
+    counts = {value: 0 for value in old_text}
+    stream = ContentStream(page.get_contents(), writer)
+    for operands, operation in stream.operations:
+        if operation == b"Tj" and operands:
+            value = str(operands[0])
+            if value in counts:
+                counts[value] += 1
+                operands[0] = TextStringObject("")
+        elif operation == b"TJ" and operands:
+            for index, item in enumerate(operands[0]):
+                if isinstance(item, (str, TextStringObject)):
+                    value = str(item)
+                    if value in counts:
+                        counts[value] += 1
+                        operands[0][index] = TextStringObject("")
+
+    if any(count != 1 for count in counts.values()):
+        raise ValueError("STOP: Original header text changed: " + repr(counts))
+    page[NameObject("/Contents")] = writer._add_object(stream)
+
+    if kind == "CONTRACT":
+        if len(page.images) != 1:
+            raise ValueError("STOP: Unexpected Agreement banner images.")
+        embedded = page.images[0]
+        picture = Image.open(BytesIO(embedded.data)).convert("RGB")
+        if picture.size != (908, 131):
+            raise ValueError("STOP: Unexpected Agreement banner dimensions.")
+
+        # Remove the old central artwork from the image itself.
+        # Preserve both original logo regions.
+        left = round((125.0 - 50.4) * picture.width / 511.2)
+        right = round((432.0 - 50.4) * picture.width / 511.2)
+        if not (120 <= left <= 145 and 670 <= right <= 690):
+            raise ValueError("STOP: Unexpected Agreement image boundaries.")
+
+        clean = picture.copy()
+        ImageDraw.Draw(clean).rectangle(
+            (left, 0, right, picture.height - 1),
+            fill=(255, 255, 255)
+        )
+        for box in (
+            (0, 0, left, picture.height),
+            (right + 1, 0, picture.width, picture.height)
+        ):
+            if clean.crop(box).tobytes() != picture.crop(box).tobytes():
+                raise ValueError("STOP: Protected logo pixels changed.")
+        embedded.replace(clean)
+
+        center_x = 288.5
+        lines = (
+            ("PROJECT SCOPE OF WORK AGREEMENT", "Helvetica-Bold", 11.0, 746),
+            (company, "Helvetica", 11.0, 727),
+            (contact, "Helvetica", 8.2, 708),
+        )
+        safe_left, safe_right = 130.0, 427.0
+    else:
+        center_x = 286.0
+        lines = (
+            ("HVAC INVOICE", "Helvetica-Bold", 15.0, 752),
+            (company, "Helvetica", 12.0, 734),
+            (contact, "Helvetica", 10.0, 711),
+        )
+        safe_left, safe_right = 113.0, 459.0
+
+    overlay = BytesIO()
+    drawing = canvas.Canvas(overlay, pagesize=(width, height))
+    drawing.setFillColorRGB(0, 0, 0)
+    for label, font, size, y in lines:
+        measured = stringWidth(label, font, size)
+        if center_x - measured / 2 < safe_left or center_x + measured / 2 > safe_right:
+            raise ValueError("STOP: Header overlaps protected logo area.")
+        drawing.setFont(font, size)
+        drawing.drawCentredString(center_x, y, label)
+    drawing.save()
+    overlay.seek(0)
+    page.merge_page(PdfReader(overlay).pages[0])
+
 
 def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=None, signing_test=False):
     if signing_test and (not release_context or sandbox_review):
@@ -104,6 +366,8 @@ def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=N
     source = template_path(kind)
     reader = PdfReader(source)
     writer = PdfWriter();writer.clone_document_from_reader(reader)
+    refresh_completion_identity(writer, kind)
+    refresh_other_document_identity(writer, kind)
     fields = writer.get_fields() or {}
     if not SIGNATURE_FIELDS.issubset(fields) or any(fields[name].get('/FT')!='/Sig' for name in SIGNATURE_FIELDS):
         raise ValidationError('The template lacks required native signature fields.')
@@ -213,13 +477,13 @@ def generate(actor, msr_id, kind):
     if kind=='COMPLETION_FINANCED' and financing!='FINANCED' or kind=='COMPLETION_NON_FINANCED' and financing!='NON_FINANCED':
         raise ValidationError('Certificate type must match the approved financing selection.')
     template_hash=hashlib.sha256(template_path(kind).read_bytes()).hexdigest()
-    existing=Document.objects.filter(msr=record,kind=kind,template_sha256=template_hash,renderer_version=RENDERER_VERSION).first()
+    existing=Document.objects.filter(msr=record,kind=kind,template_sha256=template_hash,renderer_version=completion_renderer_version(kind)).first()
     if existing:
         return existing,False
     created_at=timezone.now()
     content,values,template_hash=render_pdf(kind,record,created_at)
     if len(content)>5*1024*1024:
         raise ValidationError('The generated document exceeds the preparation size limit.')
-    document=Document.objects.create(msr=record,kind=kind,created_by=actor,filename=f'{project.code}-V{record.number}-{kind}.pdf',template_sha256=template_hash,snapshot_sha256=canonical_hash(record.snapshot),pdf_sha256=hashlib.sha256(content).hexdigest(),renderer_version=RENDERER_VERSION,values=values,content=content)
+    document=Document.objects.create(msr=record,kind=kind,created_by=actor,filename=f'{project.code}-V{record.number}-{kind}.pdf',template_sha256=template_hash,snapshot_sha256=canonical_hash(record.snapshot),pdf_sha256=hashlib.sha256(content).hexdigest(),renderer_version=completion_renderer_version(kind),values=values,content=content)
     audit(actor,'document.generated',project.id,{'document_id':str(document.id),'msr_id':str(record.id),'version':record.number,'kind':kind,'template_sha256':template_hash,'snapshot_sha256':document.snapshot_sha256,'pdf_sha256':document.pdf_sha256,'status':'PREPARATION'})
     return document,True

@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VERIDIAN | Corporate Financial Reporting Preview</title>
+<style>
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: #142B3B;
+  background: #F7F8F5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+header {
+  background: #142B3B;
+  color: white;
+  padding: 20px max(24px, calc((100vw - 1250px)/2));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.brand { font-weight: 800; font-size: 24px; }
+.brand small { font-weight: 400; font-size: 12px; display:block; }
+main { max-width: 1250px; margin: auto; padding: 28px 24px 70px; }
+.eyebrow {
+  font-size: 11px; letter-spacing: .12em;
+  color: #087F75; font-weight: 800;
+}
+h1 { font-size: 29px; margin: 8px 0; }
+h2 { font-size: 19px; margin-top: 0; }
+.muted { color: #526675; font-size: 13px; line-height: 1.6; }
+.banner {
+  background: #EDF5F3; border-left: 4px solid #087F75;
+  padding: 14px 18px; margin: 20px 0;
+  font-size: 13px; line-height: 1.6;
+}
+.warning {
+  background: #FFF8E8; border-left-color: #C39A58;
+}
+.toolbar {
+  display: flex; justify-content: space-between; flex-wrap: wrap;
+  gap: 16px; align-items: end; margin: 22px 0;
+}
+label { display: block; font-size: 12px; font-weight: 700; }
+select {
+  display: block; margin-top: 6px; padding: 10px 14px;
+  border: 1px solid #D7E3E7; border-radius: 7px;
+  font: inherit; background: white; color: #142B3B;
+}
+.tabs { display:flex; flex-wrap:wrap; gap:8px; margin:20px 0; }
+button {
+  background: white; color: #142B3B;
+  border:1px solid #D7E3E7; border-radius:7px;
+  padding:11px 15px; font:inherit; cursor:pointer;
+}
+button.active {
+  background: #087F75; color:white; border-color:#087F75;
+}
+button:focus-visible, select:focus-visible {
+  outline: 3px solid #C39A58; outline-offset: 2px;
+}
+.cards { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.card, .statement, .approval {
+  background:white; border:1px solid #D7E3E7;
+  border-radius:10px; padding:20px; margin-bottom:16px;
+}
+.card span { display:block; font-size:12px; color:#526675; }
+.card strong { display:block; font-size:24px; margin-top:8px; }
+.report-layout {
+  display:grid; grid-template-columns:minmax(0,2fr) minmax(250px,1fr);
+  gap:18px;
+}
+.report-header {
+  display:flex; justify-content:space-between;
+  align-items:center; gap:12px;
+}
+.status {
+  color:#946200; background:#FFF3D8; padding:7px 10px;
+  font-size:11px; border-radius:5px; font-weight:800;
+}
+table { width:100%; border-collapse:collapse; font-size:14px; }
+td { padding:13px 6px; border-bottom:1px solid #E9EEEF; }
+td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
+tr.total td {
+  font-weight:800; border-top:2px solid #142B3B;
+  background:#F7F8F5;
+}
+.approval p { font-size:13px; line-height:1.6; }
+.step { padding:12px 0; border-bottom:1px solid #E9EEEF; }
+.step strong { display:block; font-size:13px; margin-bottom:5px; }
+.step span { color:#526675; font-size:12px; }
+footer { color:#526675; text-align:center; font-size:12px; margin-top:32px; }
+@media(max-width:800px) {
+  .cards, .report-layout { grid-template-columns:1fr; }
+  header { padding:20px 24px; }
+}
+
+.return-row { display:flex; justify-content:space-between;
+  align-items:center; gap:16px; flex-wrap:wrap; }
+.return-button { font-size:13px; color:#526675;
+  background:#F7F8F5; cursor:not-allowed; }
+.source-box { background:#F7F8F5; border:1px solid #D7E3E7;
+  border-radius:8px; padding:14px 18px; margin-bottom:18px; }
+.source-box strong { font-size:13px; }
+.source-box p { font-size:12px; color:#526675; line-height:1.6; }
+.section-row td { background:#EDF5F3; font-weight:800; }
+table td:first-child { width:70%; }
+.statement { min-width:0; }
+.formula-note { font-size:12px; color:#526675; line-height:1.6; }
+
+
+/* Step 4436H: approved navigation alignment only. */
+.financial-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+}
+.financial-navigation .tabs {
+  margin: 0;
+}
+.financial-navigation .return-button {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+@media (max-width: 700px) {
+  .financial-navigation .return-button {
+    margin-left: 0;
+  }
+}
+
+
+/* Step 4436Q: isolated supporting Tax Register. */
+.tax-register-link {
+  margin-left: auto;
+  padding: 11px 15px;
+  border: 1px solid #087F75;
+  border-radius: 7px;
+  color: #087F75;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  background: white;
+}
+.tax-register-link:hover { background: #EDF5F3; }
+.financial-navigation .return-button { margin-left: 0; }
+.tax-register-section { scroll-margin-top: 24px; }
+.tax-register-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.tax-register-fact {
+  background: #F7F8F5;
+  border: 1px solid #D7E3E7;
+  border-radius: 8px;
+  padding: 15px;
+}
+.tax-register-fact span {
+  display: block;
+  color: #526675;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.tax-table-scroll { overflow-x: auto; }
+.tax-register-section table { min-width: 900px; }
+.tax-register-section th {
+  text-align: left;
+  font-size: 12px;
+  color: #526675;
+  background: #EDF5F3;
+  padding: 12px;
+}
+.tax-register-section td {
+  text-align: left;
+  padding: 12px;
+  font-size: 12px;
+}
+.tax-register-section td:last-child { text-align: left; }
+.tax-evidence-warning {
+  background: #FFF8E8;
+  border-left: 4px solid #C39A58;
+  padding: 12px 16px;
+  margin: 15px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+@media (max-width: 800px) {
+  .tax-register-grid { grid-template-columns: 1fr; }
+  .tax-register-link { margin-left: 0; }
+}
+
+
+/* Step 4436S: Tax Register column layout only. */
+.tax-register-section table {
+  width: 100%;
+  min-width: 950px;
+  table-layout: fixed;
+}
+.tax-register-section th,
+.tax-register-section td {
+  width: auto;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.tax-register-section th:nth-child(1),
+.tax-register-section td:nth-child(1) { width: 12%; }
+.tax-register-section th:nth-child(2),
+.tax-register-section td:nth-child(2) { width: 13%; }
+.tax-register-section th:nth-child(3),
+.tax-register-section td:nth-child(3) { width: 21%; }
+.tax-register-section th:nth-child(4),
+.tax-register-section td:nth-child(4) { width: 22%; }
+.tax-register-section th:nth-child(5),
+.tax-register-section td:nth-child(5) { width: 12%; }
+.tax-register-section th:nth-child(6),
+.tax-register-section td:nth-child(6) { width: 12%; }
+.tax-register-section th:nth-child(7),
+.tax-register-section td:nth-child(7) { width: 8%; }
+
+
+/* 4436X - Tax-entry form, inactive design only */
+.tax-entry-grid {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px 20px;
+}
+.tax-entry-panel {
+  margin-top:22px;
+}
+.tax-entry-panel fieldset {
+  border:0;
+  margin:0;
+  padding:0;
+}
+.tax-entry-panel label {
+  color:#142B3B;
+  display:block;
+  font-size:12px;
+  font-weight:700;
+}
+.tax-entry-panel input,
+.tax-entry-panel select,
+.tax-entry-panel textarea {
+  display:block;
+  width:100%;
+  margin-top:6px;
+  padding:10px;
+  border:1px solid #D7E3E7;
+  border-radius:7px;
+  background:#F7F8F5;
+  color:#526675;
+  font:inherit;
+}
+.tax-entry-panel textarea { min-height:72px; }
+.tax-entry-note {
+  border-left:4px solid #C39A58;
+  background:#FFF8E8;
+  padding:14px 16px;
+  margin:18px 0;
+  font-size:13px;
+  line-height:1.6;
+}
+@media(max-width:700px) {
+  .tax-entry-grid { grid-template-columns:1fr; }
+}
+
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">VERIDIAN
+    <small>Business Operations &amp; Management System</small>
+  </div>
+  <span>Corporate Finance | Isolated Preview</span>
+</header>
+<main>
+
+  <h1>Corporate Financial Reporting</h1>
+  <p class="muted">Review financial performance, statement details, and approval readiness.</p>
+
+  <div class="banner">
+    <strong>FICTIONAL DATA - DESIGN REVIEW ONLY</strong>
+    <div>Sample figures are not GECC accounting records. No financial API,
+    live database, approval action, or operational payment is connected.</div>
+  </div>
+
+  <div class="toolbar">
+    <label>Reporting period
+      <select aria-label="Reporting period">
+        <option>October 2026 - Monthly</option>
+      </select>
+    </label>
+    <div class="muted">Prepared by: Comptroller (example)<br>
+    CEO final approval: Not recorded</div>
+  </div>
+
+  <div class="financial-navigation">
+  <div class="tabs" role="tablist" aria-label="Financial reports">
+    <button type="button" role="tab" aria-selected="true"
+      class="active" data-tab="income">Income Statement</button>
+    <button type="button" role="tab" aria-selected="false"
+      data-tab="balance">Balance Sheet</button>
+    <button type="button" role="tab" aria-selected="false"
+      data-tab="cash">Cash Flow</button>
+    <button type="button" role="tab" aria-selected="false"
+      data-tab="profit">Project Profitability</button>
+  </div>
+  <a class="tax-register-link" href="#corporate-tax-register">
+    Tax Register (Supporting)
+  </a>
+  <button type="button" class="return-button" disabled
+    title="Available only after authorized application integration">
+    Back to Customers &amp; Projects - Integration pending
+  </button>
+  </div>
+
+  <div class="cards" aria-label="Fictional summary">
+    <div class="card"><span id="metric1-label">Revenue</span>
+      <strong id="metric1">$125,000</strong></div>
+    <div class="card"><span id="metric2-label">Direct costs</span>
+      <strong id="metric2">$78,000</strong></div>
+    <div class="card"><span id="metric3-label">Gross profit</span>
+      <strong id="metric3">$47,000</strong></div>
+  </div>
+
+  <div class="source-box" aria-live="polite">
+<strong>Amounts and accounting sources</strong>
+<p id="source-notes">Illustrative source records only.</p>
+<p>Real reports must distinguish approved source imports,
+controlled manual accounting entries, and calculated values.
+Missing evidence must remain missing, not automatically become zero.
+No accounting entries can be made on this preview.</p>
+</div>
+<div class="report-layout">
+    <section class="statement" aria-live="polite">
+      <div class="report-header">
+        <h2 id="report-title">Income Statement</h2>
+        <span class="status">DRAFT / NOT APPROVED</span>
+      </div>
+      <p class="muted" id="report-description"></p>
+      <table aria-label="Fictional financial statement">
+        <tbody id="statement-rows"></tbody>
+      </table>
+      <p class="muted">All values are illustrative. No source
+      reconciliation or financial certification is implied.</p>
+    </section>
+
+    <aside class="approval">
+      <h2>Report review and approval</h2>
+      <div class="step">
+        <strong>1. Comptroller preparation</strong>
+        <span>Illustrated workflow only; no real preparation recorded</span>
+      </div>
+      <div class="step">
+        <strong>2. Accounting reconciliation</strong>
+        <span>Not independently verified</span>
+      </div>
+      <div class="step">
+        <strong>3. Independent CEO approval</strong>
+        <span>Not recorded; approval unavailable</span>
+      </div>
+      <div class="step">
+        <strong>4. Historical report protection</strong>
+        <span>Approved reports must retain immutable snapshots and audit history</span>
+      </div>
+      <p class="muted">This preview offers no approval, publishing,
+      editing, or payment actions.</p>
+    </aside>
+  </div>
+
+  <div class="banner warning">
+    <strong>Financial acceptance remains pending.</strong>
+    <div>Complete accounting reconciliation and separately approved
+    operational safeguards are required before production reporting.
+    The SQLite timezone correction remains test-only.</div>
+  </div>
+
+<section id="corporate-tax-register"
+  class="statement tax-register-section"
+  aria-labelledby="tax-register-title">
+  <p class="eyebrow">SUPPORTING ACCOUNTING RECORDS</p>
+  <h2 id="tax-register-title">Corporate Tax Register</h2>
+  <p class="muted">
+    Supporting tax records for the four corporate financial reports.
+    This is not a separate financial statement.
+  </p>
+  <div class="banner">
+    <strong>FICTIONAL TAX REGISTER - DESIGN REVIEW ONLY</strong>
+    <div>No real tax balances, filed returns, tax rates, payment
+    instructions, or jurisdiction determinations are included.</div>
+  </div>
+
+  <div class="tax-register-grid">
+    <div class="tax-register-fact">
+      <span>Corporate registration</span>
+      <strong>South Dakota</strong>
+    </div>
+    <div class="tax-register-fact">
+      <span>Company office</span>
+      <strong>Nevada</strong>
+    </div>
+    <div class="tax-register-fact">
+      <span>Equipment sales states</span>
+      <strong>Maryland / Delaware / Virginia</strong>
+    </div>
+  </div>
+
+  <h3>Tax review records</h3>
+  <p class="muted">Example records are not posted, verified, or
+  included in the fictional financial statement calculations.</p>
+
+  <div class="tax-table-scroll">
+    <table aria-label="Fictional tax review register">
+      <thead>
+        <tr>
+          <th>Reference</th>
+          <th>Jurisdiction</th>
+          <th>Tax category</th>
+          <th>Accounting classification</th>
+          <th>Amount</th>
+          <th>Evidence</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>DEMO-TAX-01</td><td>Federal</td>
+          <td>Corporate income tax</td>
+          <td>Current income tax expense</td>
+          <td>Not established</td><td>Not verified</td>
+          <td>Draft example</td>
+        </tr>
+        <tr>
+          <td>DEMO-TAX-02</td><td>Maryland</td>
+          <td>Project transaction review</td>
+          <td>Undetermined</td>
+          <td>Pending evidence</td><td>MSR review pending</td>
+          <td>Needs review</td>
+        </tr>
+        <tr>
+          <td>DEMO-TAX-03</td><td>Delaware</td>
+          <td>Applicable business tax review</td>
+          <td>Undetermined</td>
+          <td>Pending evidence</td><td>Activity review pending</td>
+          <td>Needs review</td>
+        </tr>
+        <tr>
+          <td>DEMO-TAX-04</td><td>Virginia</td>
+          <td>Equipment installation review</td>
+          <td>Undetermined</td>
+          <td>Pending evidence</td><td>MSR review pending</td>
+          <td>Needs review</td>
+        </tr>
+        <tr>
+          <td>DEMO-TAX-05</td><td>Nevada</td>
+          <td>Office-related tax review</td>
+          <td>Undetermined</td>
+          <td>Pending evidence</td><td>Office records pending</td>
+          <td>Needs review</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>MSR jurisdiction evidence</h3>
+  <p class="muted">
+    The approved MSR supplies the customer billing address,
+    installation address, project identity and versioned project
+    details. Delivery location must be separately confirmed where
+    relevant. No address alone establishes tax liability.
+  </p>
+
+  <div class="tax-evidence-warning">
+    <strong>Comptroller review required.</strong>
+    Actual tax determinations require the transaction type,
+    applicable jurisdiction rules, supporting documents, and
+    accounting classification. Missing evidence is not zero.
+  </div>
+
+  <h3>Accounting treatment</h3>
+  <p class="muted">
+    Income tax expense, non-income operating taxes, tax payable,
+    prepaid taxes, and actual tax payments must remain separate.
+    Supported verified amounts may later feed the four corporate
+    reports through approved accounting rules. The Tax Register
+    does not independently approve or reconcile those reports.
+  </p>
+  <p class="muted">
+    Comptroller prepares. Independent CEO final approval remains
+    applicable to corporate financial reports. Individual tax-entry
+    verification authority is not yet established.
+  </p>
+</section>
+
+
+<section class="statement tax-entry-panel"
+  aria-labelledby="tax-entry-heading">
+  <h2 id="tax-entry-heading">Prepare Tax Entry</h2>
+  <p class="muted">
+    Proposed Comptroller workflow. This form is a design example
+    only; it cannot save entries or authorize tax activity.
+  </p>
+  <div class="tax-entry-note">
+    <strong>ENTRY CONTROLS DISABLED</strong>
+    <div>Verification authority for individual tax records is
+    not yet approved. No tax amount may be posted or included
+    in corporate reports from this form.</div>
+  </div>
+
+  <fieldset disabled>
+    <div class="tax-entry-grid">
+      <label>Tax jurisdiction
+        <select><option>Select applicable jurisdiction</option></select>
+      </label>
+      <label>Tax category
+        <select><option>Select tax category</option></select>
+      </label>
+      <label>Accounting classification
+        <select><option>Expense, payable, asset or payment</option></select>
+      </label>
+      <label>Tax year / accounting period
+        <input placeholder="YYYY-MM / tax year">
+      </label>
+      <label>Amount in USD
+        <input placeholder="Evidence-supported amount">
+      </label>
+      <label>Tax authority / source reference
+        <input placeholder="Source or account reference">
+      </label>
+      <label>Project ID, if applicable
+        <input placeholder="Link to authorized project">
+      </label>
+      <label>Approved MSR ID and version
+        <input placeholder="Historical approved MSR reference">
+      </label>
+      <label>Customer billing address
+        <input placeholder="Read from approved MSR">
+      </label>
+      <label>Installation / delivery location
+        <input placeholder="Read or confirm project location">
+      </label>
+      <label>Supporting document reference
+        <input placeholder="Evidence record or retained document">
+      </label>
+      <label>Preparation / review status
+        <select><option>Draft - no verification</option></select>
+      </label>
+    </div>
+    <label>Explanation and accounting basis
+      <textarea placeholder="Required reason and accounting classification"></textarea>
+    </label>
+  </fieldset>
+
+  <p class="muted">
+    The actual implementation must record the preparer's identity,
+    timestamps, evidence verification, corrections, and immutable
+    history. Addresses will be sourced from the approved MSR where
+    available, rather than re-entered unnecessarily.
+  </p>
+  <p class="muted">
+    Corporate report preparation: Comptroller.
+    Corporate report final approval: independent CEO.
+    Individual tax-entry verifier: policy decision pending.
+  </p>
+</section>
+
+  <footer>VERIDIAN | Every Record. Every Decision. Every Step.
+  <br>Local Development Environment | Synthetic financial preview</footer>
+</main>
+<script>
+
+"use strict";
+
+/* FICTIONAL REVIEW ONLY. No network, storage or operational writes. */
+const income = Object.freeze({
+  retail:135000, discounts:10000, directCosts:78000,
+  overhead:9000, marketing:5000, otherOperating:3000,
+  depreciation:2000, amortization:0,
+  interest:1500, incomeTax:5300
+});
+
+const balance = Object.freeze({
+  cash:60000, receivables:45000, inventory:25000,
+  fixedAssets:50000, payables:30000, loans:35000,
+  contributedCapital:45000, beginningRetained:48800,
+  dividends:0
+});
+
+const cashFlow = Object.freeze({
+  beginningCash:37000, operating:25000,
+  investing:-5000, financing:3000
+});
+
+const project = Object.freeze({
+  retail:135000, discount:10000, equipment:35000,
+  materials:14000, leads:9000, marketing:4000,
+  fixed:6000, variable:10000
+});
+
+const netRevenue = income.retail-income.discounts;
+const grossProfit = netRevenue-income.directCosts;
+const operatingIncome = grossProfit-income.overhead-
+  income.marketing-income.otherOperating-
+  income.depreciation-income.amortization;
+const netEarnings = operatingIncome-income.interest-income.incomeTax;
+const ebitda = netEarnings+income.interest+income.incomeTax+
+  income.depreciation+income.amortization;
+
+const assets = balance.cash+balance.receivables+
+  balance.inventory+balance.fixedAssets;
+const liabilities = balance.payables+balance.loans;
+const retained = balance.beginningRetained+netEarnings-balance.dividends;
+const equity = balance.contributedCapital+retained;
+
+const netCashChange = cashFlow.operating+cashFlow.investing+
+  cashFlow.financing;
+const endingCash = cashFlow.beginningCash+netCashChange;
+
+const projectRevenue = project.retail-project.discount;
+const projectCosts = project.equipment+project.materials+
+  project.leads+project.marketing+project.fixed+project.variable;
+const projectProfit = projectRevenue-projectCosts;
+
+if (assets !== liabilities+equity ||
+    endingCash !== balance.cash ||
+    projectCosts !== income.directCosts ||
+    projectRevenue !== netRevenue ||
+    projectProfit !== grossProfit) {
+  throw Error("Fictional financial cross-check failed");
+}
+
+const money = n => n < 0
+  ? "("+Math.abs(n).toLocaleString("en-US",
+      {style:"currency",currency:"USD",maximumFractionDigits:0})+")"
+  : n.toLocaleString("en-US",
+      {style:"currency",currency:"USD",maximumFractionDigits:0});
+const margin = (a,b) => b > 0 ? (100*a/b).toFixed(2)+"%" : "N/A";
+
+const reports = {
+ income: {
+  title:"Income Statement",
+  description:"Fictional corporate income and expense detail.",
+  metrics:[
+   ["Net revenue",money(netRevenue)],
+   ["Gross margin",margin(grossProfit,netRevenue)],
+   ["Net earnings",money(netEarnings)]
+  ],
+  rows:[
+   ["Retail sales",money(income.retail)],
+   ["Customer price reductions",money(-income.discounts)],
+   ["Net revenue",money(netRevenue)],
+   ["Direct costs / cost of revenue",money(-income.directCosts)],
+   ["Gross profit",money(grossProfit)],
+   ["Gross margin",margin(grossProfit,netRevenue)],
+   ["Overhead and administration",money(-income.overhead)],
+   ["Corporate marketing expense",money(-income.marketing)],
+   ["Other operating expenses",money(-income.otherOperating)],
+   ["Depreciation",money(-income.depreciation)],
+   ["Amortization",money(-income.amortization)],
+   ["Operating income",money(operatingIncome)],
+   ["Interest expense",money(-income.interest)],
+   ["Earnings before income taxes",money(netEarnings+income.incomeTax)],
+   ["Income tax expense",money(-income.incomeTax)],
+   ["Net earnings",money(netEarnings)],
+   ["Net margin",margin(netEarnings,netRevenue)],
+   ["EBITDA (non-GAAP)",money(ebitda)],
+   ["EBITDA reconciliation: net earnings",money(netEarnings)],
+   ["Add: net interest expense",money(income.interest)],
+   ["Add: income tax expense",money(income.incomeTax)],
+   ["Add: depreciation and amortization",
+     money(income.depreciation+income.amortization)]
+  ],
+  source:"Retail pricing and price concessions originate from approved project records, subject to GAAP revenue recognition. Project costs require approved classifications. Overhead, corporate marketing, depreciation, amortization, interest, and taxes require ledger support or approved manual accounting entries. Ratios, subtotals, and EBITDA are calculated. EBITDA is non-GAAP and reconciled to net earnings."
+ },
+ balance: {
+  title:"Balance Sheet",
+  description:"Fictional financial position as of October 31, 2026.",
+  metrics:[
+   ["Total assets",money(assets)],
+   ["Total liabilities",money(liabilities)],
+   ["Total equity",money(equity)]
+  ],
+  rows:[
+   ["ASSETS",""],
+   ["Cash and equivalents",money(balance.cash)],
+   ["Accounts receivable",money(balance.receivables)],
+   ["Inventory",money(balance.inventory)],
+   ["Property and equipment, net",money(balance.fixedAssets)],
+   ["Total assets",money(assets)],
+   ["LIABILITIES",""],
+   ["Accounts payable",money(balance.payables)],
+   ["Loans and other debt",money(balance.loans)],
+   ["Total liabilities",money(liabilities)],
+   ["STOCKHOLDERS' EQUITY",""],
+   ["Contributed capital",money(balance.contributedCapital)],
+   ["Opening retained earnings",money(balance.beginningRetained)],
+   ["Current-period net earnings",money(netEarnings)],
+   ["Dividends or distributions",money(-balance.dividends)],
+   ["Ending retained earnings",money(retained)],
+   ["Total equity",money(equity)],
+   ["Total liabilities and equity",money(liabilities+equity)],
+   ["Balance check",money(assets-liabilities-equity)]
+  ],
+  source:"Balance-sheet amounts require supported ledger balances and period-end reconciliations. Retained earnings roll forward from opening retained earnings plus net earnings less dividends and authorized adjustments; it must never be entered as a plug to make the balance sheet balance. Totals and the balance check are calculated."
+ },
+ cash: {
+  title:"Cash Flow Statement",
+  description:"Fictional operating, investing and financing cash activity.",
+  metrics:[
+   ["Operating cash flow",money(cashFlow.operating)],
+   ["Net cash change",money(netCashChange)],
+   ["Ending cash",money(endingCash)]
+  ],
+  rows:[
+   ["Operating activities",money(cashFlow.operating)],
+   ["Investing activities",money(cashFlow.investing)],
+   ["Financing activities",money(cashFlow.financing)],
+   ["Net change in cash",money(netCashChange)],
+   ["Beginning cash",money(cashFlow.beginningCash)],
+   ["Ending cash",money(endingCash)],
+   ["Balance-sheet cash",money(balance.cash)],
+   ["Cash reconciliation difference",money(endingCash-balance.cash)]
+  ],
+  source:"Operating, investing, and financing cash amounts require source transactions and proper ASC 230 classification. Beginning and ending cash require bank and ledger reconciliation. The displayed fictional amounts are not bank verified; the reconciliation here checks mathematics only."
+ },
+ profit: {
+  title:"Project Profitability",
+  description:"Fictional project cost components, not a GAAP income statement.",
+  metrics:[
+   ["Net selling price",money(projectRevenue)],
+   ["Total classified project costs",money(projectCosts)],
+   ["Project contribution",money(projectProfit)]
+  ],
+  rows:[
+   ["Retail price",money(project.retail)],
+   ["Value of customer price discount",money(-project.discount)],
+   ["Net selling price",money(projectRevenue)],
+   ["Cost of equipment",money(-project.equipment)],
+   ["Cost of materials",money(-project.materials)],
+   ["Cost of leads",money(-project.leads)],
+   ["Project marketing expense",money(-project.marketing)],
+   ["Fixed project expenses",money(-project.fixed)],
+   ["Variable project expenses",money(-project.variable)],
+   ["Total classified project costs",money(-projectCosts)],
+   ["Project contribution / configured profit",money(projectProfit)],
+   ["Project margin",margin(projectProfit,projectRevenue)]
+  ],
+  source:"Retail price and price-discount details originate in the approved MSR. Equipment, materials, leads, technician costs, dealer fees, and fixed contractor amounts must map once to approved cost records and configuration. Marketing allocations and otherwise unavailable amounts need controlled evidence-backed entries. Corporate marketing and project marketing must not be double counted. This management measure is not automatically GAAP gross profit."
+ }
+};
+
+function render(key) {
+ const report=reports[key];
+ if (!report) return;
+ document.getElementById("report-title").textContent=report.title;
+ document.getElementById("report-description").textContent=report.description;
+ document.getElementById("source-notes").textContent=report.source;
+ report.metrics.forEach(([label,value],index)=>{
+  document.getElementById(`metric${index+1}-label`).textContent=label;
+  document.getElementById(`metric${index+1}`).textContent=value;
+ });
+ const tbody=document.getElementById("statement-rows");
+ tbody.replaceChildren();
+ report.rows.forEach(([label,value],index)=>{
+  const tr=document.createElement("tr");
+  const td1=document.createElement("td");
+  const td2=document.createElement("td");
+  td1.textContent=label;
+  td2.textContent=value;
+  if (!value) tr.className="section-row";
+  if (/^(Net earnings|Total liabilities and equity|Ending cash|Project contribution)/.test(label))
+    tr.className="total";
+  tr.append(td1,td2);
+  tbody.append(tr);
+ });
+ document.querySelectorAll("[data-tab]").forEach(button=>{
+  const active=button.dataset.tab===key;
+  button.classList.toggle("active",active);
+  button.setAttribute("aria-selected",String(active));
+ });
+}
+document.querySelectorAll("[data-tab]").forEach(button=>{
+ button.addEventListener("click",()=>render(button.dataset.tab));
+});
+render("income");
+
+</script>
+</body>
+</html>

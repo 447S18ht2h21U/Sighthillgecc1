@@ -80,11 +80,43 @@ class FinancialReportCreateInput(serializers.Serializer):
         return super().to_internal_value(data)
 
 
-def _authorized_actor(request):
-    return require_financial_reporting_role(
-        request.user,
-        Role.COMPTROLLER,
+def _authorized_actor(request, operation="read"):
+    from django.conf import settings as financial_settings
+    from rest_framework.exceptions import PermissionDenied
+
+    ceo_policy = (
+        getattr(
+            financial_settings,
+            "VERIDIAN_CEO_FINANCIAL_APPROVAL_ENABLED",
+            False,
+        ) is True
     )
+
+    if not ceo_policy:
+        return require_financial_reporting_role(
+            request.user, Role.COMPTROLLER
+        )
+
+    if operation == "create":
+        return require_financial_reporting_role(
+            request.user, Role.COMPTROLLER
+        )
+
+    if operation == "approve":
+        return require_financial_reporting_role(
+            request.user, Role.CEO
+        )
+
+    if operation == "read":
+        if getattr(request.user, "role", None) == Role.CEO:
+            return require_financial_reporting_role(
+                request.user, Role.CEO
+            )
+        return require_financial_reporting_role(
+            request.user, Role.COMPTROLLER
+        )
+
+    raise PermissionDenied("Unsupported financial report operation.")
 
 
 def _no_store(response):
@@ -97,7 +129,10 @@ def _no_store(response):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def financial_reports(request):
-    actor = _authorized_actor(request)
+    actor = _authorized_actor(
+        request,
+        operation="create" if request.method == "POST" else "read",
+    )
 
     if request.method == "GET":
         records = (
@@ -155,7 +190,7 @@ def financial_report_detail(request, report_id):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def financial_report_approve(request, report_id):
-    actor = _authorized_actor(request)
+    actor = _authorized_actor(request, operation="approve")
 
     report = approve_financial_report(
         actor=actor,

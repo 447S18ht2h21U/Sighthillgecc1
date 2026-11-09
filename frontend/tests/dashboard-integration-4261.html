@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VERIDIAN Dashboard Integration Review</title>
+</head>
+<body>
+  <main id="root"></main>
+  <script type="module">
+    import React from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { ProjectStatusDashboard } from '../src/ProjectStatusDashboard.tsx';
+
+    createRoot(document.getElementById('root')).render(
+      React.createElement(ProjectStatusDashboard)
+    );
+  </script>
+</body>
+</html>

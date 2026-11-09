@@ -1,3 +1,5 @@
+from core import msr_named_catalog_choices_api_4551
+from core import product_catalog_collections_api_4546
 from django.urls import path, include
 from core import own_contractor_payment_api
 from rest_framework.routers import DefaultRouter
@@ -16,7 +18,31 @@ from core.marketing_msr_api import MarketingMSRViewSet
 router.register('marketing-msrs', MarketingMSRViewSet, basename='marketing-msrs')
 from core.visible_msr_api import VisibleMSRViewSet
 router.register('visible-msrs', VisibleMSRViewSet, basename='visible-msrs')
+from core import fictional_document_preview_api_4525
+from core import approved_msr_source_api_4530
+from core import equipment_catalog_selection_api_4534
+from core import equipment_catalog_management_api_4542
 urlpatterns = [
+    path('api/development-msr-named-catalogs/', msr_named_catalog_choices_api_4551.msr_named_catalog_choices),
+    path('api/development-product-catalogs/', product_catalog_collections_api_4546.collections),
+    path('api/development-product-catalogs/<uuid:catalog_id>/', product_catalog_collections_api_4546.collection_detail),
+    path('api/development-product-catalogs/<uuid:catalog_id>/products/', product_catalog_collections_api_4546.collection_products),
+    path('api/development-product-catalogs/<uuid:catalog_id>/products/<uuid:equipment_id>/', product_catalog_collections_api_4546.collection_product_detail),
+
+    path('api/development-equipment-management/', equipment_catalog_management_api_4542.manage_catalog),
+    path('api/development-equipment-management/<uuid:equipment_id>/', equipment_catalog_management_api_4542.manage_catalog_item),
+    path('api/development-equipment-catalog/', equipment_catalog_selection_api_4534.equipment_catalog_choices, name='equipment-catalog-4534'),
+    path(
+        'api/development-approved-msr-source/<uuid:project_id>/',
+        approved_msr_source_api_4530.approved_msr_source,
+        name='approved-msr-source-4530',
+    ),
+    path(
+        'api/fictional-document-previews/<str:kind>/',
+        fictional_document_preview_api_4525.fictional_document_preview,
+        name='fictional-document-preview-4525',
+    ),
+
     path(
         'api/own-contractor-payments/',
         own_contractor_payment_api.own_contractor_payment_history,

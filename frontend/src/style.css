@@ -324,8 +324,8 @@ section, aside {
 
 
 /* VERIDIAN Shared Navigation Row v1 */
-.veridian-navigation-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin: 0.75rem 0 1rem; }
-.veridian-navigation-row > button:last-child:not(:first-child) { margin-left: auto; }
+.veridian-navigation-row { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 0.75rem; margin: 0.75rem 0 1rem; }
+.veridian-navigation-row > button.veridian-return-button { margin-left: auto; }
 
 /* Reusable guidance banners for Technician and Sales workflows. */
 .veridian-guide-banner {
@@ -416,4 +416,198 @@ section, aside {
     overflow-x: auto;
     max-width: 100%;
   }
+}
+/* GECC Login Identity v2 */
+.login .gecc-login-identity {
+  margin: 0 0 2rem;
+  color: var(--veridian-navy, #142B3B);
+  text-align: center;
+}
+.login .gecc-login-identity strong {
+  display: block;
+  font-size: clamp(1.2rem, 3.5vw, 1.55rem);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+.login .gecc-login-identity .gecc-login-line {
+  display: block;
+  margin-top: 0;
+}
+.login .gecc-login-identity > span {
+  display: block;
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.login .login-product-brand {
+  margin-top: 1.4rem;
+  font-size: 0.9rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  color: var(--veridian-teal, #087F75);
+}
+.login .login-environment {
+  margin: 0.3rem 0 0;
+  font-size: 0.75rem;
+  color: var(--veridian-muted, #526675);
+}
+
+/* VERIDIAN Dashboard Full-Width Layout 3999 */
+
+/* Give each attention project its own readable entry. */
+.project-status-dashboard .dashboard-attention-projects {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.project-status-dashboard .dashboard-attention-projects > li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #D7E3E7;
+  border-radius: 0.65rem;
+  background: #fff;
+  line-height: 1.55;
+}
+
+.project-status-dashboard .dashboard-attention-projects > li > strong,
+.project-status-dashboard .dashboard-attention-projects > li > span,
+.project-status-dashboard .dashboard-attention-projects > li > .dashboard-next-action {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.project-status-dashboard .dashboard-attention-projects > li > button {
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+}
+
+/* Keep the milestone cards compact; move details below the grid. */
+
+
+.project-status-dashboard .dashboard-selected-projects {
+  margin-top: 1.2rem;
+  padding: 1.25rem;
+  border: 1px solid #D7E3E7;
+  border-radius: 0.65rem;
+  background: #F7F8F5;
+}
+
+.project-status-dashboard .dashboard-selected-projects h3 {
+  margin: 0 0 1rem;
+  color: #142B3B;
+}
+
+.project-status-dashboard .dashboard-selected-project-list {
+  list-style: none;
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+}
+
+.project-status-dashboard .dashboard-selected-project-list > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto;
+  align-items: start;
+  gap: 1.25rem;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #D7E3E7;
+  border-radius: 0.6rem;
+}
+
+.project-status-dashboard .dashboard-selected-project-info,
+.project-status-dashboard .dashboard-selected-project-guidance,
+.project-status-dashboard .dashboard-selected-project-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.project-status-dashboard .dashboard-selected-project-guidance small {
+  color: #526675;
+}
+
+.project-status-dashboard .dashboard-selected-project-actions button {
+  width: 100%;
+  white-space: normal;
+}
+
+@media (max-width: 900px) {
+  .project-status-dashboard .dashboard-selected-project-list > li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-status-dashboard .dashboard-selected-project-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .project-status-dashboard .dashboard-selected-project-actions button {
+    width: auto;
+  }
+}
+
+
+/* VERIDIAN login identity and shared copyright footer */
+.login .login-bottom {
+  width: 100%;
+  margin-top: 2rem;
+  text-align: center;
+}
+.login .login-bottom .login-product-brand {
+  text-align: center;
+  color: #087F75;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+  margin-bottom: 0.35rem;
+}
+.login .login-platform-tagline {
+  text-align: center;
+  color: #142B3B;
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin: 0.2rem 0 0.45rem;
+}
+.login .login-bottom .login-environment {
+  text-align: center;
+  margin: 0.2rem 0 1.25rem;
+}
+.login .login-credit-bar {
+  width: 100%;
+  border-top: 1px solid #D7E3E7;
+  padding-top: 1rem;
+  text-align: center;
+  font-size: 0.8rem;
+}
+.login .login-credit-bar * {
+  text-align: center;
+}
+
+/* Step 4563: prominent MSR equipment selection action. */
+button.msr-add-equipment-primary {
+  background: #087F75;
+  border-color: #087F75;
+  color: #FFFFFF;
+  font-weight: 600;
+}
+button.msr-add-equipment-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

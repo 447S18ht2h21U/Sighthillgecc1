@@ -63,3 +63,6 @@ backend/core/migrations/*.py.bak-1907P-*
 # Numbered development snapshots and temporary files
 *.bak-1907P-*
 *.tmp-1907P-*
+
+# Local VERIDIAN recovery checkpoints
+/recovery/

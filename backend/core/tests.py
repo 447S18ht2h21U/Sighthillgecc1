@@ -151,6 +151,8 @@ class FoundationTests(TestCase):
     def test_money_validation_and_payment_options(self):
         valid_combinations = [
             ('FINANCED', '50_PERCENT_DEPOSIT'),
+            ('FINANCED', '100_PERCENT_COMPLETION'),
+            ('NON_FINANCED', '50_PERCENT_DEPOSIT'),
             ('NON_FINANCED', '100_PERCENT_COMPLETION'),
         ]
         for financing, option in valid_combinations:
@@ -160,15 +162,12 @@ class FoundationTests(TestCase):
                     'financing_type': financing,
                     'payment_option': option,
                 }, complete=True)
-        for financing, option in [
-            ('FINANCED', '100_PERCENT_COMPLETION'),
-            ('NON_FINANCED', '50_PERCENT_DEPOSIT'),
-        ]:
-            with self.subTest(financing=financing, option=option):
+        for option in ('INVALID', '', None):
+            with self.subTest(invalid_payment_option=option):
                 with self.assertRaises(ValidationError):
                     validate_snapshot({
                         **self.snapshot,
-                        'financing_type': financing,
+                        'financing_type': 'NON_FINANCED',
                         'payment_option': option,
                     }, complete=True)
         with self.assertRaises(ValidationError):

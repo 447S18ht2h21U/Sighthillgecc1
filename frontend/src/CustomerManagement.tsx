@@ -5,7 +5,7 @@ type Customer={id:string;legal_name:string;billing_address:string;email:string;p
 type Contact={id:string;customer:string;name:string;relationship:string;email:string;phone:string;primary:boolean;revision:string};
 type Page<T>={count:number;next:string|null;previous:string|null;results:T[]};
 
-export function CustomerManagement({api,onChanged,onBack}:{api:API;onChanged:()=>Promise<void>;onBack:()=>void}){
+export function CustomerManagement({api,onChanged,onBack,onCreateProject}:{api:API;onChanged:()=>Promise<void>;onBack:()=>void;onCreateProject:(customerId:string)=>void}){
  const [customers,setCustomers]=useState<Page<Customer>|null>(null),[page,setPage]=useState(1),[selected,setSelected]=useState<Customer|null>(null);
  const [query,setQuery]=useState(''),[status,setStatus]=useState(''),[filters,setFilters]=useState({search:'',status:''});
  const customerPath=()=>`customers/?${new URLSearchParams({...filters,page:String(page)})}`;
@@ -32,6 +32,7 @@ export function CustomerManagement({api,onChanged,onBack}:{api:API;onChanged:()=
   </div><div>{selected?<>
    <h3>{selected.legal_name}</h3><p className="customer-address">{selected.billing_address}</p><p>{selected.email||'Email not set'}<br/>{selected.phone||'Phone not set'}</p><p>{selected.archived?'Archived — unavailable for new projects':'Active customer'}</p><p>Primary contact: {selected.primary_contact?.name||'None selected'}</p>
    <button className="quiet" disabled={busy} onClick={()=>{closeForms();setEditCustomer(true);setError('');setMessage('');}}>Edit customer</button>
+    {!selected.archived&&<button className="quiet" disabled={busy} onClick={()=>onCreateProject(selected.id)}>Create project for this customer</button>}
    {editCustomer&&<form key={selected.revision} onSubmit={e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.currentTarget));void run(async()=>{await api(`customers/${selected.id}/`,'PATCH',{...f,archived:f.archived==='on',expected_revision:selected.revision});setEditCustomer(false);await refresh();await onChanged();setMessage('Customer changes saved.');});}}>
     <h3>Edit customer details</h3><fieldset disabled={busy}><div className="grid">
      <label>Customer legal name<input name="legal_name" defaultValue={selected.legal_name} required maxLength={250}/></label>

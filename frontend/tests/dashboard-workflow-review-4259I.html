@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VERIDIAN Isolated Workflow Test</title>
+</head>
+<body>
+  <main id="root"></main>
+  <script type="module">
+    import React from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { ProjectDocumentWorkflowStatus } from '../src/ProjectDocumentWorkflowStatus.tsx';
+
+    const scenario = new URLSearchParams(location.search).get('scenario');
+
+    const base = {
+      read_only: true,
+      evidence_source: 'EXISTING_PREREQUISITE_CHECKS',
+      installation_authorized: false,
+      project_completion_authorized: false,
+      statuses: {
+        approved_msr: 'VERIFIED',
+        contract_signature: 'CHECK_PASSED',
+        cancellation_deadline: 'BLOCKED',
+        waiting_period: 'NOT_EVALUATED',
+        payment_readiness: 'CHECK_PASSED',
+        installation_authorization: 'NOT_EVALUATED',
+        final_invoice_delivery: 'NOT_EVALUATED',
+        receipt_delivery: 'NOT_EVALUATED',
+        completed_docusign: 'NOT_EVALUATED',
+        project_completion: 'BLOCKED'
+      }
+    };
+
+    let evidence;
+
+    if (scenario === 'valid') {
+      evidence = base;
+    } else if (scenario === 'unsafe') {
+      evidence = {
+        ...base,
+        statuses: {
+          ...base.statuses,
+          installation_authorization: 'VERIFIED',
+          final_invoice_delivery: 'VERIFIED',
+          receipt_delivery: 'VERIFIED',
+          completed_docusign: 'VERIFIED',
+          project_completion: 'VERIFIED'
+        }
+      };
+    } else if (scenario === 'invalid') {
+      evidence = {
+        ...base,
+        release_authorized: true,
+        installation_authorized: true,
+        project_completion_authorized: true
+      };
+    }
+
+    createRoot(document.getElementById('root')).render(
+      React.createElement(ProjectDocumentWorkflowStatus, {
+        projectCode: 'FICTIONAL-4259I',
+        evidence
+      })
+    );
+  </script>
+</body>
+</html>

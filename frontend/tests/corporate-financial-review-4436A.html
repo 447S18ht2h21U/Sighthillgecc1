@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VERIDIAN | Corporate Financial Reporting Preview</title>
+<style>
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: #142B3B;
+  background: #F7F8F5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+header {
+  background: #142B3B;
+  color: white;
+  padding: 20px max(24px, calc((100vw - 1250px)/2));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.brand { font-weight: 800; font-size: 24px; }
+.brand small { font-weight: 400; font-size: 12px; display:block; }
+main { max-width: 1250px; margin: auto; padding: 28px 24px 70px; }
+.eyebrow {
+  font-size: 11px; letter-spacing: .12em;
+  color: #087F75; font-weight: 800;
+}
+h1 { font-size: 29px; margin: 8px 0; }
+h2 { font-size: 19px; margin-top: 0; }
+.muted { color: #526675; font-size: 13px; line-height: 1.6; }
+.banner {
+  background: #EDF5F3; border-left: 4px solid #087F75;
+  padding: 14px 18px; margin: 20px 0;
+  font-size: 13px; line-height: 1.6;
+}
+.warning {
+  background: #FFF8E8; border-left-color: #C39A58;
+}
+.toolbar {
+  display: flex; justify-content: space-between; flex-wrap: wrap;
+  gap: 16px; align-items: end; margin: 22px 0;
+}
+label { display: block; font-size: 12px; font-weight: 700; }
+select {
+  display: block; margin-top: 6px; padding: 10px 14px;
+  border: 1px solid #D7E3E7; border-radius: 7px;
+  font: inherit; background: white; color: #142B3B;
+}
+.tabs { display:flex; flex-wrap:wrap; gap:8px; margin:20px 0; }
+button {
+  background: white; color: #142B3B;
+  border:1px solid #D7E3E7; border-radius:7px;
+  padding:11px 15px; font:inherit; cursor:pointer;
+}
+button.active {
+  background: #087F75; color:white; border-color:#087F75;
+}
+button:focus-visible, select:focus-visible {
+  outline: 3px solid #C39A58; outline-offset: 2px;
+}
+.cards { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.card, .statement, .approval {
+  background:white; border:1px solid #D7E3E7;
+  border-radius:10px; padding:20px; margin-bottom:16px;
+}
+.card span { display:block; font-size:12px; color:#526675; }
+.card strong { display:block; font-size:24px; margin-top:8px; }
+.report-layout {
+  display:grid; grid-template-columns:minmax(0,2fr) minmax(250px,1fr);
+  gap:18px;
+}
+.report-header {
+  display:flex; justify-content:space-between;
+  align-items:center; gap:12px;
+}
+.status {
+  color:#946200; background:#FFF3D8; padding:7px 10px;
+  font-size:11px; border-radius:5px; font-weight:800;
+}
+table { width:100%; border-collapse:collapse; font-size:14px; }
+td { padding:13px 6px; border-bottom:1px solid #E9EEEF; }
+td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
+tr.total td {
+  font-weight:800; border-top:2px solid #142B3B;
+  background:#F7F8F5;
+}
+.approval p { font-size:13px; line-height:1.6; }
+.step { padding:12px 0; border-bottom:1px solid #E9EEEF; }
+.step strong { display:block; font-size:13px; margin-bottom:5px; }
+.step span { color:#526675; font-size:12px; }
+footer { color:#526675; text-align:center; font-size:12px; margin-top:32px; }
+@media(max-width:800px) {
+  .cards, .report-layout { grid-template-columns:1fr; }
+  header { padding:20px 24px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">VERIDIAN
+    <small>Business Operations &amp; Management System</small>
+  </div>
+  <span>Corporate Finance | Isolated Preview</span>
+</header>
+<main>
+  <p class="eyebrow">VERIDIAN / CORPORATE FINANCIAL REPORTING</p>
+  <h1>Corporate Financial Reporting</h1>
+  <p class="muted">Review financial performance, statement details, and approval readiness.</p>
+
+  <div class="banner">
+    <strong>FICTIONAL DATA - DESIGN REVIEW ONLY</strong>
+    <div>Sample figures are not GECC accounting records. No financial API,
+    live database, approval action, or operational payment is connected.</div>
+  </div>
+
+  <div class="toolbar">
+    <label>Reporting period
+      <select aria-label="Reporting period">
+        <option>October 2026 - Monthly</option>
+      </select>
+    </label>
+    <div class="muted">Prepared by: Comptroller (example)<br>
+    CEO final approval: Not recorded</div>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Financial reports">
+    <button type="button" role="tab" aria-selected="true"
+      class="active" data-tab="income">Income Statement</button>
+    <button type="button" role="tab" aria-selected="false"
+      data-tab="balance">Balance Sheet</button>
+    <button type="button" role="tab" aria-selected="false"
+      data-tab="cash">Cash Flow</button>
+    <button type="button" role="tab" aria-selected="false"
+      data-tab="profit">Project Profitability</button>
+  </div>
+
+  <div class="cards" aria-label="Fictional summary">
+    <div class="card"><span id="metric1-label">Revenue</span>
+      <strong id="metric1">$125,000</strong></div>
+    <div class="card"><span id="metric2-label">Direct costs</span>
+      <strong id="metric2">$78,000</strong></div>
+    <div class="card"><span id="metric3-label">Gross profit</span>
+      <strong id="metric3">$47,000</strong></div>
+  </div>
+
+  <div class="report-layout">
+    <section class="statement" aria-live="polite">
+      <div class="report-header">
+        <h2 id="report-title">Income Statement</h2>
+        <span class="status">DRAFT / NOT APPROVED</span>
+      </div>
+      <p class="muted" id="report-description"></p>
+      <table aria-label="Fictional financial statement">
+        <tbody id="statement-rows"></tbody>
+      </table>
+      <p class="muted">All values are illustrative. No source
+      reconciliation or financial certification is implied.</p>
+    </section>
+
+    <aside class="approval">
+      <h2>Report review and approval</h2>
+      <div class="step">
+        <strong>1. Comptroller preparation</strong>
+        <span>Illustrated workflow only; no real preparation recorded</span>
+      </div>
+      <div class="step">
+        <strong>2. Accounting reconciliation</strong>
+        <span>Not independently verified</span>
+      </div>
+      <div class="step">
+        <strong>3. Independent CEO approval</strong>
+        <span>Not recorded; approval unavailable</span>
+      </div>
+      <div class="step">
+        <strong>4. Historical report protection</strong>
+        <span>Approved reports must retain immutable snapshots and audit history</span>
+      </div>
+      <p class="muted">This preview offers no approval, publishing,
+      editing, or payment actions.</p>
+    </aside>
+  </div>
+
+  <div class="banner warning">
+    <strong>Financial acceptance remains pending.</strong>
+    <div>Complete accounting reconciliation and separately approved
+    operational safeguards are required before production reporting.
+    The SQLite timezone correction remains test-only.</div>
+  </div>
+  <footer>VERIDIAN | Every Record. Every Decision. Every Step.
+  <br>Local Development Environment | Synthetic financial preview</footer>
+</main>
+<script>
+"use strict";
+const reports = {
+  income: {
+    title:"Income Statement",
+    description:"Fictional revenue, direct costs, and operating results.",
+    metrics:[["Revenue","$125,000"],["Direct costs","$78,000"],["Gross profit","$47,000"]],
+    rows:[
+      ["Revenue","$125,000"],["Direct costs","($78,000)"],
+      ["Gross profit","$47,000"],["Operating expenses","($19,000)"],
+      ["Illustrative operating profit","$28,000"]
+    ]
+  },
+  balance: {
+    title:"Balance Sheet",
+    description:"Fictional financial position as of October 31, 2026.",
+    metrics:[["Assets","$180,000"],["Liabilities","$65,000"],["Equity","$115,000"]],
+    rows:[
+      ["Cash","$60,000"],["Other assets","$120,000"],
+      ["Total assets","$180,000"],["Total liabilities","$65,000"],
+      ["Total equity","$115,000"],["Liabilities and equity","$180,000"]
+    ]
+  },
+  cash: {
+    title:"Cash Flow Statement",
+    description:"Fictional cash receipts and payments, not bank-verified.",
+    metrics:[["Cash received","$105,000"],["Cash paid","$82,000"],["Net cash change","$23,000"]],
+    rows:[
+      ["Cash received","$105,000"],["Cash paid","($82,000)"],
+      ["Net cash change","$23,000"]
+    ]
+  },
+  profit: {
+    title:"Project Profitability",
+    description:"Fictional project costs and estimated profitability.",
+    metrics:[["Sales","$125,000"],["Project costs","$78,000"],["Gross profit","$47,000"]],
+    rows:[
+      ["Fictional Project A","$20,000"],
+      ["Fictional Project B","$15,000"],
+      ["Fictional Project C","$12,000"],
+      ["Combined gross profit","$47,000"]
+    ]
+  }
+};
+function render(key) {
+  const report = reports[key];
+  if (!report) return;
+  document.getElementById("report-title").textContent = report.title;
+  document.getElementById("report-description").textContent = report.description;
+  report.metrics.forEach(([label,value],index) => {
+    document.getElementById(`metric${index+1}-label`).textContent = label;
+    document.getElementById(`metric${index+1}`).textContent = value;
+  });
+  const tbody = document.getElementById("statement-rows");
+  tbody.replaceChildren();
+  report.rows.forEach(([label,value],index) => {
+    const tr = document.createElement("tr");
+    if (index === report.rows.length-1) tr.className = "total";
+    const description = document.createElement("td");
+    const amount = document.createElement("td");
+    description.textContent = label;
+    amount.textContent = value;
+    tr.append(description,amount);
+    tbody.append(tr);
+  });
+  document.querySelectorAll("[data-tab]").forEach(button => {
+    const active = button.dataset.tab === key;
+    button.classList.toggle("active",active);
+    button.setAttribute("aria-selected",String(active));
+  });
+}
+document.querySelectorAll("[data-tab]").forEach(button => {
+  button.addEventListener("click",() => render(button.dataset.tab));
+});
+render("income");
+</script>
+</body>
+</html>

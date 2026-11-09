@@ -46,7 +46,10 @@ def next_code(initials):
         number = counter.value
     return f'{number}-{initials}-{timezone.now().astimezone(EASTERN).date().isoformat()}'
 
-SNAPSHOT_FIELDS = {'customer', 'contact', 'billing_address', 'project_location', 'scope', 'equipment', 'materials', 'base_price', 'discount', 'tax', 'total_price', 'payment_option', 'payment_terms', 'commercial_notes', 'financing_type', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip'}
+from .msr_document_source import msr_other_details
+from .equipment_catalog_policy import validate_equipment_details
+
+SNAPSHOT_FIELDS = {'customer', 'contact', 'billing_address', 'project_location', 'scope', 'equipment', 'materials', 'base_price', 'discount', 'tax', 'total_price', 'payment_option', 'payment_terms', 'commercial_notes', 'financing_type', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip', 'other'}
 def validate_snapshot(data, complete=False):
     if not isinstance(data, dict) or set(data) - SNAPSHOT_FIELDS:
         raise ValidationError('Invalid or unknown commercial fields.')
@@ -58,7 +61,39 @@ def validate_snapshot(data, complete=False):
         if key in result:
             if not isinstance(result[key], list) or len(result[key]) > 100:
                 raise ValidationError({key: 'Provide a list of up to 100 line items.'})
+            if key == 'equipment' and any(
+                type(line) is dict and 'category_of_work' in line
+                for line in result[key]
+            ):
+                # The revised eight-row MSR must be validated as a whole.
+                # Historical equipment without work categories remains valid.
+                from .equipment_invoice_rows import project_equipment_rows
+                try:
+                    project_equipment_rows({'equipment': result[key]})
+                except ValueError as exc:
+                    raise ValidationError({'equipment': str(exc)})
+                continue
             for item in result[key]:
+                if key == 'equipment' and type(item) is dict and set(item) == {
+                    'brand', 'residential_system_type', 'model_number',
+                    'description', 'quantity'
+                }:
+                    try:
+                        details = validate_equipment_details({
+                            name: item[name]
+                            for name in (
+                                'brand', 'residential_system_type',
+                                'model_number', 'description'
+                            )
+                        })
+                    except ValueError as exc:
+                        raise ValidationError({'equipment': str(exc)})
+                    if type(item['quantity']) is not int or not 1 <= item['quantity'] <= 999:
+                        raise ValidationError({
+                            'equipment': 'Catalog quantity must be an integer from 1 to 999.'
+                        })
+                    item.update(details.snapshot())
+                    continue
                 if not isinstance(item, dict) or set(item) != {'description', 'quantity'} or not isinstance(item['description'], str) or not item['description'].strip() or len(item['description']) > 1000:
                     raise ValidationError({key: 'Each item requires a description and quantity.'})
                 try:
@@ -68,6 +103,20 @@ def validate_snapshot(data, complete=False):
                 except (InvalidOperation, ValueError):
                     raise ValidationError({key: 'Quantity must be positive and finite.'})
                 item['quantity'] = str(quantity)
+    if 'other' in result and result['other'] is not None:
+        try:
+            result['other'] = msr_other_details({'other': result['other']})
+        except (ValueError, TypeError, ArithmeticError) as exc:
+            raise ValidationError({'other': str(exc)})
+        other = result['other']
+        if (
+            other['type'] == 'Reduced Price'
+            and 'discount' in result
+            and Decimal(str(result['discount'])) != Decimal(other['amount'])
+        ):
+            raise ValidationError({
+                'other': 'Reduced Price amount must match the MSR discount.'
+            })
     for key in ('base_price', 'discount', 'tax', 'total_price'):
         if key in result:
             try:
@@ -82,18 +131,13 @@ def validate_snapshot(data, complete=False):
     if 'financing_type' in result and result['financing_type'] not in {'FINANCED', 'NON_FINANCED'}:
         raise ValidationError({'financing_type': 'Choose financed or non-financed.'})
     if complete:
-        required = SNAPSHOT_FIELDS - {'commercial_notes', 'contact', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip'}
+        required = SNAPSHOT_FIELDS - {'commercial_notes', 'contact', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip', 'other'}
         missing = [key for key in required if key not in result or (isinstance(result[key], str) and not result[key].strip())]
         if missing:
             raise ValidationError({'required': sorted(missing)})
-        expected_option = {
-            'FINANCED': '50_PERCENT_DEPOSIT',
-            'NON_FINANCED': '100_PERCENT_COMPLETION',
-        }[result['financing_type']]
-        if result['payment_option'] != expected_option:
-            raise ValidationError({
-                'payment_option': 'Payment option must match the financing classification.'
-            })
+        # Financing classification and payment schedule are independent.
+        # Installation payment eligibility is checked separately, including
+        # any project- and MSR-specific CEO payment exception.
         expected = Decimal(result['base_price']) - Decimal(result['discount']) + Decimal(result['tax'])
         if expected != Decimal(result['total_price']) or expected <= 0:
             raise ValidationError({'total_price': 'Must equal base price minus discount plus tax and be positive.'})
@@ -137,7 +181,9 @@ def transition(actor, msr_id, action, expected_sequence, snapshot=None, reason='
     if action == 'edit':
         if record.status not in {'DRAFT', 'REJECTED'}:
             raise ValidationError('Only drafts or rejected records can be edited.')
-        record.snapshot = validate_snapshot(snapshot)
+        from .msr_catalog_selection_guard_4558 import verify_new_equipment_selections
+        checked_snapshot = verify_new_equipment_selections(snapshot, record.snapshot)
+        record.snapshot = validate_snapshot(checked_snapshot)
         record.prepared_by = actor
     elif action == 'submit':
         if record.status not in {'DRAFT', 'REJECTED'}:

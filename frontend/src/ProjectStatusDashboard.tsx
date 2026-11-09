@@ -1,11 +1,18 @@
 import React, { useEffect, useState } from 'react';
+import { ProjectDocumentWorkflowStatus } from './ProjectDocumentWorkflowStatus';
 
 type DashboardProject = {
+  workflow_evidence?: import('./ProjectDocumentWorkflowStatus').ProjectWorkflowEvidence;
   id: string;
   code: string;
   customer_name: string;
   location: string;
   state: string;
+  guidance?: {
+    label: string;
+    detail: string;
+    read_only: boolean;
+  };
   payments?: {
     deposit: string;
     final: string;
@@ -22,10 +29,12 @@ type DashboardStage = {
 
 type DashboardResponse = {
   stages: DashboardStage[];
+  needs_attention?: DashboardProject[];
 };
 
-export function ProjectStatusDashboard() {
+export function ProjectStatusDashboard({ onOpenProject, onReviewInstallation }: { onOpenProject?: (id: string) => Promise<void>; onReviewInstallation?: (id: string) => void }) {
   const [stages, setStages] = useState<DashboardStage[]>([]);
+  const [needsAttention, setNeedsAttention] = useState<DashboardProject[]>([]);
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -46,6 +55,7 @@ export function ProjectStatusDashboard() {
 
       const data: DashboardResponse = await response.json();
       setStages(data.stages);
+      setNeedsAttention(Array.isArray(data.needs_attention) ? data.needs_attention : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load dashboard.');
     } finally {
@@ -82,6 +92,52 @@ export function ProjectStatusDashboard() {
       {loading && <p>Loading project stages...</p>}
 
       {!loading && !error && (
+        <section className="dashboard-attention" aria-labelledby="dashboard-attention-heading">
+          <h3 id="dashboard-attention-heading">
+            Projects Needing Attention ({needsAttention.length})
+          </h3>
+          <p className="muted">
+            These projects have not earned a Dashboard milestone yet.
+            Only projects you are authorized to see are listed here.
+          </p>
+          {needsAttention.length === 0 ? (
+            <p>No projects currently need attention in this section.</p>
+          ) : (
+            <ul className="dashboard-attention-projects">
+              {needsAttention.map(project => (
+                <li key={project.id}>
+                  <strong>{project.code}</strong>
+                  <span>{project.customer_name}</span>
+                  <span>{project.location}</span>
+                  <ProjectDocumentWorkflowStatus projectCode={project.code} evidence={project.workflow_evidence} />
+                  {onReviewInstallation && (
+                    <button className="quiet" type="button" onKeyDown={event => event.stopPropagation()} onClick={event => {
+                      event.stopPropagation();
+                      onReviewInstallation(project.id);
+                    }} aria-label={`Review installation readiness for ${project.code}`}>Review installation readiness</button>
+                  )}
+                  {onOpenProject && (
+                    <button className="quiet" type="button" onKeyDown={event => event.stopPropagation()} onClick={event => {
+                      event.stopPropagation();
+                      void onOpenProject(project.id);
+                    }} aria-label={`Open project ${project.code}`}>Open project</button>
+                  )}
+                  {project.guidance?.read_only === true && (
+                    <div className="dashboard-next-action">
+                      <strong>Suggested next step: {project.guidance.label}</strong>
+                      <span>{project.guidance.detail}</span>
+                      <small>Guidance only. This does not grant permission or confirm completion.</small>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+
+      {!loading && !error && (
         <>
           <div className="dashboard-stage-grid">
             {stages.map(stage => (
@@ -89,32 +145,70 @@ export function ProjectStatusDashboard() {
                 <span>{stage.name}</span>
                 <strong>{stage.count}</strong>
                 <small>{stage.count === 1 ? 'project' : 'projects'}</small>
-                <div className="dashboard-stage-projects" hidden={selectedStage !== stage.key}>
-                  {stage.projects.length === 0 ? (
-                    <p className="muted">No projects in this stage.</p>
-                  ) : (
-                    <ul>
-                      {stage.projects.map(project => (
-                        <li key={project.id}>
-                          <strong>{project.code}</strong>
-                          <span>{project.customer_name}</span>
-                          <span>{project.location}</span>
-                          {stage.key === 'payment_received' && project.payments && (
-                            <div className="dashboard-payment-breakdown">
-                              <span>Deposit: ${Number(project.payments.deposit).toFixed(2)}</span>
-                              <span>Final payment: ${Number(project.payments.final).toFixed(2)}</span>
-                              <span>Full payment: ${Number(project.payments.full).toFixed(2)}</span>
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+
               </section>
             ))}
           </div>
         </>
+      )}
+
+      {/* VERIDIAN Dashboard Full-Width Layout 3999 */}
+      {!loading && !error && selectedStage && (
+        <section
+          className="dashboard-selected-projects"
+          aria-label="Selected milestone projects"
+        >
+          {stages.filter(stage => stage.key === selectedStage).map(stage => (
+            <React.Fragment key={stage.key}>
+              <h3>{stage.name} ? {stage.count} {stage.count === 1 ? 'project' : 'projects'}</h3>
+              {stage.projects.length === 0 ? (
+                <p className="muted">No projects currently meet this milestone.</p>
+              ) : (
+                <ul className="dashboard-selected-project-list">
+                  {stage.projects.map(project => (
+                    <li key={project.id}>
+                      <div className="dashboard-selected-project-info">
+                        <strong>{project.code}</strong>
+                        <span>{project.customer_name}</span>
+                        <span>{project.location}</span>
+                      </div>
+                      {project.guidance && (
+                        <div className="dashboard-selected-project-guidance">
+                          <strong>Suggested next step: {project.guidance.label}</strong>
+                          <span>{project.guidance.detail}</span>
+                          <small>Guidance only. This does not grant permission or confirm completion.</small>
+                        </div>
+                      )}
+                      <ProjectDocumentWorkflowStatus projectCode={project.code} evidence={project.workflow_evidence} />
+                      <div className="dashboard-selected-project-actions">
+                        {onReviewInstallation && (
+                          <button
+                            className="quiet"
+                            type="button"
+                            aria-label={`Review installation readiness for ${project.code}`}
+                            onClick={() => onReviewInstallation(project.id)}
+                          >
+                            Review installation readiness
+                          </button>
+                        )}
+                        {onOpenProject && (
+                          <button
+                            className="quiet"
+                            type="button"
+                            aria-label={`Open project ${project.code}`}
+                            onClick={() => void onOpenProject(project.id)}
+                          >
+                            Open project
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </React.Fragment>
+          ))}
+        </section>
       )}
     </section>
   );

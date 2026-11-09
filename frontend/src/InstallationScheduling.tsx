@@ -32,7 +32,6 @@ type InstallationReadiness = {
   requirements: {
     approved_msr: boolean;
     contract_signed: boolean;
-    invoice_signed: boolean;
     cancellation_complete: boolean;
     waiting_period_complete: boolean;
     deposit_verified: boolean;
@@ -71,6 +70,14 @@ export function InstallationScheduling({
   } | null>(null);
   const readinessRequestId = useRef(0);
   const selectedProjectRef = useRef(projectId);
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    selectedProjectRef.current = selectedProjectId;
+    readinessRequestId.current += 1;
+    setReadiness(null);
+    setReadinessError('');
+    setProjectId(selectedProjectId);
+  }, [selectedProjectId]);
 
   async function readPages<T>(path: string): Promise<T[]> {
     const all: T[] = [];
@@ -327,7 +334,8 @@ export function InstallationScheduling({
               ? <p className="error">Unable to verify readiness: {readinessError}</p>
               : readiness
                 ? <>
-                    <p><strong>{readiness.eligible ? 'READY FOR INSTALLATION' : 'NOT READY FOR INSTALLATION'}</strong></p>
+                    <p><strong>{readiness.eligible ? 'SCHEDULING REQUIREMENTS SATISFIED' : 'SCHEDULING REQUIREMENTS INCOMPLETE'}</strong></p>
+                    <p className="muted">No customer Receipt signature is required. Before administrative project completion, the exact final Receipt must be retained and its email delivery evidenced, and GECC must have received and retained a verified completed DocuSign Completion Certificate. The Customer Satisfaction Survey is optional. Scheduling does not authorize installation to start.</p>
                     <p className="muted">
                       {readiness.eligible
                         ? 'All requirements satisfied.'
@@ -337,7 +345,6 @@ export function InstallationScheduling({
                       {([
                         ['approved_msr', 'Project sales record approved'],
                         ['contract_signed', 'Customer contract signed'],
-                        ['invoice_signed', 'Customer invoice signed'],
                         ['cancellation_complete', 'Customer cancellation period has ended'],
                         ['waiting_period_complete', 'Five-calendar-day waiting period has ended'],
                         ['deposit_verified', 'Required customer payment confirmed by the bank'],

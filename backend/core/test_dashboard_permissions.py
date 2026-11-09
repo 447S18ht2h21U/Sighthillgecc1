@@ -7,6 +7,7 @@ from .models import (
     Role,
     Customer,
     Project,
+    AuditHead,
     ProjectTechnicalAssignment,
     InstallationSchedule,
 )
@@ -23,6 +24,8 @@ from .technical_assignment_services import (
 class DashboardPermissionTests(TestCase):
 
     def setUp(self):
+        # Initialize the audit chain only in the disposable test database.
+        AuditHead.objects.get_or_create(pk=1)
 
         self.sales_one = User.objects.create_user(
             username='sales_one',

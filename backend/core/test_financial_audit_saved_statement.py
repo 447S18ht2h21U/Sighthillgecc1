@@ -1,9 +1,11 @@
 """Database-backed tests for saved monthly direct-cost audit inspection."""
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import timezone
+from unittest.mock import patch
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from .financial_audit_saved_statement import inspect_saved_monthly_direct_costs
@@ -16,7 +18,14 @@ class SavedStatementAuditTests(TestCase):
     """Reuse proven fixture setup without inheriting unrelated test methods."""
 
     def setUp(self):
-        FinancialReportTests.setUp(self)
+        # Match the fixture's October 2026 financial statement period.
+        # This controls test data only, never historical source records.
+        fixture_time = timezone.make_aware(
+            datetime(2026, 10, 15, 12, 0, 0),
+            timezone.get_current_timezone(),
+        )
+        with patch("django.utils.timezone.now", return_value=fixture_time):
+            FinancialReportTests.setUp(self)
 
     def make_report(self):
         from .financial_report_services import create_income_statement

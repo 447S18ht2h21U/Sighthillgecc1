@@ -84,6 +84,7 @@ class Project(Entity):
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
     location = models.TextField()
     sales_associate = models.ForeignKey(User, on_delete=models.PROTECT, related_name='sales_projects')
+    ownership_revision = models.PositiveBigIntegerField(default=0)
     reviewer = models.ForeignKey(User, on_delete=models.PROTECT, related_name='review_projects')
     state = models.CharField(max_length=20, default='DRAFT')
     current_approved = models.ForeignKey('MSR', null=True, blank=True, on_delete=models.PROTECT, related_name='+')
@@ -1990,3 +1991,337 @@ class CustomerSignerRevocation(Entity):
 
     def delete(self, *args, **kwargs):
         raise ValidationError('Customer signer revocations cannot be deleted.')
+
+from . import msr_delegation_models  # Register proposed evidence models
+
+
+class EquipmentCatalogItem(Entity):
+    """Versioned residential equipment selection reference.
+
+    A catalog revision is a new record. Approved MSRs keep independent
+    equipment snapshots, never a live reference to mutable catalog text.
+    """
+
+    brand = models.CharField(max_length=120)
+    residential_system_type = models.CharField(max_length=200)
+    model_number = models.CharField(max_length=120)
+    description = models.CharField(max_length=1000)
+    revision = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    supersedes = models.ForeignKey(
+        "self", null=True, blank=True,
+        on_delete=models.PROTECT, related_name="successor_revisions",
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name="equipment_catalog_entries_created",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "brand", "residential_system_type",
+                    "model_number", "revision",
+                ],
+                name="equipment_catalog_identity_revision_unique",
+            ),
+        ]
+        ordering = ["brand", "residential_system_type", "model_number", "-revision"]
+
+    def __str__(self):
+        return f"{self.brand} | {self.model_number} | v{self.revision}"
+
+    def save(self, *args, **kwargs):
+        """Existing catalog identities/descriptions are immutable."""
+        from django.core.exceptions import ValidationError
+
+        if self._state.adding:
+            return super().save(*args, **kwargs)
+
+        original = type(self).objects.filter(pk=self.pk).first()
+        if original is None:
+            raise ValidationError("Missing catalog history; cannot update.")
+
+        protected = (
+            "brand", "residential_system_type", "model_number",
+            "description", "revision", "supersedes_id", "created_by_id",
+        )
+        if any(
+            getattr(self, name) != getattr(original, name)
+            for name in protected
+        ):
+            raise ValidationError(
+                "Equipment history is immutable. Create a new revision."
+            )
+        if original.is_active is False and self.is_active is True:
+            raise ValidationError(
+                "Inactive equipment cannot be reactivated directly."
+            )
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError(
+            "Equipment history cannot be deleted; deactivate it."
+        )
+
+
+class ReceiptSendingObservation(Entity):
+    """Append-only Receipt email observation; NEVER verified sending proof.
+
+    A stored observation cannot authorize completion. Future provider
+    authentication and independently verified delivery are separate.
+    """
+
+    msr = models.ForeignKey(
+        MSR, on_delete=models.PROTECT,
+        related_name="receipt_sending_observations",
+    )
+    document = models.ForeignKey(
+        Document, on_delete=models.PROTECT,
+        related_name="receipt_sending_observations",
+    )
+    recorded_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name="receipt_sending_observations_recorded",
+    )
+    recipient_email = models.EmailField()
+    provider_reference = models.CharField(max_length=256)
+    sent_at = models.DateTimeField()
+    pdf_sha256 = models.CharField(max_length=64)
+    observation_source = models.CharField(max_length=40)
+    status = models.CharField(max_length=20, default="UNVERIFIED")
+
+    def clean(self):
+        import hashlib
+        import re
+        from django.core.exceptions import ValidationError
+        from django.utils import timezone
+
+        errors = {}
+        if self.status != "UNVERIFIED":
+            errors["status"] = "Observation cannot claim verified delivery."
+        if self.observation_source not in (
+            "PROVIDER_CANDIDATE", "MANUAL_OBSERVATION",
+        ):
+            errors["observation_source"] = "Unsupported observation source."
+        if not isinstance(self.provider_reference, str) or not self.provider_reference.strip():
+            errors["provider_reference"] = "Provider reference required."
+        if self.sent_at is None or timezone.is_naive(self.sent_at) or self.sent_at > timezone.now():
+            errors["sent_at"] = "A valid past timezone-aware timestamp is required."
+        if not isinstance(self.recipient_email, str) or (
+            not self.recipient_email.strip()
+            or self.recipient_email.strip() != self.recipient_email
+        ):
+            errors["recipient_email"] = "Recipient email required."
+        if self.document_id and self.msr_id:
+            doc = self.document
+            if doc.msr_id != self.msr_id or doc.kind not in ("INVOICE", "RECEIPT"):
+                errors["document"] = "Document must belong to this MSR and have a supported kind."
+            else:
+                content = bytes(doc.content)
+                actual_sha = hashlib.sha256(content).hexdigest()
+                if not content.startswith(b"%PDF-") or (
+                    not isinstance(self.pdf_sha256, str)
+                    or re.fullmatch(r"[0-9a-fA-F]{64}", self.pdf_sha256) is None
+                    or actual_sha != self.pdf_sha256.lower()
+                ):
+                    errors["pdf_sha256"] = "Receipt PDF fingerprint mismatch."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Receipt sending observations are append-only.")
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Receipt sending observations cannot be deleted.")
+
+
+# Receipt outbox dependency aliases are explicit and local to this model.
+import uuid as receipt_outbox_uuid
+from django.utils import timezone as receipt_outbox_timezone
+
+
+class ReceiptDispatchOutbox(models.Model):
+    """Durable intent only: not evidence that an email was sent."""
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=receipt_outbox_uuid.uuid4,
+        editable=False,
+    )
+    project = models.ForeignKey(
+        "Project", on_delete=models.PROTECT,
+        related_name="receipt_dispatch_outbox_entries",
+    )
+    msr = models.ForeignKey(
+        "MSR", on_delete=models.PROTECT,
+        related_name="receipt_dispatch_outbox_entries",
+    )
+    document = models.ForeignKey(
+        "Document", on_delete=models.PROTECT,
+        related_name="receipt_dispatch_outbox_entries",
+    )
+    requested_by = models.ForeignKey(
+        "User", on_delete=models.PROTECT,
+        related_name="receipt_dispatch_outbox_requests",
+    )
+    idempotency_key = models.CharField(max_length=128)
+    recipient_email = models.EmailField(max_length=254)
+    pdf_sha256 = models.CharField(max_length=64)
+    status = models.CharField(max_length=16, default="PENDING")
+    created_at = models.DateTimeField(
+        default=receipt_outbox_timezone.now, editable=False,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "idempotency_key"],
+                name="receipt_outbox_unique_project_key",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status="PENDING"),
+                name="receipt_outbox_pending_only",
+            ),
+        ]
+
+    def clean(self):
+        import hashlib
+        import re
+        from django.core.exceptions import ValidationError
+
+        if self.status != "PENDING":
+            raise ValidationError("Outbox cannot claim delivery.")
+        if not re.fullmatch(
+            r"[A-Za-z0-9_-]{8,128}", self.idempotency_key or ""
+        ):
+            raise ValidationError("Invalid idempotency key.")
+        if not re.fullmatch(r"[0-9a-f]{64}", self.pdf_sha256 or ""):
+            raise ValidationError("Invalid PDF fingerprint.")
+
+        if self.project_id and self.msr_id:
+            if self.msr.project_id != self.project_id:
+                raise ValidationError("MSR project mismatch.")
+
+        if self.document_id and self.msr_id:
+            document = self.document
+            if document.msr_id != self.msr_id:
+                raise ValidationError("Document MSR mismatch.")
+            content = bytes(document.content)
+            if (
+                not content.startswith(b"%PDF-")
+                or hashlib.sha256(content).hexdigest() != self.pdf_sha256
+            ):
+                raise ValidationError("Retained PDF mismatch.")
+
+        if self.msr_id:
+            snapshot = self.msr.snapshot
+            approved = (
+                snapshot.get("customer_email")
+                if isinstance(snapshot, dict) else None
+            )
+            if (
+                self.msr.status != "APPROVED"
+                or not isinstance(approved, str)
+                or not approved.strip()
+                or self.recipient_email.strip().casefold()
+                != approved.strip().casefold()
+            ):
+                raise ValidationError("Approved MSR email mismatch.")
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Existing outbox intent is immutable.")
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Outbox intent cannot be deleted.")
+
+
+class ProductCatalogCollection(Entity):
+    """Named product collection; separate from equipment manufacturer identity."""
+
+    name = models.CharField(max_length=120, unique=True)
+    description = models.CharField(max_length=500, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name="product_catalog_collections_created",
+    )
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+
+        if not self._state.adding:
+            original = type(self).objects.filter(pk=self.pk).first()
+            if original is None:
+                raise ValidationError("Catalog history is missing.")
+            if any(
+                getattr(self, field) != getattr(original, field)
+                for field in ("name", "description", "created_by_id")
+            ):
+                raise ValidationError(
+                    "Catalog identity and description are immutable."
+                )
+            if not original.is_active and self.is_active:
+                raise ValidationError(
+                    "An inactive catalog cannot be directly reactivated."
+                )
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError(
+            "Catalog deletion is prohibited; deactivate instead."
+        )
+
+
+class ProductCatalogMembership(Entity):
+    """Historical association of an equipment revision with one catalog."""
+
+    catalog = models.ForeignKey(
+        ProductCatalogCollection, on_delete=models.PROTECT,
+        related_name="memberships",
+    )
+    equipment = models.OneToOneField(
+        EquipmentCatalogItem, on_delete=models.PROTECT,
+        related_name="catalog_membership",
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name="product_catalog_memberships_created",
+    )
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+
+        if not self._state.adding:
+            raise ValidationError(
+                "Product catalog membership is immutable."
+            )
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError(
+            "Product catalog membership cannot be deleted."
+        )

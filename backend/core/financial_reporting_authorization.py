@@ -16,6 +16,7 @@ from .models import Role, User
 ALLOWED_REPORTING_ROLES = frozenset({
     Role.SALES_MANAGER,
     Role.COMPTROLLER,
+    Role.CEO,
 })
 
 

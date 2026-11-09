@@ -109,15 +109,10 @@ def ensure_installation_eligible(project):
         CustomerSignatureEvidence.DocumentKind.CONTRACT,
     )
 
-    invoice_signed = verified_signature_time(
-        msr,
-        CustomerSignatureEvidence.DocumentKind.INVOICE,
-    )
-
     deadline = cancellation_deadline(msr)
 
     eligible_at = max(
-        max(contract_signed, invoice_signed) + timedelta(days=5),
+        contract_signed + timedelta(days=5),
         deadline,
     )
 

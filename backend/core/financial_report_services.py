@@ -164,9 +164,17 @@ def approve_financial_report(
     Approve a draft financial report.
     """
 
-    actor = require_financial_reporting_role(
-        actor, Role.COMPTROLLER
+    from django.conf import settings as financial_settings
+
+    ceo_policy = (
+        getattr(
+            financial_settings,
+            "VERIDIAN_CEO_FINANCIAL_APPROVAL_ENABLED",
+            False,
+        ) is True
     )
+    role = Role.CEO if ceo_policy else Role.COMPTROLLER
+    actor = require_financial_reporting_role(actor, role)
 
     report = (
         FinancialReport.objects
@@ -179,6 +187,26 @@ def approve_financial_report(
             'Only draft financial reports may be approved.'
         )
 
+    if ceo_policy:
+        if report.created_by_id == actor.pk:
+            raise ValidationError(
+                "Financial report self-approval is prohibited."
+            )
+        require_financial_reporting_role(
+            report.created_by, Role.COMPTROLLER
+        )
+
+    # Accounting safety gate for the new CEO approval pathway.
+    # These statement kinds do not yet have a complete, reconciled
+    # accounting foundation. A draft snapshot cannot override this.
+    if ceo_policy and report.kind in (
+        FinancialReport.Kind.BALANCE_SHEET,
+        FinancialReport.Kind.CASH_FLOW,
+    ):
+        raise ValidationError(
+            "Final approval is unavailable: this financial statement "
+            "requires complete, independently reconciled accounting evidence."
+        )
     report.status = FinancialReport.Status.APPROVED
     report.approved_by = actor
     report.approved_at = timezone.now()

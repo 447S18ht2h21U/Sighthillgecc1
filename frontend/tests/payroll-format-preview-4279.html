@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VERIDIAN Payroll Format - Fictional Design Preview</title>
+<style>
+:root {
+  color-scheme: light;
+  font-family: Inter, Arial, sans-serif;
+  color: #142B3B;
+  background: #F7F8F5;
+}
+body { margin: 0; }
+header { background: #142B3B; color: white; padding: 24px 5%; }
+header h1 { margin: 0 0 8px; letter-spacing: .07em; }
+header p { margin: 0; color: #D7E3E7; }
+main { max-width: 1140px; margin: auto; padding: 24px; }
+.notice {
+  border-left: 5px solid #C39A58;
+  background: #fffaf0;
+  padding: 14px;
+  margin-bottom: 24px;
+}
+section {
+  background: white;
+  border: 1px solid #D7E3E7;
+  border-radius: 12px;
+  margin: 20px 0;
+  padding: 22px;
+}
+h2 { margin-top: 0; }
+.description { color: #435865; }
+table { border-collapse: collapse; width: 100%; }
+th, td {
+  padding: 11px;
+  border-bottom: 1px solid #D7E3E7;
+  text-align: left;
+}
+th { background: #edf5f3; }
+.amount { text-align: right; font-variant-numeric: tabular-nums; }
+.status { font-weight: 600; color: #087F75; }
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 12px;
+}
+.metric {
+  background: #F7F8F5;
+  border: 1px solid #D7E3E7;
+  padding: 16px;
+  border-radius: 8px;
+}
+.metric strong { display: block; font-size: 24px; margin-top: 8px; }
+footer { padding: 20px; text-align: center; color: #435865; }
+@media(max-width: 680px) {
+  .summary { grid-template-columns: 1fr; }
+  section { overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>VERIDIAN</h1>
+  <p>Payroll &amp; Compensation - Presentation Review</p>
+</header>
+<main>
+  <div class="notice" role="note" data-test-only="true">
+    <strong>FICTIONAL DATA - DESIGN REVIEW ONLY</strong>
+    <p>This page is not connected to VERIDIAN records or APIs.
+    It cannot disclose payroll, approve payments, or issue funds.</p>
+  </div>
+
+  <section data-view="my-compensation">
+    <h2>1. My Compensation</h2>
+    <p class="description">Own approved and paid records only.
+    The real system must independently verify the signed-in account.</p>
+    <table>
+      <thead><tr>
+        <th scope="col">Pay period</th>
+        <th scope="col">Type</th>
+        <th scope="col">Status</th>
+        <th scope="col">Scheduled payment</th>
+        <th scope="col" class="amount">Amount</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td>Nov 2-8, 2026</td>
+          <td>Commission</td>
+          <td class="status">Approved - Not Yet Paid</td>
+          <td>Nov 11, 2026</td>
+          <td class="amount">$1,250.00</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section data-view="payroll-review">
+    <h2>2. Payroll Review &amp; Approval</h2>
+    <p class="description">Manager and Comptroller views must
+    enforce separate role permissions and approval stages.</p>
+    <table>
+      <thead><tr>
+        <th scope="col">Contractor</th>
+        <th scope="col">Project</th>
+        <th scope="col">Earned date</th>
+        <th scope="col">Scheduled Wednesday</th>
+        <th scope="col">Actual paid date</th>
+        <th scope="col">Approval status</th>
+        <th scope="col" class="amount">Amount</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td>Fictional Contractor A</td>
+          <td>DEMO-001</td>
+          <td>Nov 3, 2026</td>
+          <td>Nov 11, 2026</td>
+          <td>Not paid</td>
+          <td class="status">Approved</td>
+          <td class="amount">$750.00</td>
+        </tr>
+        <tr>
+          <td>Fictional Contractor B</td>
+          <td>DEMO-002</td>
+          <td>Nov 4, 2026</td>
+          <td>Nov 11, 2026</td>
+          <td>Not paid</td>
+          <td>Pending approval</td>
+          <td class="amount">$500.00</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="description">The real register must separately show first
+    approval, Comptroller approval, payment method/reference,
+    adjustment, exception, and audit details.</p>
+  </section>
+
+  <section data-view="company-summary">
+    <h2>3. Company Payroll Summary</h2>
+    <p class="description">CEO and Comptroller only.
+    Figures below are illustrative, not operational totals.</p>
+    <div class="summary">
+      <div class="metric">Contractors<strong>$8,500.00</strong></div>
+      <div class="metric">Employees<strong>$4,000.00</strong></div>
+      <div class="metric">Combined total<strong>$12,500.00</strong></div>
+    </div>
+    <p class="description">A real summary must reconcile to paid
+    records for the selected period, without mixing approved
+    but unpaid obligations into actual-paid totals.</p>
+  </section>
+</main>
+<footer>VERIDIAN test-only payroll presentation - no operational integration</footer>
+</body>
+</html>

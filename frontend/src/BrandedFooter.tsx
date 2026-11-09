@@ -24,7 +24,7 @@ export function BrandedFooter({ versionLabel }: BrandedFooterProps) {
             © 2026 Sighthill Associates, Inc. All Rights Reserved.
           </small>
           <small>
-            Development Assistance by PA — VERIDIAN Code Wrangler
+            Development by PA - Code Wrangler
           </small>
           <small>
             Powered by ChatGPT, an AI assistant by OpenAI.
