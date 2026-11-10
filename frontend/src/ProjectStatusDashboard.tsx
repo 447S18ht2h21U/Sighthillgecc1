@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ProjectDocumentWorkflowStatus } from './ProjectDocumentWorkflowStatus';
+import { CompletionPreflightReview4586 } from './CompletionPreflightReview4586';
 
 type DashboardProject = {
   workflow_evidence?: import('./ProjectDocumentWorkflowStatus').ProjectWorkflowEvidence;
@@ -32,7 +33,7 @@ type DashboardResponse = {
   needs_attention?: DashboardProject[];
 };
 
-export function ProjectStatusDashboard({ onOpenProject, onReviewInstallation }: { onOpenProject?: (id: string) => Promise<void>; onReviewInstallation?: (id: string) => void }) {
+export function ProjectStatusDashboard({ onOpenProject, onReviewInstallation, onBack, backLabel }: { onOpenProject?: (id: string) => Promise<void>; onReviewInstallation?: (id: string) => void; onBack: () => void; backLabel: string }) {
   const [stages, setStages] = useState<DashboardStage[]>([]);
   const [needsAttention, setNeedsAttention] = useState<DashboardProject[]>([]);
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
@@ -77,9 +78,18 @@ export function ProjectStatusDashboard({ onOpenProject, onReviewInstallation }: 
             Each stage lists its qualifying projects. Projects may appear in more than one stage.
           </p>
         </div>
-        <button className="quiet" type="button" onClick={() => void refresh()} disabled={loading}>
-          Refresh dashboard
-        </button>
+        <div className="dashboard-navigation-actions">
+          <button
+            className="veridian-dashboard-back"
+            type="button"
+            onClick={onBack}
+          >
+            {backLabel}
+          </button>
+          <button className="quiet" type="button" onClick={() => void refresh()} disabled={loading}>
+            Refresh dashboard
+          </button>
+        </div>
       </div>
 
       <div className="veridian-guide-banner veridian-guide-banner--info">
@@ -87,7 +97,7 @@ export function ProjectStatusDashboard({ onOpenProject, onReviewInstallation }: 
         <p><strong>Step 1 - Choose a stage.</strong> Select a stage to see the projects listed there. Select it again to close the list.</p>
         <p><strong>Step 2 - Read the project list.</strong> Check the project number, customer name, and installation address. A project may appear in more than one stage.</p>
         <p><strong>Step 3 - Check payments.</strong> In Payment Received, deposits, final payments, and full payments are shown separately.</p>
-        <p><strong>Step 4 - Refresh or return.</strong> Select Refresh dashboard to load updated information. Select Return to Customers &amp; Projects to leave this screen.</p>
+        <p><strong>Step 4 - Refresh or return.</strong> Select Refresh dashboard to load updated information. Select {backLabel} to leave this screen.</p>
       </div>      {error && <p role="alert" className="error">{error}</p>}
       {loading && <p>Loading project stages...</p>}
 
@@ -110,6 +120,7 @@ export function ProjectStatusDashboard({ onOpenProject, onReviewInstallation }: 
                   <span>{project.customer_name}</span>
                   <span>{project.location}</span>
                   <ProjectDocumentWorkflowStatus projectCode={project.code} evidence={project.workflow_evidence} />
+                  <CompletionPreflightReview4586 projectId={project.id} projectCode={project.code} />
                   {onReviewInstallation && (
                     <button className="quiet" type="button" onKeyDown={event => event.stopPropagation()} onClick={event => {
                       event.stopPropagation();
@@ -180,6 +191,7 @@ export function ProjectStatusDashboard({ onOpenProject, onReviewInstallation }: 
                         </div>
                       )}
                       <ProjectDocumentWorkflowStatus projectCode={project.code} evidence={project.workflow_evidence} />
+                  <CompletionPreflightReview4586 projectId={project.id} projectCode={project.code} />
                       <div className="dashboard-selected-project-actions">
                         {onReviewInstallation && (
                           <button

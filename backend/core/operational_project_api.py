@@ -109,9 +109,137 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
             "installation_authorized": False,
         }
 
+        # Read-only current-time start assessment.
+        from django.utils import timezone
+        from .installation_start_control_4565 import (
+            assess_installation_start,
+        )
+
+        result["installation_start"] = assess_installation_start(
+            project=project,
+            proposed_start=timezone.now(),
+        )
+
         return Response({
             "project_id": project.id,
             **result,
+        })
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="completion-preflight",
+    )
+    def completion_preflight(self, request, pk=None):
+        """Authorized, read-only administrative completion assessment."""
+        from dataclasses import asdict
+        from django.db import connections, router
+        from rest_framework.exceptions import PermissionDenied
+        from .models import (
+            CompletionEnvelopeAttempt,
+            CompletionSignatureVerification,
+            Document,
+            ProjectEvidence,
+        )
+        from .project_completion_preflight import (
+            assess_project_completion_preflight,
+        )
+        from .services import authorize
+
+        # Resolve the project through the existing visibility boundary.
+        project = self.get_object()
+        actor = User.objects.filter(
+            pk=request.user.pk,
+            is_active=True,
+        ).first()
+        if actor is None:
+            raise PermissionDenied("Active completion reviewer required.")
+
+        # Completion-review authority is separate from project visibility.
+        # Deny before disclosing any evidence or database schema details.
+        authorize(actor, project, approval=True)
+
+        # Prerequisites are reported read-only to authorized reviewers.
+        # No evidence is authenticated and no completion is authorized.
+        approved = project.current_approved
+        if project.state == "CANCELLED" or (
+            approved is None
+            or approved.status != "APPROVED"
+            or approved.project_id != project.pk
+        ):
+            reason = (
+                "Cancelled projects cannot be completed."
+                if project.state == "CANCELLED"
+                else "A current approved Master Sales Record is required."
+            )
+            return Response({
+                "project_id": str(project.pk),
+                "status": "COMPLETION_PREREQUISITES_MISSING",
+                "read_only": True,
+                "completion_authorized": False,
+                "project_completed": False,
+                "receipt_email_authenticated": False,
+                "docusign_completion_authenticated": False,
+                "satisfaction_survey_required": False,
+                "blockers": [
+                    reason,
+                    "Completion evidence has not been authenticated.",
+                    "The authorized project-completion transaction is unavailable.",
+                ],
+            })
+
+        required_models = (
+            CompletionEnvelopeAttempt,
+            CompletionSignatureVerification,
+            Document,
+            ProjectEvidence,
+        )
+        alias = router.db_for_read(CompletionSignatureVerification)
+        connection = connections[alias]
+        with connection.cursor() as cursor:
+            available = set(connection.introspection.table_names(cursor))
+
+        if not all(
+            model._meta.db_table in available
+            for model in required_models
+        ):
+            return Response({
+                "project_id": str(project.pk),
+                "status": "EVIDENCE_STORAGE_UNAVAILABLE",
+                "read_only": True,
+                "completion_authorized": False,
+                "project_completed": False,
+                "receipt_email_authenticated": False,
+                "docusign_completion_authenticated": False,
+                "satisfaction_survey_required": False,
+                "blockers": [
+                    "Completion evidence storage is unavailable; "
+                    "database migration and verification are pending."
+                ],
+            })
+
+        report = assess_project_completion_preflight(
+            actor=actor,
+            project_id=project.pk,
+        )
+        result = asdict(report)
+
+        # This API cannot grant or represent completion authority.
+        if (
+            result["completion_authorized"] is not False
+            or result["project_completed"] is not False
+            or result["receipt_email_authenticated"] is not False
+            or result["docusign_completion_authenticated"] is not False
+            or result["satisfaction_survey_required"] is not False
+        ):
+            raise PermissionDenied(
+                "Unverified completion authority is prohibited."
+            )
+
+        return Response({
+            **result,
+            "status": "COMPLETION_EVIDENCE_UNVERIFIED",
+            "read_only": True,
         })
 
     @action(

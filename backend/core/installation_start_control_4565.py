@@ -32,7 +32,19 @@ def assess_installation_start(*, project, proposed_start):
     try:
         commercial_ready = ensure_installation_eligible(project) is True
     except ValidationError as exc:
-        reasons.append(str(exc.detail))
+        # Convert DRF error details into readable operational messages.
+        # Preserve every reported blocker without changing eligibility.
+        def messages(detail):
+            if isinstance(detail, dict):
+                for value in detail.values():
+                    yield from messages(value)
+            elif isinstance(detail, (list, tuple)):
+                for value in detail:
+                    yield from messages(value)
+            else:
+                yield str(detail)
+
+        reasons.extend(messages(exc.detail))
 
     # No operational trusted-equipment issuer or start-authorization
     # workflow has yet been approved. Never interpret previews or

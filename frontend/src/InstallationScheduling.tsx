@@ -49,6 +49,16 @@ type InstallationReadiness = {
     expedited_authorized: boolean;
     installation_authorized: boolean;
   };
+  installation_start?: {
+    project_id: string;
+    schedule_verified: boolean;
+    commercial_ready: boolean;
+    trusted_equipment_verified: boolean;
+    expedited_authorized: boolean;
+    installation_authorized: boolean;
+    installation_started: boolean;
+    blockers: string[];
+  };
 };
 
 export function InstallationScheduling({
@@ -340,6 +350,37 @@ export function InstallationScheduling({
         </label>
         {projectId && <div className="installation-readiness" role="status" aria-live="polite">
           <h4>Installation Readiness</h4>
+          {readiness?.installation_start && (
+            <div className="installation-start-readiness">
+              <h4>Installation Start Authorization</h4>
+              <p>
+                <strong>Not authorized to begin installation</strong>
+              </p>
+              <p>
+                Schedule verified: {readiness.installation_start.schedule_verified ? 'Yes' : 'No'}
+              </p>
+              <p>
+                Commercial readiness: {readiness.installation_start.commercial_ready ? 'Verified' : 'Not verified'}
+              </p>
+              <p>
+                Trusted equipment verification: {readiness.installation_start.trusted_equipment_verified ? 'Verified' : 'Pending'}
+              </p>
+              <p>
+                Expedited authorization: {readiness.installation_start.expedited_authorized ? 'Reported' : 'Not verified'}
+              </p>
+              {readiness.installation_start.blockers.length > 0 && (
+                <ul>
+                  {readiness.installation_start.blockers.map((reason, index) => (
+                    <li key={index}>{reason}</li>
+                  ))}
+                </ul>
+              )}
+              <p className="muted">
+                Current-time assessment only. No installation-start action
+                is available or authorized.
+              </p>
+            </div>
+          )}
           {readiness?.expedited_service && (
             <div className="expedited-service-status">
               <h4>Expedited Service Evidence</h4>

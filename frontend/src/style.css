@@ -611,3 +611,71 @@ button.msr-add-equipment-primary:disabled {
   opacity: 0.5;
   cursor: default;
 }
+
+
+/* VERIDIAN Step 1907P-4594: Visible completion and back controls. */
+.project-status-dashboard .veridian-completion-review-button,
+.project-status-dashboard button.quiet.veridian-completion-review-button {
+  background: #087F75;
+  color: #ffffff;
+  border: 2px solid #087F75;
+  font-weight: 700;
+  padding: 11px 18px;
+  min-height: 44px;
+}
+
+.project-status-dashboard .veridian-completion-review-button:hover:not(:disabled),
+.project-status-dashboard button.quiet.veridian-completion-review-button:hover:not(:disabled) {
+  background: #065e57;
+  border-color: #065e57;
+  color: #ffffff;
+}
+
+.project-status-dashboard .veridian-completion-review-button:focus-visible,
+.project-status-dashboard .veridian-dashboard-back:focus-visible {
+  outline: 3px solid #C39A58;
+  outline-offset: 3px;
+}
+
+.project-status-dashboard .dashboard-navigation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.project-status-dashboard .veridian-dashboard-back {
+  background: #142B3B;
+  border-color: #142B3B;
+  color: #ffffff;
+  font-weight: 600;
+  min-height: 44px;
+}
+
+.project-status-dashboard .veridian-dashboard-back:hover {
+  background: #23465d;
+  border-color: #23465d;
+}
+
+
+/* veridian-4603-guidance: readable dashboard next steps */
+.project-status-dashboard .dashboard-next-action,
+.project-status-dashboard .dashboard-selected-project-guidance {
+  min-width: 0;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.project-status-dashboard .dashboard-next-action > strong,
+.project-status-dashboard .dashboard-next-action > span,
+.project-status-dashboard .dashboard-next-action > small,
+.project-status-dashboard .dashboard-selected-project-guidance > strong,
+.project-status-dashboard .dashboard-selected-project-guidance > span,
+.project-status-dashboard .dashboard-selected-project-guidance > small {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.project-status-dashboard .dashboard-next-action > small {
+  color: #526675;
+}

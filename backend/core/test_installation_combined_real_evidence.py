@@ -73,6 +73,63 @@ class RealTwoStageDatabaseRegressionTests(TestCase):
             "tax": "0.00",
             "total_price": "10000.00",
         })
+
+        # STEP 1907P-4590: Synthetic active catalog selection.
+        # Never bypass the real MSR catalog validation boundary.
+        from .models import (
+            ProductCatalogCollection,
+            ProductCatalogMembership,
+            EquipmentCatalogItem,
+        )
+
+        collection_fields = {
+            field.name
+            for field in ProductCatalogCollection._meta.concrete_fields
+        }
+        collection_values = {
+            "created_by": self.manager,
+        }
+        if "name" in collection_fields:
+            collection_values["name"] = "Synthetic regression catalog"
+        elif "title" in collection_fields:
+            collection_values["title"] = "Synthetic regression catalog"
+        else:
+            collection_values["label"] = "Synthetic regression catalog"
+        if "code" in collection_fields:
+            collection_values["code"] = "TEST-COMBINED-REAL"
+        if "description" in collection_fields:
+            collection_values["description"] = (
+                "Disposable fixture equipment only"
+            )
+        if "is_active" in collection_fields:
+            collection_values["is_active"] = True
+
+        catalog = ProductCatalogCollection.objects.create(
+            **collection_values
+        )
+        equipment_details = {
+            key: self.snapshot["equipment"][0][key]
+            for key in (
+                "brand", "residential_system_type",
+                "model_number", "description",
+            )
+        }
+        catalog_item = EquipmentCatalogItem.objects.create(
+            **equipment_details,
+            created_by=self.manager,
+            is_active=True,
+        )
+        ProductCatalogMembership.objects.create(
+            catalog=catalog,
+            equipment=catalog_item,
+            created_by=self.manager,
+        )
+
+        self.snapshot["equipment"][0]["catalog_id"] = str(catalog.pk)
+        self.snapshot["equipment"][0]["equipment_id"] = str(
+            catalog_item.pk
+        )
+
         approved = self.approve()
         self.project.refresh_from_db()
         self.assertEqual(self.project.current_approved_id, approved.pk)
