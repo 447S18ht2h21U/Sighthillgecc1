@@ -1,4 +1,4 @@
-﻿from django.db import transaction
+from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
 from .models import (
@@ -62,7 +62,7 @@ def create_installation_schedule(
     current_actor, temporary_authorization = _authorized_installation_actor(actor)
     _require_project_access(current_actor, project.pk)
 
-    if installation_manager.role != Role.INSTALLATION_MANAGER:
+    if (installation_manager.role != Role.INSTALLATION_MANAGER or not installation_manager.is_active):
         raise ValidationError(
             'Assigned installation manager must have the installation manager role.'
         )
@@ -94,6 +94,87 @@ def create_installation_schedule(
         )
     return schedule
 
+
+@transaction.atomic
+def create_future_installation_schedule(
+    *, actor, project, scheduled_date, installation_manager
+):
+    """Create an appointment, never authorization to start installation."""
+    from datetime import date
+    from rest_framework.exceptions import PermissionDenied
+    from .installation_eligibility import (
+        require_current_approved_msr,
+        verified_signature_time,
+        cancellation_deadline,
+    )
+    from .installation_payment_readiness import installation_payment_readiness
+    from .installation_future_date_policy_4565 import assess_future_installation_date
+    from .models import CustomerSignatureEvidence, TemporaryDutyActivity
+
+    current_actor, delegation = _authorized_installation_actor(actor)
+    _require_project_access(current_actor, project.pk)
+
+    if type(scheduled_date) is not date:
+        raise ValidationError("A valid installation date is required.")
+
+    if (
+        installation_manager is None
+        or not installation_manager.is_active
+        or installation_manager.role != Role.INSTALLATION_MANAGER
+    ):
+        raise PermissionDenied("An active Installation Manager is required.")
+
+    msr = require_current_approved_msr(project)
+    signed = verified_signature_time(
+        msr, CustomerSignatureEvidence.DocumentKind.CONTRACT
+    )
+    deadline = cancellation_deadline(msr)
+
+    try:
+        assessment = assess_future_installation_date(
+            proposed_date=scheduled_date,
+            verified_contract_signed_at=signed,
+            verified_cancellation_deadline=deadline,
+            now=timezone.now(),
+        )
+    except ValueError as exc:
+        raise ValidationError(str(exc)) from exc
+
+    if not assessment["normal_date_eligible"]:
+        raise ValidationError(
+            "Proposed installation date is before the verified normal "
+            "waiting-period or cancellation deadline."
+        )
+
+    payment = installation_payment_readiness(project)
+    if not payment["payment_ready"]:
+        raise ValidationError(payment["explanation"])
+
+    schedule = InstallationSchedule.objects.create(
+        project=project,
+        scheduled_date=scheduled_date,
+        installation_manager=installation_manager,
+        scheduled_by=current_actor,
+        status=InstallationSchedule.Status.SCHEDULED,
+    )
+    details = {
+        "project_id": str(project.pk),
+        "scheduled_date": scheduled_date.isoformat(),
+        "installation_manager_id": str(installation_manager.pk),
+        "future_date_assessment": "NORMAL_WAIT_VERIFIED",
+    }
+    if delegation is not None:
+        details["temporary_duty_authorization_id"] = str(delegation.pk)
+    event = audit(current_actor, "installation_schedule.created", schedule.pk, details)
+    if delegation is not None:
+        TemporaryDutyActivity.objects.create(
+            authorization=delegation,
+            employee=current_actor,
+            audit_event=event,
+        )
+    return schedule
+
+
 @transaction.atomic
 def complete_installation_schedule(
     actor,
@@ -113,6 +194,8 @@ def complete_installation_schedule(
         raise ValidationError(
             'Only scheduled installations may be completed.'
         )
+
+    ensure_installation_eligible(schedule.project)
 
     schedule.status = InstallationSchedule.Status.COMPLETED
     schedule.completed_at = timezone.now()

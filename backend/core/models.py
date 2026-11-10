@@ -2325,3 +2325,114 @@ class ProductCatalogMembership(Entity):
         raise ValidationError(
             "Product catalog membership cannot be deleted."
         )
+
+
+from django.conf import settings as _exp_settings
+from django.core.exceptions import ValidationError as _ExpValidationError
+from django.db import models as _exp_models
+from uuid import uuid4 as _exp_uuid4
+
+
+class _ExpeditedImmutableRecord(_exp_models.Model):
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding or (
+            self.pk is not None and
+            type(self).objects.filter(pk=self.pk).exists()
+        ):
+            raise _ExpValidationError(
+                "Expedited signing records cannot be updated."
+            )
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise _ExpValidationError(
+            "Expedited signing records cannot be deleted."
+        )
+
+
+class ExpeditedSigningAttempt(_ExpeditedImmutableRecord):
+    id = _exp_models.UUIDField(
+        primary_key=True, default=_exp_uuid4, editable=False
+    )
+    msr = _exp_models.ForeignKey(
+        "core.MSR", on_delete=_exp_models.PROTECT,
+        related_name="expedited_signing_attempts"
+    )
+    initiated_by = _exp_models.ForeignKey(
+        _exp_settings.AUTH_USER_MODEL, on_delete=_exp_models.PROTECT,
+        related_name="expedited_signing_attempts_initiated"
+    )
+    snapshot_sha256 = _exp_models.CharField(max_length=64)
+    proposed_date = _exp_models.DateField()
+    recipient_manifest = _exp_models.JSONField()
+    source_digest = _exp_models.CharField(max_length=64)
+    created_at = _exp_models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            _exp_models.UniqueConstraint(
+                fields=["msr", "source_digest"],
+                name="exp_sign_attempt_source_unique"
+            )
+        ]
+
+
+class ExpeditedEnvelopeBinding(_ExpeditedImmutableRecord):
+    id = _exp_models.UUIDField(
+        primary_key=True, default=_exp_uuid4, editable=False
+    )
+    attempt = _exp_models.OneToOneField(
+        ExpeditedSigningAttempt, on_delete=_exp_models.PROTECT,
+        related_name="envelope_binding"
+    )
+    provider_account_id = _exp_models.UUIDField()
+    provider_envelope_id = _exp_models.UUIDField(unique=True)
+    bound_by = _exp_models.ForeignKey(
+        _exp_settings.AUTH_USER_MODEL, on_delete=_exp_models.PROTECT,
+        related_name="expedited_envelopes_bound"
+    )
+    binding_digest = _exp_models.CharField(max_length=64)
+    bound_at = _exp_models.DateTimeField(auto_now_add=True)
+
+
+class ExpeditedSigningObservation(_ExpeditedImmutableRecord):
+    id = _exp_models.UUIDField(
+        primary_key=True, default=_exp_uuid4, editable=False
+    )
+    binding = _exp_models.ForeignKey(
+        ExpeditedEnvelopeBinding, on_delete=_exp_models.PROTECT,
+        related_name="observations"
+    )
+    observed_by = _exp_models.ForeignKey(
+        _exp_settings.AUTH_USER_MODEL, on_delete=_exp_models.PROTECT,
+        related_name="expedited_signing_observations"
+    )
+    evidence = _exp_models.JSONField()
+    digest = _exp_models.CharField(max_length=64)
+    observed_at = _exp_models.DateTimeField(auto_now_add=True)
+
+
+class ExpeditedSigningDocument(_ExpeditedImmutableRecord):
+    id = _exp_models.UUIDField(
+        primary_key=True, default=_exp_uuid4, editable=False
+    )
+    observation = _exp_models.ForeignKey(
+        ExpeditedSigningObservation, on_delete=_exp_models.PROTECT,
+        related_name="retained_documents"
+    )
+    document_id = _exp_models.CharField(max_length=20)
+    filename = _exp_models.CharField(max_length=250)
+    content = _exp_models.BinaryField()
+    pdf_sha256 = _exp_models.CharField(max_length=64)
+    retained_at = _exp_models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            _exp_models.UniqueConstraint(
+                fields=["observation", "document_id"],
+                name="exp_sign_document_unique"
+            )
+        ]

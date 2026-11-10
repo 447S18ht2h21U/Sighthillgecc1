@@ -37,6 +37,18 @@ type InstallationReadiness = {
     deposit_verified: boolean;
   };
   blocking_reasons: string[];
+  expedited_service?: {
+    status: string;
+    storage_available: boolean;
+    attempt_recorded: boolean;
+    documents_retained: boolean;
+    retained_document_count: number;
+    provider_authenticated: boolean;
+    signatures_verified: boolean;
+    distribution_verified: boolean;
+    expedited_authorized: boolean;
+    installation_authorized: boolean;
+  };
 };
 
 export function InstallationScheduling({
@@ -328,6 +340,28 @@ export function InstallationScheduling({
         </label>
         {projectId && <div className="installation-readiness" role="status" aria-live="polite">
           <h4>Installation Readiness</h4>
+          {readiness?.expedited_service && (
+            <div className="expedited-service-status">
+              <h4>Expedited Service Evidence</h4>
+              <p>
+                {!readiness.expedited_service.storage_available
+                  ? 'Expedited evidence storage unavailable. Database migration and verification are pending.'
+                  : readiness.expedited_service.documents_retained
+                  ? `${readiness.expedited_service.retained_document_count} candidate documents retained; verification pending.`
+                  : readiness.expedited_service.attempt_recorded
+                    ? 'Expedited signing attempt recorded; verified document retention pending.'
+                    : 'No expedited signing evidence retained for the current approved MSR.'}
+              </p>
+              <p>
+                <strong>Expedited installation authorization: Not verified.</strong>
+              </p>
+              <p className="muted">
+                Retained documents do not establish DocuSign authentication,
+                independent approvals, customer distribution, or permission
+                to install before applicable waiting and cancellation deadlines.
+              </p>
+            </div>
+          )}
           {readinessLoading
             ? <p>Checking installation requirements...</p>
             : readinessError

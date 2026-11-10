@@ -5,7 +5,7 @@ payment, or installation authority. Callers must independently verify
 those records before relying on the result.
 """
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 
@@ -42,8 +42,12 @@ def assess_waiting_period(
     )
     current = _eastern(now, "Current time")
 
-    # Five local calendar days after the verified Contract signature.
-    contract_wait_ends = contract + timedelta(days=WAITING_DAYS)
+    # Normal eligibility begins at midnight Eastern on calendar day five.
+    # The verified cancellation deadline remains an independent later gate.
+    fifth_day = contract.date() + timedelta(days=WAITING_DAYS)
+    contract_wait_ends = datetime.combine(
+        fifth_day, time.min, tzinfo=EASTERN
+    )
 
     # Comparing UTC instants handles different Eastern UTC offsets safely.
     earliest = max(

@@ -44,6 +44,71 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
 
         result = installation_readiness(project)
 
+        # Read-only evidence visibility; never installation authorization.
+        from .models import (
+            ExpeditedSigningAttempt,
+            ExpeditedEnvelopeBinding,
+            ExpeditedSigningObservation,
+            ExpeditedSigningDocument,
+        )
+
+        from django.db import connections, router
+
+        # Read-only schema check. Missing tables must not cause an HTTP 500
+        # or be mistaken for verified expedited-service evidence.
+        database_alias = router.db_for_read(ExpeditedSigningAttempt)
+        connection = connections[database_alias]
+        required_tables = {
+            ExpeditedSigningAttempt._meta.db_table,
+            ExpeditedEnvelopeBinding._meta.db_table,
+            ExpeditedSigningObservation._meta.db_table,
+            ExpeditedSigningDocument._meta.db_table,
+        }
+        with connection.cursor() as cursor:
+            existing_tables = set(
+                connection.introspection.table_names(cursor)
+            )
+        storage_available = required_tables.issubset(existing_tables)
+
+        msr = project.current_approved
+        attempted = False
+        retained = False
+        document_count = 0
+
+        if storage_available and msr is not None and msr.status == "APPROVED":
+            attempted = ExpeditedSigningAttempt.objects.filter(
+                msr=msr
+            ).exists()
+            observations = ExpeditedSigningObservation.objects.filter(
+                binding__attempt__msr=msr
+            )
+            retained = observations.exists()
+            if retained:
+                document_count = ExpeditedSigningDocument.objects.filter(
+                    observation__in=observations
+                ).count()
+
+        result["expedited_service"] = {
+            "status": (
+                "SCHEMA_UNAVAILABLE"
+                if not storage_available else
+                "UNVERIFIED_DOCUMENTS_RETAINED"
+                if retained else
+                "ATTEMPT_RECORDED_UNVERIFIED"
+                if attempted else
+                "NO_RETAINED_EVIDENCE"
+            ),
+            "storage_available": storage_available,
+            "attempt_recorded": attempted,
+            "documents_retained": retained,
+            "retained_document_count": document_count,
+            "provider_authenticated": False,
+            "signatures_verified": False,
+            "distribution_verified": False,
+            "expedited_authorized": False,
+            "installation_authorized": False,
+        }
+
         return Response({
             "project_id": project.id,
             **result,

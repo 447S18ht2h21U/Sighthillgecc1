@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.utils import timezone
@@ -38,6 +38,7 @@ def verified_signature_time(msr, document_kind):
     evidence = CustomerSignatureEvidence.objects.filter(
         msr=msr,
         document_kind=document_kind,
+        signer_role=CustomerSignatureEvidence.SignerRole.CUSTOMER,
     ).order_by('-created_at', '-id').first()
 
     if evidence is None:
@@ -111,10 +112,11 @@ def ensure_installation_eligible(project):
 
     deadline = cancellation_deadline(msr)
 
-    eligible_at = max(
-        contract_signed + timedelta(days=5),
-        deadline,
-    )
+    # Five Eastern local calendar days, not 120 elapsed hours.
+    # The verified cancellation deadline remains independently binding.
+    fifth_day = contract_signed.astimezone(EASTERN).date() + timedelta(days=5)
+    normal_wait_at = datetime.combine(fifth_day, time.min, tzinfo=EASTERN)
+    eligible_at = max(normal_wait_at, deadline.astimezone(EASTERN))
 
     if timezone.now().astimezone(EASTERN) < eligible_at:
         raise ValidationError(
