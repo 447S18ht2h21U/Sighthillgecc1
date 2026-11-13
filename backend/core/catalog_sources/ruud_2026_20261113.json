@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "catalog_name": "Ruud Residential Systems",
+  "catalog_description": "2026 Ruud A/C and furnace system combinations, including AHRI references and complete component models.",
+  "source_document": "2026 RUUD Systems with Model Numbers 20261113.pdf",
+  "source_received": "2026-07-20",
+  "equipment_count": 15,
+  "manufacturer_specific_fields": [
+    "ahri_reference",
+    "outdoor_model",
+    "coil_model",
+    "furnace_model",
+    "capacity_btuh",
+    "seer2"
+  ],
+  "records": [
+    {
+      "sequence": 1,
+      "ahri_reference": "216376265",
+      "outdoor_model": "RA14AY24BJ1NA",
+      "coil_model": "RCFY2414STAAMC",
+      "furnace_model": "R801T0503A14UHSNAS",
+      "capacity_btuh": 22800,
+      "seer2": "15.2",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C with 80% Upflow / Horizontal Furnace",
+        "model_number": "RA14AY24BJ1NA / RCFY2414STAAMC / R801T0503A14UHSNAS",
+        "description": "AHRI Reference: 216376265; Outdoor Unit: RA14AY24BJ1NA; Evaporator Coil: RCFY2414STAAMC; Furnace: R801T0503A14UHSNAS; Cooling Capacity: 22800 BTUh; SEER2: 15.2"
+      }
+    },
+    {
+      "sequence": 2,
+      "ahri_reference": "215230299",
+      "outdoor_model": "RA14AY36AJ1NA",
+      "coil_model": "RCFY3621STANMC",
+      "furnace_model": "R801T0754A21UHSNAS",
+      "capacity_btuh": 34000,
+      "seer2": "15.2",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C with 80% Upflow / Horizontal Furnace",
+        "model_number": "RA14AY36AJ1NA / RCFY3621STANMC / R801T0754A21UHSNAS",
+        "description": "AHRI Reference: 215230299; Outdoor Unit: RA14AY36AJ1NA; Evaporator Coil: RCFY3621STANMC; Furnace: R801T0754A21UHSNAS; Cooling Capacity: 34000 BTUh; SEER2: 15.2"
+      }
+    },
+    {
+      "sequence": 3,
+      "ahri_reference": "216376269",
+      "outdoor_model": "RA14AY24BJ1NA",
+      "coil_model": "RCFY2414STAAMC",
+      "furnace_model": "R801T0503A14DZSNAS",
+      "capacity_btuh": 22800,
+      "seer2": "15.2",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C with 80% Downflow Furnace",
+        "model_number": "RA14AY24BJ1NA / RCFY2414STAAMC / R801T0503A14DZSNAS",
+        "description": "AHRI Reference: 216376269; Outdoor Unit: RA14AY24BJ1NA; Evaporator Coil: RCFY2414STAAMC; Furnace: R801T0503A14DZSNAS; Cooling Capacity: 22800 BTUh; SEER2: 15.2"
+      }
+    },
+    {
+      "sequence": 4,
+      "ahri_reference": "215230379",
+      "outdoor_model": "RA14AY36AJ1NA",
+      "coil_model": "RCFY3621STANMC",
+      "furnace_model": "R801T0755A21DZSNAS",
+      "capacity_btuh": 34000,
+      "seer2": "15.2",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C with 80% Downflow Furnace",
+        "model_number": "RA14AY36AJ1NA / RCFY3621STANMC / R801T0755A21DZSNAS",
+        "description": "AHRI Reference: 215230379; Outdoor Unit: RA14AY36AJ1NA; Evaporator Coil: RCFY3621STANMC; Furnace: R801T0755A21DZSNAS; Cooling Capacity: 34000 BTUh; SEER2: 15.2"
+      }
+    },
+    {
+      "sequence": 5,
+      "ahri_reference": "215225702",
+      "outdoor_model": "RA14AY18AJ1NA",
+      "coil_model": "RCFY2417STANMC",
+      "furnace_model": "R801V0754A17UHSCAP",
+      "capacity_btuh": 17100,
+      "seer2": "15.2",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C with 80% Single Stage Variable Speed Furnace",
+        "model_number": "RA14AY18AJ1NA / RCFY2417STANMC / R801V0754A17UHSCAP",
+        "description": "AHRI Reference: 215225702; Outdoor Unit: RA14AY18AJ1NA; Evaporator Coil: RCFY2417STANMC; Furnace: R801V0754A17UHSCAP; Cooling Capacity: 17100 BTUh; SEER2: 15.2"
+      }
+    },
+    {
+      "sequence": 6,
+      "ahri_reference": "216375818",
+      "outdoor_model": "RA14AY24BJ1NA",
+      "coil_model": "RCFY2417STANMC",
+      "furnace_model": "R801V0754A17UHSCAP",
+      "capacity_btuh": 22800,
+      "seer2": "15.2",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C with 80% Single Stage Variable Speed Furnace",
+        "model_number": "RA14AY24BJ1NA / RCFY2417STANMC / R801V0754A17UHSCAP",
+        "description": "AHRI Reference: 216375818; Outdoor Unit: RA14AY24BJ1NA; Evaporator Coil: RCFY2417STANMC; Furnace: R801V0754A17UHSCAP; Cooling Capacity: 22800 BTUh; SEER2: 15.2"
+      }
+    },
+    {
+      "sequence": 7,
+      "ahri_reference": "215230358",
+      "outdoor_model": "RA14AY36AJ1NA",
+      "coil_model": "RCFY3617STANMC",
+      "furnace_model": "R801V0754A17UHSCAP",
+      "capacity_btuh": 33600,
+      "seer2": "15.2",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C with 80% Single Stage Variable Speed Furnace",
+        "model_number": "RA14AY36AJ1NA / RCFY3617STANMC / R801V0754A17UHSCAP",
+        "description": "AHRI Reference: 215230358; Outdoor Unit: RA14AY36AJ1NA; Evaporator Coil: RCFY3617STANMC; Furnace: R801V0754A17UHSCAP; Cooling Capacity: 33600 BTUh; SEER2: 15.2"
+      }
+    },
+    {
+      "sequence": 8,
+      "ahri_reference": "215259589",
+      "outdoor_model": "RA15AY18AJ1NA",
+      "coil_model": "RCFY2414STAAMC",
+      "furnace_model": "R802V0503A14UHSCAP",
+      "capacity_btuh": 17100,
+      "seer2": "16",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C W/ 80% Two-Stage Variable Speed Furnace",
+        "model_number": "RA15AY18AJ1NA / RCFY2414STAAMC / R802V0503A14UHSCAP",
+        "description": "AHRI Reference: 215259589; Outdoor Unit: RA15AY18AJ1NA; Evaporator Coil: RCFY2414STAAMC; Furnace: R802V0503A14UHSCAP; Cooling Capacity: 17100 BTUh; SEER2: 16"
+      }
+    },
+    {
+      "sequence": 9,
+      "ahri_reference": "216376064",
+      "outdoor_model": "RA14AY24BJ1NA",
+      "coil_model": "RCFY2417STANMC",
+      "furnace_model": "R802V0754A17UHSCAP",
+      "capacity_btuh": 22800,
+      "seer2": "15.2",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C W/ 80% Two-Stage Variable Speed Furnace",
+        "model_number": "RA14AY24BJ1NA / RCFY2417STANMC / R802V0754A17UHSCAP",
+        "description": "AHRI Reference: 216376064; Outdoor Unit: RA14AY24BJ1NA; Evaporator Coil: RCFY2417STANMC; Furnace: R802V0754A17UHSCAP; Cooling Capacity: 22800 BTUh; SEER2: 15.2"
+      }
+    },
+    {
+      "sequence": 10,
+      "ahri_reference": "215231223",
+      "outdoor_model": "RA14AY36AJ1NA",
+      "coil_model": "RCFY3621STANMC",
+      "furnace_model": "R802V1005A21UHSCAP",
+      "capacity_btuh": 34000,
+      "seer2": "15.2",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C W/ 80% Two-Stage Variable Speed Furnace",
+        "model_number": "RA14AY36AJ1NA / RCFY3621STANMC / R802V1005A21UHSCAP",
+        "description": "AHRI Reference: 215231223; Outdoor Unit: RA14AY36AJ1NA; Evaporator Coil: RCFY3621STANMC; Furnace: R802V1005A21UHSCAP; Cooling Capacity: 34000 BTUh; SEER2: 15.2"
+      }
+    },
+    {
+      "sequence": 11,
+      "ahri_reference": "217166592",
+      "outdoor_model": "UA16AY24AJ2NA",
+      "coil_model": "RCFY2417MTANMC",
+      "furnace_model": "R801V0503A14UHSCAP",
+      "capacity_btuh": 22800,
+      "seer2": "17",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C W/ 80% Variable Speed Furnace",
+        "model_number": "UA16AY24AJ2NA / RCFY2417MTANMC / R801V0503A14UHSCAP",
+        "description": "AHRI Reference: 217166592; Outdoor Unit: UA16AY24AJ2NA; Evaporator Coil: RCFY2417MTANMC; Furnace: R801V0503A14UHSCAP; Cooling Capacity: 22800 BTUh; SEER2: 17"
+      }
+    },
+    {
+      "sequence": 12,
+      "ahri_reference": "217167322",
+      "outdoor_model": "UA16AY36AJ2NA",
+      "coil_model": "RCFY3617STANMC",
+      "furnace_model": "R801V0754A17UHSCAP",
+      "capacity_btuh": 34200,
+      "seer2": "16",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C W/ 80% Variable Speed Furnace",
+        "model_number": "UA16AY36AJ2NA / RCFY3617STANMC / R801V0754A17UHSCAP",
+        "description": "AHRI Reference: 217167322; Outdoor Unit: UA16AY36AJ2NA; Evaporator Coil: RCFY3617STANMC; Furnace: R801V0754A17UHSCAP; Cooling Capacity: 34200 BTUh; SEER2: 16"
+      }
+    },
+    {
+      "sequence": 13,
+      "ahri_reference": "217168202",
+      "outdoor_model": "UA16AY48AJ2NA",
+      "coil_model": "RCFY4821STANMC",
+      "furnace_model": "R801V1005A21UHSCAP",
+      "capacity_btuh": 45500,
+      "seer2": "16",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C W/ 80% Variable Speed Furnace",
+        "model_number": "UA16AY48AJ2NA / RCFY4821STANMC / R801V1005A21UHSCAP",
+        "description": "AHRI Reference: 217168202; Outdoor Unit: UA16AY48AJ2NA; Evaporator Coil: RCFY4821STANMC; Furnace: R801V1005A21UHSCAP; Cooling Capacity: 45500 BTUh; SEER2: 16"
+      }
+    },
+    {
+      "sequence": 14,
+      "ahri_reference": "216376444",
+      "outdoor_model": "RA14AY24BJ1NA",
+      "coil_model": "RCFY2417STANMC",
+      "furnace_model": "R921T0403A17M4SNAS",
+      "capacity_btuh": 22800,
+      "seer2": "15.2",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C W/ 92% Single Stage Furnace",
+        "model_number": "RA14AY24BJ1NA / RCFY2417STANMC / R921T0403A17M4SNAS",
+        "description": "AHRI Reference: 216376444; Outdoor Unit: RA14AY24BJ1NA; Evaporator Coil: RCFY2417STANMC; Furnace: R921T0403A17M4SNAS; Cooling Capacity: 22800 BTUh; SEER2: 15.2"
+      }
+    },
+    {
+      "sequence": 15,
+      "ahri_reference": "215229623",
+      "outdoor_model": "RA14AY36AJ1NA",
+      "coil_model": "RCFY3617STANMC",
+      "furnace_model": "R921V0703A17M4SCAP",
+      "capacity_btuh": 34200,
+      "seer2": "15.2",
+      "catalog_fields": {
+        "brand": "Ruud",
+        "residential_system_type": "A/C W/ 92% Single Stage Variable Speed Furnace",
+        "model_number": "RA14AY36AJ1NA / RCFY3617STANMC / R921V0703A17M4SCAP",
+        "description": "AHRI Reference: 215229623; Outdoor Unit: RA14AY36AJ1NA; Evaporator Coil: RCFY3617STANMC; Furnace: R921V0703A17M4SCAP; Cooling Capacity: 34200 BTUh; SEER2: 15.2"
+      }
+    }
+  ]
+}
