@@ -28,6 +28,18 @@ def connect(request):
 def callback(request):
     # Do not render tracebacks containing authorization codes or request data.
     try:
+        from .completion_send_oauth_callback_4628 import (
+            is_sender_state, finish as finish_sender,
+        )
+        state = request.query_params.get('state')
+        if is_sender_state(state):
+            return private(Response(finish_sender(
+                actor=request.user,
+                session_key=request.session.session_key,
+                state=state,
+                code=request.query_params.get('code'),
+                error=request.query_params.get('error'),
+            )))
         proof = docusign.finish(request.user, request.session.session_key,
             request.query_params.get('state'), request.query_params.get('code'), request.query_params.get('error'))
         if isinstance(proof, dict):

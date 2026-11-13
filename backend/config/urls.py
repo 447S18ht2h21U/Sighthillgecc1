@@ -3,7 +3,8 @@ from core import product_catalog_collections_api_4546
 from django.urls import path, include
 from core import own_contractor_payment_api
 from rest_framework.routers import DefaultRouter
-from core import completion_envelope_api, installation_schedule_api, api, docusign_api, sandbox_api, release_api, signing_test_api, technical_assignment_api, operational_project_api, dashboard_api, financial_reporting_api, contractor_directory_api
+from core import completion_provider_oauth_api_4611
+from core import completion_send_oauth_api_4629, completion_envelope_api, installation_schedule_api, api, docusign_api, sandbox_api, release_api, signing_test_api, technical_assignment_api, operational_project_api, dashboard_api, financial_reporting_api, contractor_directory_api
 router = DefaultRouter()
 for prefix, view in [('customers', api.CustomerViewSet), ('contacts', api.ContactViewSet), ('projects', api.ProjectViewSet), ('msrs', api.MSRViewSet), ('documents', api.DocumentViewSet), ('audit', api.AuditViewSet), ('directory', api.DirectoryViewSet), ('accounts', api.AccountViewSet)]:
     router.register(prefix, view, basename=prefix)
@@ -61,7 +62,13 @@ urlpatterns = [
         'api/financial-reports/<uuid:report_id>/',
         financial_reporting_api.financial_report_detail,
     ),
+    path(
+        'api/completion-envelope-attempts/<uuid:attempt_id>/verify-sandbox/',
+        completion_provider_oauth_api_4611.connect,
+        name='completion-provider-oauth-4611',
+    ),
     path('api/completion-envelope-attempts/<uuid:attempt_id>/', completion_envelope_api.detail),
+    path('api/completion-envelope-attempts/<uuid:attempt_id>/sender-oauth/', completion_send_oauth_api_4629.connect),
     path('api/project-dashboard/', dashboard_api.project_dashboard),
     path('api/release-packages/<uuid:source_id>/signing-tests/', signing_test_api.packages),
     path('api/signing-tests/<uuid:package_id>/decisions/', signing_test_api.decision),

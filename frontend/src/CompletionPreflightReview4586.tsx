@@ -1,6 +1,29 @@
 import React, { useState } from 'react';
 
+type CompletionRequirement = {
+  key: string;
+  label: string;
+  status: 'READY' | 'BLOCKED';
+  candidate_count: number;
+  detail: string;
+};
+
+type ReceiptEvidence = {
+  status: 'UNVERIFIED';
+  approved_msr_id: string | null;
+  valid_pdf_candidates: number;
+  matching_outbox_intents: number;
+  matching_local_observations: number;
+  final_receipt_verified: false;
+  provider_email_authenticated: false;
+  customer_delivery_verified: false;
+  completion_authorized: false;
+  blockers: string[];
+};
+
 type CompletionPreflight = {
+  receipt_evidence?: ReceiptEvidence;
+  evidence_requirements: CompletionRequirement[];
   project_id: string;
   status: string;
   read_only: boolean;
@@ -62,7 +85,50 @@ export function CompletionPreflightReview4586({
 
       const data: CompletionPreflight = await response.json();
 
+      const requiredKeys = [
+        'approved_msr', 'final_receipt', 'receipt_email',
+        'completion_certificate', 'completion_transaction',
+      ];
+      const requirements = data.evidence_requirements;
+      const receipt = data.receipt_evidence;
+      const receiptRequired =
+        data.status === 'COMPLETION_EVIDENCE_UNVERIFIED';
+      const validReceipt =
+        !receiptRequired ||
+        (
+          receipt != null &&
+          receipt.status === 'UNVERIFIED' &&
+          (receipt.approved_msr_id == null ||
+            receipt.approved_msr_id === data.current_approved_msr_id) &&
+          [
+            receipt.valid_pdf_candidates,
+            receipt.matching_outbox_intents,
+            receipt.matching_local_observations,
+          ].every(value => Number.isSafeInteger(value) && value >= 0) &&
+          receipt.final_receipt_verified === false &&
+          receipt.provider_email_authenticated === false &&
+          receipt.customer_delivery_verified === false &&
+          receipt.completion_authorized === false &&
+          Array.isArray(receipt.blockers) &&
+          receipt.blockers.every(value => typeof value === 'string')
+        );
+
       if (
+        !validReceipt ||
+        !Array.isArray(requirements) ||
+        requirements.length !== requiredKeys.length ||
+        !requirements.every((item, index) =>
+          item !== null &&
+          typeof item === 'object' &&
+          item.key === requiredKeys[index] &&
+          typeof item.label === 'string' &&
+          typeof item.detail === 'string' &&
+          Number.isSafeInteger(item.candidate_count) &&
+          item.candidate_count >= 0 &&
+          (index === 0
+            ? ['READY', 'BLOCKED'].includes(item.status)
+            : item.status === 'BLOCKED')
+        ) ||
         data.project_id !== projectId ||
         data.read_only !== true ||
         data.completion_authorized !== false ||
@@ -130,6 +196,43 @@ export function CompletionPreflightReview4586({
                   <li>Email observations: {report.unverified_email_observations ?? 0} (not authenticated delivery)</li>
                   <li>Completion Certificate candidates: {report.certificate_candidates ?? 0} (not authenticated DocuSign completion)</li>
                 </ul>
+              )}
+              <strong>Completion evidence checklist</strong>
+              <ul>
+                {report.evidence_requirements.map(item => (
+                  <li key={item.key}>
+                    <strong>{item.label}: {item.status === 'READY' ? 'Prerequisite present' : 'Not verified'}</strong>
+                    {' '}— {item.detail}
+                    {item.candidate_count > 0 && (
+                      <span> Candidate records: {item.candidate_count} (untrusted).</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {report.receipt_evidence && (
+                <>
+                  <strong>Customer Receipt evidence</strong>
+                  <ul>
+                    <li>
+                      Retained historical PDF candidates:
+                      {' '}{report.receipt_evidence.valid_pdf_candidates}
+                    </li>
+                    <li>
+                      Matching pending email requests:
+                      {' '}{report.receipt_evidence.matching_outbox_intents}
+                    </li>
+                    <li>
+                      Matching unverified sending observations:
+                      {' '}{report.receipt_evidence.matching_local_observations}
+                    </li>
+                    <li>
+                      Final Receipt: Not independently verified
+                    </li>
+                    <li>
+                      Customer email sending: Not provider-authenticated
+                    </li>
+                  </ul>
+                </>
               )}
               <p>Customer Satisfaction Survey: Optional</p>
               <strong>Outstanding completion requirements</strong>

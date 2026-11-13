@@ -131,6 +131,44 @@ class CompletionPreflightAPISecurityTests(TestCase):
                 for reason in data["blockers"])
         )
 
+    def test_evidence_checklist_never_promotes_candidate_records(self):
+        from unittest.mock import patch as mock_patch
+        from .project_completion_preflight import ProjectCompletionPreflight
+
+        self.authenticate(self.comptroller)
+        report = ProjectCompletionPreflight(
+            project_id=str(self.project.pk),
+            current_approved_msr_id=str(self.project.current_approved_id),
+            receipt_candidates=3,
+            unverified_email_observations=4,
+            certificate_candidates=2,
+            receipt_email_authenticated=False,
+            docusign_completion_authenticated=False,
+            satisfaction_survey_required=False,
+            blockers=("Unverified evidence.",),
+        )
+        with mock_patch(
+            "core.project_completion_preflight."
+            "assess_project_completion_preflight",
+            return_value=report,
+        ):
+            response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200, response.content)
+        data = response.json()
+        gates = data["evidence_requirements"]
+        self.assertEqual(len(gates), 5)
+        self.assertEqual(gates[0]["status"], "READY")
+        self.assertTrue(all(
+            gate["status"] == "BLOCKED" for gate in gates[1:]
+        ))
+        self.assertEqual(
+            [gate["candidate_count"] for gate in gates],
+            [0, 3, 4, 2, 0],
+        )
+        self.assertIs(data["completion_authorized"], False)
+        self.assertIs(data["project_completed"], False)
+
     def test_forged_completion_authority_is_rejected(self):
         self.authenticate(self.comptroller)
 
@@ -159,3 +197,55 @@ class CompletionPreflightAPISecurityTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.project.refresh_from_db()
         self.assertNotEqual(self.project.state, "COMPLETED")
+
+    def test_current_approved_project_receipt_chain_remains_untrusted(self):
+        self.authenticate(self.comptroller)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200, response.content)
+        data = response.json()
+        receipt = data["receipt_evidence"]
+
+        self.assertEqual(receipt["status"], "UNVERIFIED")
+        self.assertEqual(
+            receipt["approved_msr_id"],
+            str(self.project.current_approved_id),
+        )
+        self.assertIs(receipt["final_receipt_verified"], False)
+        self.assertIs(receipt["provider_email_authenticated"], False)
+        self.assertIs(receipt["customer_delivery_verified"], False)
+        self.assertIs(receipt["completion_authorized"], False)
+        self.assertIs(data["project_completed"], False)
+
+    def test_missing_receipt_storage_fails_closed(self):
+        from .models import ReceiptDispatchOutbox
+
+        self.authenticate(self.comptroller)
+        with connection.cursor() as cursor:
+            available = list(
+                connection.introspection.table_names(cursor)
+            )
+
+        reduced = [
+            name for name in available
+            if name != ReceiptDispatchOutbox._meta.db_table
+        ]
+
+        self.assertLess(len(reduced), len(available))
+
+        with patch.object(
+            connection.introspection,
+            "table_names",
+            return_value=reduced,
+        ):
+            response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200, response.content)
+        data = response.json()
+        self.assertEqual(
+            data["status"], "EVIDENCE_STORAGE_UNAVAILABLE"
+        )
+        self.assertIs(data["completion_authorized"], False)
+        self.assertIs(data["project_completed"], False)
+        self.assertIs(data["receipt_email_authenticated"], False)

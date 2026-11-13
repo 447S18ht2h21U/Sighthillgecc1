@@ -145,6 +145,11 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
             assess_project_completion_preflight,
         )
         from .services import authorize
+        from .receipt_evidence_chain_4613 import inspect_receipt_chain
+        from .models import ReceiptDispatchOutbox, ReceiptSendingObservation
+        from .completion_evidence_status_4609 import (
+            completion_evidence_requirements,
+        )
 
         # Resolve the project through the existing visibility boundary.
         project = self.get_object()
@@ -176,6 +181,7 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
                 "project_id": str(project.pk),
                 "status": "COMPLETION_PREREQUISITES_MISSING",
                 "read_only": True,
+                "evidence_requirements": completion_evidence_requirements(project),
                 "completion_authorized": False,
                 "project_completed": False,
                 "receipt_email_authenticated": False,
@@ -189,6 +195,8 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
             })
 
         required_models = (
+            ReceiptDispatchOutbox,
+            ReceiptSendingObservation,
             CompletionEnvelopeAttempt,
             CompletionSignatureVerification,
             Document,
@@ -207,6 +215,7 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
                 "project_id": str(project.pk),
                 "status": "EVIDENCE_STORAGE_UNAVAILABLE",
                 "read_only": True,
+                "evidence_requirements": completion_evidence_requirements(project),
                 "completion_authorized": False,
                 "project_completed": False,
                 "receipt_email_authenticated": False,
@@ -240,6 +249,8 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
             **result,
             "status": "COMPLETION_EVIDENCE_UNVERIFIED",
             "read_only": True,
+            "receipt_evidence": inspect_receipt_chain(project),
+            "evidence_requirements": completion_evidence_requirements(project, report),
         })
 
     @action(
