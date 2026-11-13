@@ -2437,3 +2437,109 @@ class ExpeditedSigningDocument(_ExpeditedImmutableRecord):
                 name="exp_sign_document_unique"
             )
         ]
+
+# STEP 1907P-4801: Immutable, non-issuable draft document package.
+from uuid import uuid4 as _receipt_draft_uuid4
+from hashlib import sha256 as _receipt_draft_sha256
+import re as _receipt_draft_re
+
+
+class ReceiptDraftPackage(models.Model):
+    """Exact draft ZIP bytes, never a FINAL Receipt or delivery record."""
+
+    id = models.UUIDField(
+        primary_key=True, default=_receipt_draft_uuid4, editable=False
+    )
+    project = models.ForeignKey(
+        "Project", on_delete=models.PROTECT,
+        related_name="retained_receipt_draft_packages",
+    )
+    msr = models.ForeignKey(
+        "MSR", on_delete=models.PROTECT,
+        related_name="retained_receipt_draft_packages",
+    )
+    created_by = models.ForeignKey(
+        "User", on_delete=models.PROTECT,
+        related_name="retained_receipt_draft_packages",
+    )
+    snapshot_sha256 = models.CharField(max_length=64)
+    approved_reference_sha256 = models.CharField(max_length=64)
+    receipt_sha256 = models.CharField(max_length=64)
+    addendum_sha256 = models.CharField(max_length=64)
+    archive_sha256 = models.CharField(max_length=64)
+    equipment_count = models.PositiveIntegerField()
+    content = models.BinaryField()
+    status = models.CharField(
+        max_length=24, default="DRAFT_NOT_ISSUED"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["msr", "archive_sha256"],
+                name="receipt_draft_package_unique_bytes",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status="DRAFT_NOT_ISSUED"),
+                name="receipt_draft_package_status_draft",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+
+        if self.status != "DRAFT_NOT_ISSUED":
+            raise ValidationError(
+                "Draft package cannot claim customer issuance."
+            )
+
+        for field in (
+            "snapshot_sha256",
+            "approved_reference_sha256",
+            "receipt_sha256",
+            "addendum_sha256",
+            "archive_sha256",
+        ):
+            value = getattr(self, field)
+            if not isinstance(value, str) or not _receipt_draft_re.fullmatch(
+                r"[0-9a-fA-F]{64}", value
+            ):
+                raise ValidationError({field: "Invalid SHA256."})
+
+        try:
+            content = bytes(self.content)
+        except (TypeError, ValueError):
+            raise ValidationError("Invalid draft archive bytes.") from None
+
+        if (
+            len(content) < 16
+            or len(content) > 12 * 1024 * 1024
+            or not content.startswith(b"PK")
+            or _receipt_draft_sha256(content).hexdigest()
+                != self.archive_sha256.lower()
+        ):
+            raise ValidationError("Exact draft ZIP fingerprint required.")
+
+        if self.equipment_count < 1:
+            raise ValidationError("At least one equipment unit required.")
+
+        if (
+            self.project_id
+            and self.msr_id
+            and self.msr.project_id != self.project_id
+        ):
+            raise ValidationError("Project and approved MSR mismatch.")
+
+        if self.msr_id and self.msr.status != "APPROVED":
+            raise ValidationError("Approved MSR required.")
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Retained draft packages are immutable.")
+
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Retained draft packages cannot be deleted.")

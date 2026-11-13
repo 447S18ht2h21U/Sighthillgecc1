@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { DraftReceiptPackageStatus4807 } from './DraftReceiptPackageStatus4807';
 
 type CompletionRequirement = {
   key: string;
@@ -262,6 +263,7 @@ export function CompletionPreflightReview4586({
           onClick={event => event.stopPropagation()}
         >
           <h4>Administrative Project Completion</h4>
+          <DraftReceiptPackageStatus4807 projectId={projectId} />
           <p><strong>Completion not authorized</strong></p>
           <button
             type="button"

@@ -1,4 +1,4 @@
-﻿from rest_framework import serializers, viewsets
+from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
@@ -352,6 +352,121 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
                 "verify DocuSign signatures or authorize completion."
             ),
         })
+
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="draft-receipt-package",
+    )
+    def draft_receipt_package(self, request, pk=None):
+        """Comptroller/CEO read-only draft retention status.
+
+        Never issues a document, supplies PDF/ZIP bytes, or establishes
+        receipt delivery, installation authorization, or completion.
+        """
+        from django.core.exceptions import ValidationError
+        from django.db import connections, router
+        from rest_framework.exceptions import PermissionDenied
+        from .models import ReceiptDraftPackage, Role
+        from .receipt_draft_retention_4803 import (
+            verify_retained_draft_package,
+        )
+
+        project = self.get_object()
+        actor = User.objects.filter(
+            pk=request.user.pk, is_active=True
+        ).first()
+
+        if (
+            actor is None
+            or actor.role not in (Role.CEO, Role.COMPTROLLER)
+        ):
+            raise PermissionDenied(
+                "CEO or Comptroller authorization required."
+            )
+
+        result = {
+            "project_id": str(project.pk),
+            "read_only": True,
+            "status": "NO_DRAFT_PACKAGE",
+            "storage_available": False,
+            "draft_package_count": 0,
+            "verified_draft_package_count": 0,
+            "integrity_verified": False,
+            "draft_only": True,
+            "final_receipt_verified": False,
+            "issuance_authorized": False,
+            "provider_email_authenticated": False,
+            "customer_delivery_verified": False,
+            "completion_authorized": False,
+        }
+
+        msr = project.current_approved
+
+        if (
+            msr is None
+            or msr.status != "APPROVED"
+            or msr.project_id != project.pk
+            or project.state == "CANCELLED"
+        ):
+            result["status"] = "PREREQUISITES_MISSING"
+            return Response(result)
+
+        alias = router.db_for_read(ReceiptDraftPackage)
+        connection = connections[alias]
+
+        with connection.cursor() as cursor:
+            tables = set(connection.introspection.table_names(cursor))
+
+        if ReceiptDraftPackage._meta.db_table not in tables:
+            result["status"] = "SCHEMA_UNAVAILABLE"
+            return Response(result)
+
+        result["storage_available"] = True
+
+        records = list(
+            ReceiptDraftPackage.objects.using(alias).filter(
+                project_id=project.pk,
+                msr_id=msr.pk,
+            ).order_by("created_at", "pk")
+        )
+
+        result["draft_package_count"] = len(records)
+
+        if not records:
+            return Response(result)
+
+        for record in records:
+            try:
+                verified = verify_retained_draft_package(
+                    project=project,
+                    record=record,
+                )
+            except (ValidationError, ValueError, TypeError):
+                result["status"] = "INTEGRITY_FAILED"
+                result["integrity_verified"] = False
+                result["verified_draft_package_count"] = 0
+                return Response(result)
+
+            if (
+                verified.integrity_verified is not True
+                or verified.status != "DRAFT_NOT_ISSUED"
+                or verified.issuance_authorized is not False
+                or verified.customer_delivery_verified is not False
+                or verified.completion_authorized is not False
+            ):
+                result["status"] = "INTEGRITY_FAILED"
+                result["integrity_verified"] = False
+                result["verified_draft_package_count"] = 0
+                return Response(result)
+
+            result["verified_draft_package_count"] += 1
+
+        result["integrity_verified"] = True
+        result["status"] = "VERIFIED_DRAFT_RETAINED"
+
+        return Response(result)
 
     def finalize_response(self, request, response, *args, **kwargs):
         response = super().finalize_response(request, response, *args, **kwargs)
