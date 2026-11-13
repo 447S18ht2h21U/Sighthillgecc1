@@ -9,6 +9,10 @@ import io
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
 
+from .catalog_persistent_activation_policy_4688 import (
+    require_persistent_catalog_activation,
+)
+
 from .equipment_catalog_policy import FIELDS, validate_equipment_details
 from .equipment_catalog_service import _authorized_manager
 from .models import EquipmentCatalogItem, ProductCatalogCollection
@@ -158,12 +162,14 @@ def _require_isolated_import():
 
 
 @transaction.atomic
-def import_catalog_csv(
+def _import_catalog_transaction(
     *, actor_id, content, name=None, description=None, catalog_id=None
 ):
-    """Atomic manager-confirmed import using existing audit services."""
-    _require_isolated_import()
+    """Shared atomic transaction; callers MUST pass their authority gate.
 
+    All rows are revalidated inside the transaction immediately before
+    creating records. Existing audited catalog services remain authoritative.
+    """
     preview = preview_catalog_csv(
         actor_id=actor_id,
         content=content,
@@ -189,3 +195,40 @@ def import_catalog_csv(
         )
 
     return catalog, preview["count"]
+
+
+def import_catalog_csv(
+    *, actor_id, content, name=None, description=None, catalog_id=None
+):
+    """Preserve the existing disposable-memory-only import contract."""
+    _require_isolated_import()
+    return _import_catalog_transaction(
+        actor_id=actor_id,
+        content=content,
+        name=name,
+        description=description,
+        catalog_id=catalog_id,
+    )
+
+
+def _require_persistent_import_authorization():
+    """Hard deny until a separately reviewed activation is implemented.
+
+    Neither environment variables nor caller-supplied arguments can
+    authorize persistent importing at this checkpoint.
+    """
+    require_persistent_catalog_activation()
+
+
+def import_catalog_csv_persistent(
+    *, actor_id, content, name=None, description=None, catalog_id=None
+):
+    """Future operational entry point; currently always refuses writes."""
+    _require_persistent_import_authorization()
+    return _import_catalog_transaction(
+        actor_id=actor_id,
+        content=content,
+        name=name,
+        description=description,
+        catalog_id=catalog_id,
+    )

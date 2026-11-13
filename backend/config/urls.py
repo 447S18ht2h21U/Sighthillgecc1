@@ -4,12 +4,15 @@ from core import msr_named_catalog_choices_api_4551
 from core import product_catalog_collections_api_4546
 from django.urls import path, include
 from core import own_contractor_payment_api
+from core import customer_payment_api_4714
 from rest_framework.routers import DefaultRouter
 from core import completion_provider_oauth_api_4611
+from core import receipt_outbox_status_api_prototype_4209
 from core import completion_send_oauth_api_4629, completion_envelope_api, installation_schedule_api, api, docusign_api, sandbox_api, release_api, signing_test_api, technical_assignment_api, operational_project_api, dashboard_api, financial_reporting_api, contractor_directory_api
 router = DefaultRouter()
 for prefix, view in [('customers', api.CustomerViewSet), ('contacts', api.ContactViewSet), ('projects', api.ProjectViewSet), ('msrs', api.MSRViewSet), ('documents', api.DocumentViewSet), ('audit', api.AuditViewSet), ('directory', api.DirectoryViewSet), ('accounts', api.AccountViewSet)]:
     router.register(prefix, view, basename=prefix)
+router.register('customer-payments', customer_payment_api_4714.CustomerPaymentViewSet, basename='customer-payments')
 router.register('installation-schedules', installation_schedule_api.InstallationScheduleViewSet, basename='installation-schedules')
 router.register('installation-managers', installation_schedule_api.InstallationManagerDirectoryViewSet, basename='installation-managers')
 router.register('technical-assignments', technical_assignment_api.TechnicalAssignmentViewSet, basename='technical-assignments')
@@ -71,6 +74,7 @@ urlpatterns = [
         completion_provider_oauth_api_4611.connect,
         name='completion-provider-oauth-4611',
     ),
+    path('api/receipt-outboxes/<uuid:outbox_id>/status/', receipt_outbox_status_api_prototype_4209.ReceiptOutboxStatusPrototype.as_view(), name='receipt-outbox-status'),
     path('api/completion-envelope-attempts/<uuid:attempt_id>/', completion_envelope_api.detail),
     path('api/completion-envelope-attempts/<uuid:attempt_id>/sender-oauth/', completion_send_oauth_api_4629.connect),
     path('api/project-dashboard/', dashboard_api.project_dashboard),

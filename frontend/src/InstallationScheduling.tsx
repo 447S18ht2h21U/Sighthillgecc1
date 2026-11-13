@@ -61,6 +61,19 @@ type InstallationReadiness = {
   };
 };
 
+type ProposedDateAssessment = {
+  project_id: string;
+  scheduled_date: string;
+  normal_date_eligible: boolean;
+  payment_ready: boolean;
+  scheduling_candidate: boolean;
+  earliest_normal_installation_at: string;
+  payment_explanation: string;
+  installation_authorized: boolean;
+  installation_started: boolean;
+  expedited_authorized: boolean;
+};
+
 export function InstallationScheduling({
   api,
   selectedProjectId,
@@ -85,6 +98,10 @@ export function InstallationScheduling({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [scheduleFeedback, setScheduleFeedback] = useState<{
+    status: 'working' | 'success' | 'error';
+    message: string;
+  } | null>(null);
   const [pendingStatusAction, setPendingStatusAction] = useState<{
     scheduleId: string;
     projectId: string;
@@ -223,16 +240,56 @@ export function InstallationScheduling({
     return () => { active = false; };
   }, [api, projectId]);
 
-  async function perform(action: () => Promise<unknown>, successMessage = 'Installation schedule updated.') {
+  async function perform(
+    action: () => Promise<unknown>,
+    successMessage = 'Installation schedule updated.',
+    scope: 'general' | 'schedule' = 'general',
+  ) {
+    if (busy) return;
     setBusy(true);
     setError('');
     setMessage('');
+    if (scope === 'schedule') {
+      setScheduleFeedback({
+        status: 'working',
+        message: 'Checking the proposed installation date...',
+      });
+    }
     try {
       await action();
-      await refresh();
+      try {
+        await refresh();
+      } catch {
+        // Do not report a completed write as failed just because
+        // the subsequent list refresh was unsuccessful.
+        setMessage(
+          'The action was accepted, but the updated schedule list could not be refreshed.'
+        );
+        if (scope === 'schedule') {
+          setScheduleFeedback({
+            status: 'success',
+            message: 'Appointment created. Refresh the list to verify its details.',
+          });
+        }
+        return;
+      }
       setMessage(successMessage);
+      if (scope === 'schedule') {
+        setScheduleFeedback({
+          status: 'success',
+          message: successMessage,
+        });
+      }
     } catch (err) {
-      setError((err as Error).message);
+      const explanation = err instanceof Error
+        ? err.message : 'Installation operation failed.';
+      setError(explanation);
+      if (scope === 'schedule') {
+        setScheduleFeedback({
+          status: 'error',
+          message: `Appointment not confirmed: ${explanation}`,
+        });
+      }
     } finally {
       setBusy(false);
     }
@@ -305,15 +362,69 @@ export function InstallationScheduling({
         setReadiness(current);
         setReadinessLoading(false);
 
-        if (!current.eligible) {
+        // Current-time readiness and proposed future-date eligibility
+        // are different assessments. The server is authoritative.
+        setScheduleFeedback({
+          status: 'working',
+          message: 'Assessing date, payment and verified waiting period...',
+        });
+
+        const assessment = await api<ProposedDateAssessment>(
+          'installation-schedules/assess-proposed-date/',
+          'POST',
+          {
+            project: requestedProject,
+            scheduled_date: requestedDate,
+          },
+        );
+
+        if (
+          assessment.project_id !== requestedProject ||
+          assessment.scheduled_date !== requestedDate
+        ) {
           throw new Error(
-            current.blocking_reasons.length > 0
-              ? `Scheduling is blocked: ${current.blocking_reasons.join(' ')}`
-              : 'Installation requirements are not complete.'
+            'The date assessment did not match the selected project and date.'
           );
         }
 
-        await api('installation-schedules/', 'POST', {
+        if (
+          assessment.installation_authorized ||
+          assessment.installation_started ||
+          assessment.expedited_authorized
+        ) {
+          throw new Error(
+            'Unexpected installation authorization in the date assessment.'
+          );
+        }
+
+        if (
+          !assessment.scheduling_candidate ||
+          !assessment.normal_date_eligible ||
+          !assessment.payment_ready
+        ) {
+          throw new Error(
+            !assessment.normal_date_eligible
+              ? `Proposed date is too early. Normal eligibility begins ${assessment.earliest_normal_installation_at}.`
+              : assessment.payment_explanation ||
+                'Required payment evidence is incomplete.'
+          );
+        }
+
+        if (
+          requestId !== readinessRequestId.current ||
+          selectedProjectRef.current !== requestedProject
+        ) {
+          throw new Error(
+            'The project changed during assessment. Please review it again.'
+          );
+        }
+
+        setScheduleFeedback({
+          status: 'working',
+          message: 'Date approved for scheduling. Creating appointment...',
+        });
+
+        await api('installation-schedules/schedule-future/', 'POST', {
           project: requestedProject,
           scheduled_date: requestedDate,
           installation_manager: requestedManager,
@@ -327,7 +438,10 @@ export function InstallationScheduling({
           setScheduledDate('');
           setReadiness(null);
         }
-      });
+      },
+        'Installation appointment created. Installation start is not authorized.',
+        'schedule',
+      );
     }}>
       <h3>Schedule an installation</h3>
       <div className="grid">
@@ -348,8 +462,57 @@ export function InstallationScheduling({
             </option>)}
           </select>
         </label>
-        {projectId && <div className="installation-readiness" role="status" aria-live="polite">
-          <h4>Installation Readiness</h4>
+        {projectId && <div className="installation-readiness">
+          <div className="installation-readiness-summary" role="status" aria-live="polite">
+            <h4>Installation Readiness — Current Assessment</h4>
+            {readinessLoading
+              ? <p>Checking current project requirements...</p>
+              : readinessError
+                ? <p role="alert">Evidence could not be verified. Scheduling approval has not been established.</p>
+                : readiness
+                  ? <>
+                      <p><strong>
+                        {readiness.eligible
+                          ? 'Current scheduling requirements satisfied'
+                          : 'Requirements still outstanding'}
+                      </strong></p>
+                      {readiness.blocking_reasons.length > 0
+                        ? <ul>{readiness.blocking_reasons.map((blocker, index) =>
+                            <li key={index}>{blocker}</li>
+                          )}</ul>
+                        : <p>No current-time scheduling blockers reported.</p>}
+                    </>
+                  : <p>Readiness has not been established.</p>}
+            <p className="muted">
+              A proposed future date receives a separate server assessment.
+              This summary does not authorize installation to start.
+            </p>
+          </div>
+          {readiness && !readiness.eligible && (
+            <div className="installation-evidence-guidance">
+              <strong>How to resolve outstanding evidence</strong>
+              <p>
+                <strong>Cancellation deadline:</strong> The authorized
+                Comptroller can review the approved MSR's Project
+                verification evidence section in the customer/project
+                workspace. Recording an attestation does not substitute
+                for reviewing the referenced evidence.
+              </p>
+              <p>
+                <strong>Customer deposit:</strong> The authorized payment
+                workflow must establish verified payment and bank
+                confirmation. Do not mark funds received merely to
+                clear a scheduling blocker.
+              </p>
+              <p>
+                After evidence is recorded and verified, select
+                Refresh installation status to obtain a new assessment.
+              </p>
+            </div>
+          )}
+          <details className="installation-readiness-details">
+            <summary>View detailed readiness and installation-start safeguards</summary>
+            <h4>Installation Readiness Details</h4>
           {readiness?.installation_start && (
             <div className="installation-start-readiness">
               <h4>Installation Start Authorization</h4>
@@ -439,6 +602,7 @@ export function InstallationScheduling({
                     </>}
                   </>
                 : <p>Readiness information is unavailable.</p>}
+          </details>
         </div>}
         <label>Installation date
           <input required type="date" value={scheduledDate}
@@ -456,14 +620,26 @@ export function InstallationScheduling({
       <button disabled={
         busy ||
         readinessLoading ||
-        Boolean(readinessError) ||
-        !readiness?.eligible ||
-        readiness.project_id !== projectId ||
         !projectId ||
         !scheduledDate ||
         !managerId
       }>Create schedule</button>
-      <p className="muted">Scheduling eligibility must be independently verified; a schedule status is not proof of signed completion.</p>
+      <p className="installation-schedule-help">
+        A future appointment is assessed against its proposed date.
+        Missing verified evidence cannot be bypassed.
+      </p>
+      {scheduleFeedback && <p
+        role={scheduleFeedback.status === 'error' ? 'alert' : 'status'}
+        aria-live="polite"
+        className={`installation-action-feedback ${scheduleFeedback.status}`}
+      >
+        {scheduleFeedback.message}
+      </p>}
+      <p className="muted">
+        The proposed date receives a separate server-side assessment.
+        A future appointment does not authorize installation to start.
+        Expedited installation requires independently verified evidence.
+      </p>
     </form>}
 
     <h3>Installation schedules</h3>

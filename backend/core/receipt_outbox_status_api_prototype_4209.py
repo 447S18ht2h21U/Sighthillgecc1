@@ -5,6 +5,7 @@ provider authentication, customer delivery, or project completion.
 """
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import NotFound, PermissionDenied
+from django.db import connections, router
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -38,7 +39,16 @@ class ReceiptOutboxStatusPrototype(APIView):
         except (TypeError, ValueError, DjangoValidationError):
             raise NotFound("Receipt outbox record not found.")
 
-        entry = ReceiptDispatchOutbox.objects.filter(
+        alias = router.db_for_read(ReceiptDispatchOutbox)
+        connection = connections[alias]
+
+        with connection.cursor() as cursor:
+            available = set(connection.introspection.table_names(cursor))
+
+        if ReceiptDispatchOutbox._meta.db_table not in available:
+            raise NotFound("Receipt outbox storage is unavailable.")
+
+        entry = ReceiptDispatchOutbox.objects.using(alias).filter(
             pk=identifier
         ).first()
 

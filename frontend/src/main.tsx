@@ -11,6 +11,8 @@ import { BrandedFooter } from './BrandedFooter';
 import { ProjectBrowser } from './ProjectBrowser';
 import { ProjectStatusDashboard } from './ProjectStatusDashboard';
 import { InstallationScheduling } from './InstallationScheduling';
+import { CompletionPreflightReview4586 } from './CompletionPreflightReview4586';
+import { CustomerPayments4716 } from './CustomerPayments4716';
 import { TechnicianAssignments } from './TechnicianAssignments';
 import { AuditHistory } from './AuditHistory';
 import { ContractorDirectory } from './ContractorDirectory';
@@ -78,10 +80,11 @@ function App(){
  const [customers,setCustomers]=useState<Customer[]>([]), [people,setPeople]=useState<Person[]>([]), [projectRefresh,setProjectRefresh]=useState(0), [selected,setSelected]=useState<Project|null>(null);
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null), [reason,setReason]=useState(''), [history,setHistory]=useState<MSR[]>([]);
  const [documents,setDocuments]=useState<PreparedDocument[]>([]);
- const [panel,setPanel]=useState<'projects'|'dashboard'|'installation'|'customer'|'project'|'accounts'|'customers'|'audit'|'completionInspection'|'technicianAssignments'|'contractorDirectory'|'marketingMsrs'|'visibleMsrs' | 'productCatalog'>('projects');
+ const [panel,setPanel]=useState<'projects'|'dashboard'|'installation'|'customer'|'project'|'accounts'|'customers'|'audit'|'completionInspection'|'technicianAssignments'|'contractorDirectory'|'marketingMsrs'|'visibleMsrs' | 'productCatalog' | 'customerPayments'>('projects');
   const [projectCustomerId,setProjectCustomerId]=useState('');
   const [workflowIntent,setWorkflowIntent]=useState<'none'|'completion'>('none');
   const [installationFocusId,setInstallationFocusId]=useState<string | null>(null);
+  const [evidenceProjectId,setEvidenceProjectId]=useState('');
  async function run(job:()=>Promise<void>){setBusy(true);setError('');try{await job();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  async function load(){
   const c:Customer[]=[];
@@ -142,24 +145,69 @@ function App(){
     snapshot?.payment_option === requiredPaymentOption
   );
  return <><header><div className="brand">VERIDIAN <span>Business Operations &amp; Management System</span></div><div>{user.username} <span className="badge">{user.role.replaceAll('_',' ')}</span><button className="quiet" onClick={()=>void run(async()=>{await api('logout/','POST',{});setUser(null);setSelected(null);setInstallationFocusId(null);setPanel('projects');})}>Sign out</button></div></header><main>
- <div className="title"><div>{panel==='contractorDirectory'?<p className="eyebrow">VERIDIAN / CONTRACTOR COMPENSATION</p>:panel==='technicianAssignments'||panel==='installation'||panel==='dashboard'?<p className="eyebrow">VERIDIAN / OPERATIONS</p>:null}<h1>{panel==='productCatalog'?'Product Catalog':panel==='contractorDirectory'?'Contractor Directory':panel==='technicianAssignments'?'Technician Assignments':panel==='installation'?'Installation Scheduling':panel==='dashboard'?'Project Status Dashboard':panel==='visibleMsrs'?'Master Sales Records':'Customers & projects'}</h1></div><div className="actions">{panel!=='contractorDirectory'&&panel!=='visibleMsrs'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<button className="quiet" onClick={()=>void run(()=>refresh(selected?.id))} disabled={busy}>Refresh</button>}{panel!=='contractorDirectory'&&panel!=='visibleMsrs'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<><button onClick={()=>setPanel('customer')}>Add customer</button><button disabled={busy} onClick={()=>void run(async()=>{await load();setProjectCustomerId('');setPanel('project');})}>Create project</button></>}</div></div>
+ <div className="title"><div>{panel==='contractorDirectory'?<p className="eyebrow">VERIDIAN / CONTRACTOR COMPENSATION</p>:panel==='technicianAssignments'||panel==='installation'||panel==='dashboard'?<p className="eyebrow">VERIDIAN / OPERATIONS</p>:null}<h1>{panel==='customerPayments'?'Customer Payments':panel==='productCatalog'?'Product Catalog':panel==='contractorDirectory'?'Contractor Directory':panel==='technicianAssignments'?'Technician Assignments':panel==='installation'?'Installation Scheduling':panel==='dashboard'?'Project Status Dashboard':panel==='visibleMsrs'?'Master Sales Records':'Customers & projects'}</h1></div><div className="actions">{panel!=='contractorDirectory'&&panel!=='visibleMsrs'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<button className="quiet" onClick={()=>void run(()=>refresh(selected?.id))} disabled={busy}>Refresh</button>}{panel!=='contractorDirectory'&&panel!=='visibleMsrs'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<><button onClick={()=>setPanel('customer')}>Add customer</button><button disabled={busy} onClick={()=>void run(async()=>{await load();setProjectCustomerId('');setPanel('project');})}>Create project</button></>}</div></div>
  {error&&<div role="alert" className="error">{error}</div>}
-   <div className="veridian-navigation-row"><button className="quiet" type="button" onClick={()=>setPanel('dashboard')}>Project Status Dashboard</button><button className="quiet" type="button" onClick={()=>{setInstallationFocusId(null);setPanel('installation');}}>Installation Scheduling</button>{['INSTALLATION_MANAGER','CEO','COMPTROLLER'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('technicianAssignments')}>Technician Assignments</button>}{['CEO','COMPTROLLER'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('contractorDirectory')}>Contractor Compensation</button>}{['customers','accounts','audit','completionInspection','installation','technicianAssignments','contractorDirectory','visibleMsrs','productCatalog'].includes(panel)&&<button className="quiet veridian-return-button" type="button" onClick={()=>setPanel('projects')}>Return to Customers &amp; Projects</button>}</div>
+   <div className="veridian-navigation-row"><button className="quiet" type="button" onClick={()=>setPanel('dashboard')}>Project Status Dashboard</button><button className="quiet" type="button" onClick={()=>{setInstallationFocusId(null);setPanel('installation');}}>Installation Scheduling</button>{['INSTALLATION_MANAGER','CEO','COMPTROLLER'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('technicianAssignments')}>Technician Assignments</button>}{['CEO','COMPTROLLER'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('contractorDirectory')}>Contractor Compensation</button>}{user.role==='COMPTROLLER'&&<button className="quiet" type="button" onClick={()=>setPanel('customerPayments')}>Customer Payments</button>}{['customers','accounts','audit','completionInspection','installation','technicianAssignments','contractorDirectory','visibleMsrs','productCatalog'].includes(panel)&&<button className="quiet veridian-return-button" type="button" onClick={()=>setPanel('projects')}>Return to Customers &amp; Projects</button>}</div>
     
    {user.role==='MARKETING'&&<button className="quiet" type="button" onClick={()=>setPanel('marketingMsrs')}>Master Sales Records</button>}
   {['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('visibleMsrs')}>View Master Sales Records</button>}
 {['SALES_MANAGER','INSTALLATION_MANAGER'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('productCatalog')}>Manage Product Catalog</button>}
   {panel==='productCatalog'&&['SALES_MANAGER','INSTALLATION_MANAGER'].includes(user.role)&&<NamedProductCatalog4547 api={api}/>}
+  {panel==='customerPayments'&&user.role==='COMPTROLLER'&&
+    <div className="installation-evidence-nav-actions">
+      <button type="button" className="quiet"
+        onClick={() => {
+          setInstallationFocusId(evidenceProjectId || null);
+          setPanel('installation');
+        }}>
+        Return to Installation Scheduling
+      </button>
+    </div>}
+    {panel==='customerPayments'&&user.role==='COMPTROLLER'&&<CustomerPayments4716 api={api} selectedProjectId={evidenceProjectId} onBack={()=>setPanel('projects')}/>}
   {panel==='marketingMsrs'&&user.role==='MARKETING'&&<MarketingMSRDirectory api={api}/>}
   {panel==='visibleMsrs'&&['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<VisibleMSRDirectory api={api}/>}
 {panel==='dashboard'&&<ProjectStatusDashboard onOpenProject={['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role) ? openDashboardProject : undefined} onReviewInstallation={reviewDashboardInstallation} onBack={()=>setPanel(['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)?'projects':'installation')} backLabel={['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)?'Back to Customers & Projects':'Back to Installation Scheduling'}/>}
   {panel==='technicianAssignments'&&['INSTALLATION_MANAGER','CEO','COMPTROLLER'].includes(user.role)&&<TechnicianAssignments api={api}/>}
   {panel==='contractorDirectory'&&['CEO','COMPTROLLER'].includes(user.role)&&<ContractorDirectory api={api} onBack={()=>setPanel(user.role==='CEO'?'dashboard':'projects')} returnLabel={user.role==='CEO'?'Return to Project Status Dashboard':'Return to Customers & Projects'}/>}
- {panel==='installation'&&<InstallationScheduling
+ {panel==='installation'&&user.role==='COMPTROLLER'&&
+    <section className="installation-evidence-navigation">
+      <h3>Resolve Installation Readiness Evidence</h3>
+      <p>
+        Review outstanding payment or cancellation evidence using
+        the existing authorized workspaces. Navigation does not
+        verify evidence or authorize installation.
+      </p>
+      <div className="installation-evidence-nav-actions">
+        <button type="button"
+          disabled={busy || !evidenceProjectId} onClick={() => setPanel('customerPayments')}>
+          Review Customer Payments
+        </button>
+        <button type="button" className="veridian-project-evidence-button"
+          disabled={busy || !evidenceProjectId}
+          onClick={() => {
+            const projectId = evidenceProjectId;
+            void run(async () => {
+              await openProjectDetail(projectId);
+              setWorkflowIntent('none');
+              setPanel('projects');
+            });
+          }}>
+          Review Selected Project Evidence
+        </button>
+      </div>
+      <p className="muted">
+        First select the project under Schedule an installation. Then use Review Selected Project Evidence. For cancellation evidence, review the approved project in
+        Customers &amp; Projects. Open Signing review and then
+        Project verification evidence. Verify the correct MSR version
+        before recording any attestation.
+      </p>
+    </section>}
+    {panel==='installation'&&<InstallationScheduling
     api={api}
     selectedProjectId={installationFocusId ?? undefined}
     onProjectSelected={(id) => {
       setInstallationFocusId(null);
+      setEvidenceProjectId(id);
       if (!['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)) return;
       void run(async () => {
         const project = await api<Project>(`projects/${id}/`);
@@ -196,7 +244,29 @@ function App(){
     <p className="muted">Before installation, verify the customer's signed Contract, the applicable cancellation deadline, and the five-calendar-day waiting period measured from the verified Contract signature. Confirm the required deposit has cleared and been bank-verified, or that a valid CEO-approved project-specific payment exception applies. The customer Invoice signature is not a pre-installation requirement. Physical equipment serial numbers must also be recorded before installation, unless an authorized unit-specific exception applies.</p><div className="actions">{editable&&<><button disabled={busy} onClick={()=>void run(()=>change('edit'))}>Save draft</button><button disabled={busy||!submitPaymentReady} title={!submitPaymentReady?'Choose financing and its required payment option before submitting.':undefined} onClick={()=>void run(async()=>{if(!submitPaymentReady)throw new Error('Choose financing and the required payment option before submitting.');await api(`msrs/${selected.pending!.id}/transition/`,'POST',{action:'edit',expected_sequence:selected.pending!.edit_sequence,snapshot});const p=await api<Project>(`projects/${selected.id}/`);choose(p);await api(`msrs/${p.pending!.id}/transition/`,'POST',{action:'submit',expected_sequence:p.pending!.edit_sequence});await refresh(selected.id);})}>Save & submit</button></>}{selected.state!=='CANCELLED'&&selected.pending.status==='SUBMITTED'&&approver&&<><button disabled={busy} onClick={()=>void run(()=>change('approve'))}>Approve version</button><button disabled={busy||!reason.trim()} className="quiet" onClick={()=>void run(()=>change('reject'))}>Reject with reason</button></>}</div></>:<p className="muted">The approved record is locked. Create a revision to change any commercial field.</p>}
  <label>Review note / revision reason<textarea aria-label="Review note / revision reason" value={reason} onChange={e=>setReason(e.target.value)}/></label>{selected.state!=='CANCELLED'&&selected.current_approved&&!selected.pending&&<button disabled={busy||!reason.trim()} onClick={()=>void run(async()=>{await api(`projects/${selected.id}/revision/`,'POST',{reason,expected_approved_id:selected.current_approved!.id});await refresh(selected.id);})}>Create revision</button>}
  <div className="documents"><h3>Documents</h3><ApprovedMSRSource4530 api={api} projectId={selected.id}/><FictionalDocumentPreviews4525/><div className="veridian-guide-banner veridian-guide-banner--info"><strong>Contracts and Invoices - Preparation Guide</strong><p><strong>Step 1 - Check approval.</strong> A contract or invoice can be prepared after the Master Sales Record is approved.</p><p><strong>Step 2 - Prepare the documents.</strong> Select Prepare contract or Prepare invoice. Each action creates an unsigned preparation copy.</p><p><strong>Step 3 - Review the PDFs.</strong> Download each prepared document. Check the customer information, work details, pricing, and payment terms before proceeding.</p><p><strong>Step 4 - Review signing.</strong> Use the Signing review section to check who will sign and in what order. For contracts and invoices, the customer signs first. Preparing or downloading a PDF does not mean it has been sent or signed. Electronic sending is not yet enabled.</p></div><p className="muted">Prepare unsigned interactive PDFs from the current approved MSR. Completion certificates are preparation copies; work completion and signature dates stay blank.</p>{selected.current_approved&&approver&&selected.state!=='CANCELLED'&&<div className="actions">{['CONTRACT','INVOICE',...(selected.current_approved.snapshot.financing_type==='FINANCED'?['COMPLETION_FINANCED']:selected.current_approved.snapshot.financing_type==='NON_FINANCED'?['COMPLETION_NON_FINANCED']:[])].map(kind=><button className="quiet" disabled={busy} key={kind} onClick={()=>void run(async()=>{await api(`msrs/${selected.current_approved!.id}/documents/`,'POST',{kind});setDocuments(await api<PreparedDocument[]>(`projects/${selected.id}/documents/`));})}>{kind==='CONTRACT'?'Prepare contract':kind==='INVOICE'?'Prepare invoice':'Prepare completion certificate'}</button>)}</div>}{!selected.current_approved&&<p className="muted">Document preparation becomes available after approval.</p>}{documents.map(doc=><div key={doc.id} className="document-row"><div><strong>{doc.kind.replaceAll('_',' ')}</strong><span>MSR {doc.msr_version}.0 - Unsigned preparation copy - Renderer {doc.renderer_version}</span><span>Prepared {new Date(doc.created_at).toLocaleString('en-US',{dateStyle:'medium',timeStyle:'short',timeZone:'America/New_York'})} ET</span></div><a href={doc.download_url}>Download PDF</a></div>)}</div>
- <SigningReview key={`${selected.id}-${selected.current_approved?.id}`} projectId={selected.id} msrId={selected.current_approved?.id} workflowIntent={workflowIntent} finance={selected.current_approved?.snapshot.financing_type} active={selected.state!=='CANCELLED'} approver={approver} comptroller={user.role==='COMPTROLLER'} actorId={user.id} busy={busy} api={api} run={run}/>
+ {approver && selected.current_approved &&
+    <section className="documents">
+      <h3>Project Completion Review</h3>
+      <p className="muted">
+        Read-only administrative completion assessment for the selected
+        approved project. Operational installation completion is not
+        administrative project completion. Candidate documents, local
+        email observations, and unverified signing attempts do not
+        establish verified evidence or authorize completion.
+      </p>
+      <CompletionPreflightReview4586
+        key={`${selected.id}-${selected.current_approved.id}`}
+        projectId={selected.id}
+        projectCode={selected.code}
+      />
+      <p className="muted">
+        The exact final Receipt PDF, authenticated evidence of its email
+        delivery, and the correctly matched, provider-verified completed
+        DocuSign Completion Certificate are mandatory.
+        The Customer Satisfaction Survey is optional.
+      </p>
+    </section>}
+  <SigningReview key={`${selected.id}-${selected.current_approved?.id}`} projectId={selected.id} msrId={selected.current_approved?.id} workflowIntent={workflowIntent} finance={selected.current_approved?.snapshot.financing_type} active={selected.state!=='CANCELLED'} approver={approver} comptroller={user.role==='COMPTROLLER'} actorId={user.id} busy={busy} api={api} run={run}/>
  {approver&&<button className="quiet" disabled={busy||!reason.trim()} onClick={()=>void run(async()=>{await api(`projects/${selected.id}/state/`,'POST',{action:selected.state==='CANCELLED'?'reopen':'cancel',reason,expected_state:selected.state});await refresh(selected.id);})}>{selected.state==='CANCELLED'?'Reopen project':'Cancel project'}</button>}
  </section></>}</article></div>}<BrandedFooter versionLabel={APP_VERSION_LABEL} /></main></>;
 }

@@ -275,6 +275,7 @@ class Document(Entity):
     class Kind(models.TextChoices):
         CONTRACT = 'CONTRACT', 'Project SOW agreement'
         INVOICE = 'INVOICE', 'HVAC invoice'
+        RECEIPT = 'RECEIPT', 'Final customer Receipt'
         COMPLETION_FINANCED = 'COMPLETION_FINANCED', 'Financed completion certificate'
         COMPLETION_NON_FINANCED = 'COMPLETION_NON_FINANCED', 'Non-financed completion certificate'
     msr = models.ForeignKey(MSR, on_delete=models.PROTECT, related_name='documents')

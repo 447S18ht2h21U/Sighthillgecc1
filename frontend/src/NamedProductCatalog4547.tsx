@@ -31,6 +31,7 @@ const bulkCsvPath = 'development-product-catalogs/bulk-csv/';
 
 type BulkReadiness = {
   available: boolean;
+  import_available: boolean;
   max_bytes: number;
   max_rows: number;
   required_columns: string[];
@@ -87,6 +88,11 @@ export function NamedProductCatalog4547({api}: {api: API}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [actionFeedback, setActionFeedback] = useState<{
+    scope: string;
+    status: 'working' | 'success' | 'error';
+    message: string;
+  } | null>(null);
   const [ruudReady, setRuudReady] =
     useState<RuudReadiness | null>(null);
   const [ruudReadinessError, setRuudReadinessError] =
@@ -243,17 +249,41 @@ export function NamedProductCatalog4547({api}: {api: API}) {
     return () => { cancelled = true; };
   }, [api, catalogId]);
 
-  async function run(action: () => Promise<void>) {
+  async function run(
+    action: () => Promise<void>,
+    scope = 'general',
+    successMessage = 'Action completed successfully.',
+  ) {
     if (busy) return;
     setBusy(true);
     setError('');
     setNotice('');
+    setActionFeedback(scope === 'general' ? null : {
+      scope,
+      status: 'working',
+      message: 'Processing...',
+    });
     try {
       await action();
+      if (scope !== 'general') {
+        setActionFeedback({
+          scope,
+          status: 'success',
+          message: successMessage,
+        });
+      }
     } catch (cause) {
-      setError(cause instanceof Error
+      const message = cause instanceof Error
         ? cause.message
-        : 'Catalog operation failed.');
+        : 'Catalog operation failed.';
+      setError(message);
+      if (scope !== 'general') {
+        setActionFeedback({
+          scope,
+          status: 'error',
+          message: `Unable to complete action: ${message}`,
+        });
+      }
     } finally {
       setBusy(false);
     }
@@ -288,6 +318,79 @@ export function NamedProductCatalog4547({api}: {api: API}) {
     setReason('');
     setDeactivating({kind, id, label});
   }
+
+  function feedbackFor(scope: string) {
+    if (actionFeedback?.scope !== scope) return null;
+    return <span
+      role={actionFeedback.status === 'error' ? 'alert' : 'status'}
+      aria-live="polite"
+      className={`catalog-action-feedback ${actionFeedback.status}`}
+    >
+      {actionFeedback.message}
+    </span>;
+  }
+
+  const deactivationForm = (
+    kind: 'catalog' | 'product', id: string,
+  ) => deactivating?.kind === kind && deactivating.id === id
+    ? <form
+        className="catalog-inline-confirmation"
+        onSubmit={event => {
+      event.preventDefault();
+      void run(async () => {
+        if (deactivating.kind === 'catalog') {
+          await api(
+            `${endpoint}${deactivating.id}/`,
+            'DELETE', {reason},
+          );
+          await refreshCatalogs();
+          setNotice('Catalog deactivated. Historical records retained.');
+        } else {
+          await api(
+            `${endpoint}${catalogId}/products/${deactivating.id}/`,
+            'DELETE', {reason},
+          );
+          await refreshProducts(catalogId);
+          setNotice('Product deactivated. Historical records retained.');
+        }
+        setDeactivating(null);
+        setReason('');
+      },
+        deactivating.kind === 'catalog'
+          ? `catalog:${deactivating.id}`
+          : `product:${deactivating.id}`,
+        deactivating.kind === 'catalog'
+          ? 'Catalog deactivated successfully.'
+          : 'Product deactivated successfully.',
+      );
+    }}>
+      <h3>
+        Deactivate {deactivating.kind === 'catalog'
+          ? 'Catalog' : 'Product'}: {deactivating.label}
+      </h3>
+      <p className="muted">
+        Deactivation prevents future selection. Previous revisions
+        and customer document snapshots are not deleted.
+      </p>
+      <label>
+        Reason for Deactivation
+        <textarea
+          required rows={3} minLength={10} maxLength={1000}
+          value={reason}
+          onChange={event => setReason(event.target.value)}
+        />
+      </label>
+      <button type="submit" className="catalog-confirm-primary"
+        disabled={busy || reason.trim().length < 10}
+      >
+        Confirm Deactivation
+      </button>
+      <button type="button" className="quiet catalog-cancel"
+        onClick={() => setDeactivating(null)}
+      >
+        Cancel
+      </button>
+    </form> : null;
 
   return <section aria-label="Named product catalogs">
     <h2>Product Catalog Management</h2>
@@ -417,6 +520,7 @@ export function NamedProductCatalog4547({api}: {api: API}) {
           Preview CSV Products
         </button>
       </fieldset>
+      {feedbackFor('csv-import')}
 
       {bulkPreview && bulkReady?.available && (
         <div>
@@ -438,9 +542,14 @@ export function NamedProductCatalog4547({api}: {api: API}) {
               </div>
             )}
           </div>
+          <p className="muted" role="status">
+            {bulkReady.import_available
+              ? 'Confirmed import is available in this local development environment.'
+              : 'Preview only. Importing into the development database is not yet authorized.'}
+          </p>
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || !bulkReady.import_available}
             onClick={() => void run(async () => {
               const preview = bulkPreview;
               const result = await api<{
@@ -468,7 +577,7 @@ export function NamedProductCatalog4547({api}: {api: API}) {
               setNotice(
                 `${result.added} products imported into ${result.catalog_name} with audit history.`
               );
-            })}
+            }, 'csv-import', 'Catalog imported successfully.')}
           >
             Confirm Import of {bulkPreview.count} Products
           </button>
@@ -593,6 +702,8 @@ export function NamedProductCatalog4547({api}: {api: API}) {
             Deactivate Catalog
           </button>
         }
+        {feedbackFor(`catalog:${selected.id}`)}
+        {deactivationForm('catalog', selected.id)}
       </div>
     }
 
@@ -732,57 +843,11 @@ export function NamedProductCatalog4547({api}: {api: API}) {
             Deactivate
           </button>
         </>}
+        {feedbackFor(`product:${product.id}`)}
+        {deactivationForm('product', product.id)}
       </div>
     )}
 
-    {deactivating && <form onSubmit={event => {
-      event.preventDefault();
-      void run(async () => {
-        if (deactivating.kind === 'catalog') {
-          await api(
-            `${endpoint}${deactivating.id}/`,
-            'DELETE', {reason},
-          );
-          await refreshCatalogs();
-          setNotice('Catalog deactivated. Historical records retained.');
-        } else {
-          await api(
-            `${endpoint}${catalogId}/products/${deactivating.id}/`,
-            'DELETE', {reason},
-          );
-          await refreshProducts(catalogId);
-          setNotice('Product deactivated. Historical records retained.');
-        }
-        setDeactivating(null);
-        setReason('');
-      });
-    }}>
-      <h3>
-        Deactivate {deactivating.kind === 'catalog'
-          ? 'Catalog' : 'Product'}: {deactivating.label}
-      </h3>
-      <p className="muted">
-        Deactivation prevents future selection. Previous revisions
-        and customer document snapshots are not deleted.
-      </p>
-      <label>
-        Reason for Deactivation
-        <textarea
-          required rows={3} minLength={10} maxLength={1000}
-          value={reason}
-          onChange={event => setReason(event.target.value)}
-        />
-      </label>
-      <button type="submit"
-        disabled={busy || reason.trim().length < 10}
-      >
-        Confirm Deactivation
-      </button>
-      <button type="button" className="quiet"
-        onClick={() => setDeactivating(null)}
-      >
-        Cancel
-      </button>
-    </form>}
+
   </section>;
 }

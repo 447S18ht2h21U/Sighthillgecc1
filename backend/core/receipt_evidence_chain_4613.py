@@ -48,8 +48,8 @@ def assess_receipt_chain(*, project, documents, outboxes, observations):
     for doc in documents:
         if (
             getattr(doc, "msr_id", None) != msr_id
-            or getattr(doc, "kind", None) != Document.Kind.INVOICE
-            or getattr(doc, "status", None) != "PREPARATION"
+            or getattr(doc, "kind", None) != Document.Kind.RECEIPT
+            or getattr(doc, "status", None) != "FINAL"
         ):
             continue
         try:
@@ -115,7 +115,7 @@ def inspect_receipt_chain(project):
     return assess_receipt_chain(
         project=project,
         documents=Document.objects.filter(
-            msr_id=msr.pk, kind=Document.Kind.INVOICE
+            msr_id=msr.pk, kind=Document.Kind.RECEIPT
         ),
         outboxes=ReceiptDispatchOutbox.objects.filter(
             project_id=project.pk, msr_id=msr.pk

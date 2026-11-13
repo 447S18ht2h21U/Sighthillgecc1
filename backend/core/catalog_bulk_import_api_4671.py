@@ -6,6 +6,9 @@ from django.core.exceptions import (
     ValidationError as DjangoValidationError,
 )
 from django.http import Http404
+from django.db import connection
+from django.db.utils import OperationalError, ProgrammingError
+from .models import ProductCatalogCollection
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -15,7 +18,9 @@ from rest_framework.response import Response
 from .catalog_bulk_import_service_4670 import (
     MAX_BYTES,
     _require_isolated_import,
+    _require_persistent_import_authorization,
     import_catalog_csv,
+    import_catalog_csv_persistent,
     preview_catalog_csv,
 )
 from .equipment_catalog_policy import manager_may_manage_equipment
@@ -35,9 +40,26 @@ def _authorized(request):
 
 def _available():
     try:
-        _require_isolated_import()
+        name = str(connection.settings_dict.get("NAME", ""))
+        if name in (
+            ":memory:",
+            "file:memorydb_default?mode=memory&cache=shared",
+        ):
+            _require_isolated_import()
+        else:
+            _require_persistent_import_authorization()
         return True
     except RuntimeError:
+        return False
+
+
+def _preview_available():
+    # Only the existing local-development manager API can call this.
+    # Schema availability does not authorize persistent writes.
+    try:
+        ProductCatalogCollection.objects.exists()
+        return True
+    except (OperationalError, ProgrammingError):
         return False
 
 
@@ -113,11 +135,13 @@ def _execute(call):
 @permission_classes([IsAuthenticated])
 def bulk_csv(request):
     _authorized(request)
-    available = _available()
+    import_available = _available()
+    preview_available = _preview_available()
 
     if request.method == "GET":
         response = Response({
-            "available": available,
+            "available": preview_available,
+            "import_available": import_available,
             "max_bytes": MAX_BYTES,
             "max_rows": 500,
             "required_columns": [
@@ -127,15 +151,17 @@ def bulk_csv(request):
                 "description",
             ],
             "reason": (
-                "Disposable development catalog import available."
-                if available else
-                "Persistent catalog activation pending; CSV import disabled."
+                "CSV preview and authorized catalog import are available."
+                if import_available else
+                "CSV preview is available. Persistent imports require separate authorization."
+                if preview_available else
+                "Catalog schema is unavailable; preview and import disabled."
             ),
         })
         response["Cache-Control"] = "private, no-store"
         return response
 
-    if not available:
+    if not preview_available:
         raise Http404()
 
     values = _input(request.data)
@@ -158,6 +184,8 @@ def bulk_csv(request):
             "persistent_activation": False,
         })
     else:
+        if not import_available:
+            raise Http404()
         if (
             type(values["supplied_confirmation"]) is not str
             or values["supplied_confirmation"] != values["confirmation"]
@@ -165,7 +193,16 @@ def bulk_csv(request):
             raise ValidationError(
                 "Preview confirmation does not match this CSV and catalog."
             )
-        catalog, added = _execute(lambda: import_catalog_csv(**kwargs))
+        name = str(connection.settings_dict.get("NAME", ""))
+        if name in (
+            ":memory:",
+            "file:memorydb_default?mode=memory&cache=shared",
+        ):
+            operation = import_catalog_csv
+        else:
+            operation = import_catalog_csv_persistent
+
+        catalog, added = _execute(lambda: operation(**kwargs))
         response = Response({
             "catalog_id": str(catalog.pk),
             "catalog_name": catalog.name,

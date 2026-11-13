@@ -1,5 +1,6 @@
 """Isolated HTTP acceptance for CSV preview and confirmed import."""
 from django.test import TestCase, override_settings
+from unittest.mock import patch
 from rest_framework.test import APIClient
 
 from .models import (
@@ -49,6 +50,32 @@ class BulkCatalogAPIAcceptance4671(TestCase):
         response = self.client.get(URL)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["available"])
+
+    def test_persistent_import_disabled_but_preview_available(self):
+        with patch(
+            "core.catalog_bulk_import_api_4671._available",
+            return_value=False,
+        ):
+            readiness = self.client.get(URL)
+            self.assertEqual(readiness.status_code, 200)
+            self.assertTrue(readiness.data["available"])
+            self.assertFalse(readiness.data["import_available"])
+
+            preview = self.client.post(
+                URL, self.payload(), format="json"
+            )
+            self.assertEqual(preview.status_code, 200)
+            self.assertEqual(preview.data["count"], 2)
+
+            denied = self.client.post(
+                URL,
+                self.payload("import", preview.data["confirmation"]),
+                format="json",
+            )
+            self.assertEqual(denied.status_code, 404)
+
+        self.assertEqual(EquipmentCatalogItem.objects.count(), 0)
+        self.assertEqual(AuditEvent.objects.count(), 0)
 
     def test_preview_is_read_only(self):
         response = self.client.post(

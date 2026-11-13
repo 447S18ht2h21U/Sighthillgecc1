@@ -93,6 +93,17 @@ def confirm_customer_payment_bank_availability(
             "The payment must have a valid amount and verification."
         )
 
+    # A repeated reference makes bank-evidence attribution ambiguous.
+    # Preserve historical records; require controlled reconciliation.
+    if CustomerPayment.objects.filter(
+        project_id=payment.project_id,
+        payment_reference=payment.payment_reference,
+    ).exclude(pk=payment.pk).exists():
+        raise ValidationError(
+            "Duplicate payment reference requires review before "
+            "bank availability can be confirmed."
+        )
+
     if CustomerPaymentBankConfirmation.objects.filter(
         payment=payment
     ).exists():
