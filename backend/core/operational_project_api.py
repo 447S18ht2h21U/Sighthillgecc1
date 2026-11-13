@@ -259,13 +259,98 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
         url_path="completion-signature-status",
     )
     def completion_signature_status(self, request, pk=None):
+        """Read-only administrative state; not signature verification."""
+        from django.db import connections, router
+        from django.db.models import Count
+        from rest_framework.exceptions import PermissionDenied
+        from .models import CompletionEnvelopeAttempt
+        from .services import authorize
+
         project = self.get_object()
-        return Response({
-            "project_id": project.id,
-            "status": "VERIFICATION_PENDING",
+        actor = User.objects.filter(
+            pk=request.user.pk, is_active=True
+        ).first()
+        if actor is None:
+            raise PermissionDenied("Active completion reviewer required.")
+
+        # Visibility of a project does not itself confer approval rights.
+        authorize(actor, project, approval=True)
+
+        common = {
+            "project_id": str(project.pk),
+            "read_only": True,
             "provider_verified": False,
             "installation_complete_qualified": False,
-            "reason": "Trusted completion-signature verification is not yet available.",
+            "completion_authorized": False,
+            "retry_authorized": False,
+        }
+
+        approved = project.current_approved
+        if (
+            project.state == "CANCELLED"
+            or approved is None
+            or approved.status != "APPROVED"
+            or approved.project_id != project.pk
+        ):
+            return Response({
+                **common,
+                "status": "PREREQUISITES_MISSING",
+                "attempt_count": 0,
+                "attempt_states": [],
+                "reason": "An active project and current approved MSR are required.",
+            })
+
+        alias = router.db_for_read(CompletionEnvelopeAttempt)
+        connection = connections[alias]
+        with connection.cursor() as cursor:
+            available = set(connection.introspection.table_names(cursor))
+
+        if CompletionEnvelopeAttempt._meta.db_table not in available:
+            return Response({
+                **common,
+                "status": "SCHEMA_UNAVAILABLE",
+                "attempt_count": 0,
+                "attempt_states": [],
+                "reason": "Envelope attempt storage is unavailable.",
+            })
+
+        rows = list(
+            CompletionEnvelopeAttempt.objects.using(alias).filter(
+                release_package__plan__msr_id=approved.pk
+            ).values("state").annotate(
+                count=Count("pk")
+            ).order_by("state")
+        )
+
+        known_states = {
+            "AUTH_PENDING",
+            "NETWORK_STARTED",
+            "SENT_UNCHECKED",
+            "SEND_UNCERTAIN",
+            "CANCELLED_UNSENT",
+        }
+
+        states = [
+            {
+                "state": (
+                    row["state"]
+                    if row["state"] in known_states
+                    else "UNKNOWN_UNVERIFIED"
+                ),
+                "count": row["count"],
+            }
+            for row in rows
+        ]
+
+        return Response({
+            **common,
+            "status": "ATTEMPTS_UNVERIFIED" if rows else "NO_ATTEMPTS",
+            "attempt_count": sum(row["count"] for row in rows),
+            "attempt_states": states,
+            "reason": (
+                "Recorded envelope attempts do not independently "
+                "verify DocuSign signatures or authorize completion."
+            ),
         })
 
     def finalize_response(self, request, response, *args, **kwargs):

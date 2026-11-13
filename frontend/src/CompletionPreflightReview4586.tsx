@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 type CompletionRequirement = {
   key: string;
@@ -19,6 +19,20 @@ type ReceiptEvidence = {
   customer_delivery_verified: false;
   completion_authorized: false;
   blockers: string[];
+};
+
+type EnvelopeStatus = {
+  project_id: string;
+  read_only: true;
+  status: 'PREREQUISITES_MISSING' | 'SCHEMA_UNAVAILABLE'
+    | 'ATTEMPTS_UNVERIFIED' | 'NO_ATTEMPTS';
+  attempt_count: number;
+  attempt_states: { state: string; count: number }[];
+  provider_verified: false;
+  installation_complete_qualified: false;
+  completion_authorized: false;
+  retry_authorized: false;
+  reason: string;
 };
 
 type CompletionPreflight = {
@@ -47,20 +61,38 @@ export function CompletionPreflightReview4586({
   projectCode: string;
 }) {
   const [report, setReport] = useState<CompletionPreflight | null>(null);
+  const [envelopeStatus, setEnvelopeStatus] = useState<EnvelopeStatus | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const requestSequence = useRef(0);
 
-  async function review() {
+  // Never display evidence belonging to a previously selected project.
+  useEffect(() => {
+    requestSequence.current += 1;
+    setReport(null);
+    setEnvelopeStatus(null);
+    setError('');
+    setLoading(false);
+    setExpanded(false);
+    return () => {
+      requestSequence.current += 1;
+    };
+  }, [projectId]);
+
+  async function review(forceRefresh = false) {
     if (loading) return;
-    if (expanded) {
+    if (expanded && !forceRefresh) {
+      requestSequence.current += 1;
       setExpanded(false);
       return;
     }
 
-    setLoading(true);
-    setError('');
+    const sequence = ++requestSequence.current;
     setReport(null);
+    setEnvelopeStatus(null);
+    setError('');
+    setLoading(true);
     setExpanded(true);
 
     try {
@@ -143,11 +175,66 @@ export function CompletionPreflightReview4586({
         throw new Error('Completion evidence response failed the safety checks.');
       }
 
-      setReport(data);
+      const envelopeResponse = await fetch(
+        `/api/operational-projects/${encodeURIComponent(projectId)}/completion-signature-status/`,
+        {
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store',
+        },
+      );
+
+      if (!envelopeResponse.ok) {
+        throw new Error('Completion envelope status is unavailable.');
+      }
+
+      const envelope: EnvelopeStatus = await envelopeResponse.json();
+      const total = Array.isArray(envelope.attempt_states)
+        ? envelope.attempt_states.reduce(
+            (sum, item) => sum + (
+              item != null &&
+              Number.isSafeInteger(item.count) &&
+              item.count >= 0 ? item.count : 0
+            ), 0
+          )
+        : -1;
+
+      if (
+        envelope.project_id !== projectId ||
+        envelope.read_only !== true ||
+        envelope.provider_verified !== false ||
+        envelope.installation_complete_qualified !== false ||
+        envelope.completion_authorized !== false ||
+        envelope.retry_authorized !== false ||
+        !Number.isSafeInteger(envelope.attempt_count) ||
+        envelope.attempt_count < 0 ||
+        !Array.isArray(envelope.attempt_states) ||
+        !envelope.attempt_states.every(item =>
+          item !== null &&
+          typeof item.state === 'string' &&
+          Number.isSafeInteger(item.count) &&
+          item.count >= 0
+        ) ||
+        total !== envelope.attempt_count ||
+        !['PREREQUISITES_MISSING', 'SCHEMA_UNAVAILABLE',
+          'ATTEMPTS_UNVERIFIED', 'NO_ATTEMPTS'].includes(envelope.status) ||
+        typeof envelope.reason !== 'string'
+      ) {
+        throw new Error('Completion envelope status failed the safety checks.');
+      }
+
+      if (sequence === requestSequence.current) {
+        setReport(data);
+        setEnvelopeStatus(envelope);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Completion review unavailable.');
+      if (sequence === requestSequence.current) {
+        setError(err instanceof Error ? err.message : 'Completion review unavailable.');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) {
+        setLoading(false);
+      }
     }
   }
 
@@ -176,6 +263,17 @@ export function CompletionPreflightReview4586({
         >
           <h4>Administrative Project Completion</h4>
           <p><strong>Completion not authorized</strong></p>
+          <button
+            type="button"
+            className="quiet"
+            disabled={loading}
+            onClick={event => {
+              event.stopPropagation();
+              void review(true);
+            }}
+          >
+            {loading ? 'Refreshing evidence...' : 'Refresh evidence review'}
+          </button>
           <p className="muted">
             This read-only review does not change installation status or
             authorize project completion.
@@ -232,6 +330,26 @@ export function CompletionPreflightReview4586({
                       Customer email sending: Not provider-authenticated
                     </li>
                   </ul>
+                </>
+              )}
+              {envelopeStatus && (
+                <>
+                  <strong>DocuSign Completion Certificate activity</strong>
+                  <p>
+                    Recorded envelope attempts: {envelopeStatus.attempt_count}.
+                    {' '}These records do not verify signatures.
+                  </p>
+                  {envelopeStatus.attempt_states.length > 0 && (
+                    <ul>
+                      {envelopeStatus.attempt_states.map((item, index) => (
+                        <li key={`${item.state}-${index}`}>
+                          {item.state.replaceAll('_', ' ').toLowerCase()}:
+                          {' '}{item.count} unverified record(s)
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="muted">{envelopeStatus.reason}</p>
                 </>
               )}
               <p>Customer Satisfaction Survey: Optional</p>
