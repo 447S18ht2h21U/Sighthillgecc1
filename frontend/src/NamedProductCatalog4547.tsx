@@ -27,6 +27,25 @@ type API = <T>(
 const endpoint = 'development-product-catalogs/';
 const ruudImportPath =
   'development-product-catalogs/import-ruud-2026/';
+const bulkCsvPath = 'development-product-catalogs/bulk-csv/';
+
+type BulkReadiness = {
+  available: boolean;
+  max_bytes: number;
+  max_rows: number;
+  required_columns: string[];
+  reason: string;
+};
+
+type BulkPreview = {
+  count: number;
+  brands: string[];
+  rows: Details[];
+  confirmation: string;
+  csvText: string;
+  name: string;
+  description: string;
+};
 
 type RuudReadiness = {
   available: boolean;
@@ -73,6 +92,14 @@ export function NamedProductCatalog4547({api}: {api: API}) {
   const [ruudReadinessError, setRuudReadinessError] =
     useState('');
 
+  const [bulkReady, setBulkReady] = useState<BulkReadiness | null>(null);
+  const [bulkReadinessError, setBulkReadinessError] = useState('');
+  const [bulkFileName, setBulkFileName] = useState('');
+  const [bulkCsv, setBulkCsv] = useState('');
+  const [bulkName, setBulkName] = useState('');
+  const [bulkDescription, setBulkDescription] = useState('');
+  const [bulkPreview, setBulkPreview] = useState<BulkPreview | null>(null);
+
   const selected = catalogs.find(catalog => catalog.id === catalogId);
   const brands = Array.from(
     new Set(products.map(product => product.brand))
@@ -94,6 +121,64 @@ export function NamedProductCatalog4547({api}: {api: API}) {
     });
     return () => { cancelled = true; };
   }, [api]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api<BulkReadiness>(bulkCsvPath).then(value => {
+      if (!cancelled) setBulkReady(value);
+    }).catch(() => {
+      if (!cancelled) {
+        setBulkReady(null);
+        setBulkReadinessError(
+          'CSV import readiness could not be verified.'
+        );
+      }
+    });
+    return () => { cancelled = true; };
+  }, [api]);
+
+  function bulkPayload(
+    action: 'preview' | 'import',
+    csvText: string,
+    name: string,
+    description: string,
+    confirmation: string | null,
+  ) {
+    return {
+      action,
+      name,
+      description,
+      catalog_id: null,
+      csv_text: csvText,
+      confirmation,
+    };
+  }
+
+  async function selectBulkFile(file?: File) {
+    setBulkPreview(null);
+    setBulkCsv('');
+    setBulkFileName('');
+    setError('');
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setError('Select a CSV file with the four required columns.');
+      return;
+    }
+
+    if (file.size === 0 || file.size > (bulkReady?.max_bytes ?? 2000000)) {
+      setError('CSV file must contain 1 to 2,000,000 bytes.');
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      setBulkCsv(text);
+      setBulkFileName(file.name);
+    } catch {
+      setError('The selected CSV file could not be read.');
+    }
+  }
 
   async function refreshCatalogs(preferredId?: string) {
     const next = await api<Catalog[]>(endpoint);
@@ -247,6 +332,156 @@ export function NamedProductCatalog4547({api}: {api: API}) {
       >
         Import 15 Ruud Systems
       </button>
+    </section>
+
+    <section aria-label="Bulk CSV catalog import">
+      <h3>Import a Manufacturer Catalog (CSV)</h3>
+      <p className="muted">
+        Upload a CSV file containing these four columns, in order:
+        brand, residential_system_type, model_number, description.
+        Review every product before confirming. Maximum 500 products
+        per file. Historical catalog records remain protected.
+      </p>
+      <p className="muted" role="status">
+        {bulkReadinessError ||
+          bulkReady?.reason ||
+          'Checking protected CSV import availability...'}
+      </p>
+      <fieldset disabled={busy || !bulkReady?.available}>
+        <label>
+          CSV File
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            onChange={event =>
+              void selectBulkFile(event.currentTarget.files?.[0])}
+          />
+        </label>
+        {bulkFileName && <p className="muted">
+          Selected: {bulkFileName}
+        </p>}
+        <div className="grid">
+          <label>
+            New Catalog Name
+            <input
+              maxLength={120}
+              value={bulkName}
+              onChange={event => {
+                setBulkName(event.target.value);
+                setBulkPreview(null);
+              }}
+              placeholder="Example: Carrier Residential"
+            />
+          </label>
+          <label>
+            Catalog Description (optional)
+            <input
+              maxLength={500}
+              value={bulkDescription}
+              onChange={event => {
+                setBulkDescription(event.target.value);
+                setBulkPreview(null);
+              }}
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          disabled={!bulkCsv || !bulkName.trim() || busy}
+          onClick={() => void run(async () => {
+            setBulkPreview(null);
+            const response = await api<{
+              count: number;
+              brands: string[];
+              rows: Details[];
+              confirmation: string;
+            }>(
+              bulkCsvPath,
+              'POST',
+              bulkPayload(
+                'preview', bulkCsv, bulkName,
+                bulkDescription, null,
+              ),
+            );
+            setBulkPreview({
+              ...response,
+              csvText: bulkCsv,
+              name: bulkName,
+              description: bulkDescription,
+            });
+            setNotice(
+              `${response.count} products validated. Review before importing.`
+            );
+          })}
+        >
+          Preview CSV Products
+        </button>
+      </fieldset>
+
+      {bulkPreview && bulkReady?.available && (
+        <div>
+          <h4>Review {bulkPreview.count} Products</h4>
+          <p className="muted">
+            Catalog: {bulkPreview.name}.
+            Manufacturers: {bulkPreview.brands.join(', ')}.
+            No records have been imported yet.
+          </p>
+          <div style={{maxHeight: 280, overflowY: 'auto'}}>
+            {bulkPreview.rows.map((item, index) =>
+              <div className="line" key={`${index}-${item.model_number}`}>
+                <div>
+                  <strong>{item.brand} — {item.model_number}</strong>
+                  <p>
+                    {item.residential_system_type} — {item.description}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void run(async () => {
+              const preview = bulkPreview;
+              const result = await api<{
+                catalog_id: string;
+                catalog_name: string;
+                added: number;
+              }>(
+                bulkCsvPath,
+                'POST',
+                bulkPayload(
+                  'import',
+                  preview.csvText,
+                  preview.name,
+                  preview.description,
+                  preview.confirmation,
+                ),
+              );
+              await refreshCatalogs(result.catalog_id);
+              await refreshProducts(result.catalog_id);
+              setBulkPreview(null);
+              setBulkCsv('');
+              setBulkFileName('');
+              setBulkName('');
+              setBulkDescription('');
+              setNotice(
+                `${result.added} products imported into ${result.catalog_name} with audit history.`
+              );
+            })}
+          >
+            Confirm Import of {bulkPreview.count} Products
+          </button>
+          <button
+            type="button"
+            className="quiet"
+            disabled={busy}
+            onClick={() => setBulkPreview(null)}
+          >
+            Cancel Preview
+          </button>
+        </div>
+      )}
     </section>
 
     <div className="grid">
