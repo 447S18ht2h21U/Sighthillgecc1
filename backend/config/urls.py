@@ -1,3 +1,4 @@
+from core import ruud_catalog_import_api_4651
 from core import msr_named_catalog_choices_api_4551
 from core import product_catalog_collections_api_4546
 from django.urls import path, include
@@ -24,6 +25,7 @@ from core import approved_msr_source_api_4530
 from core import equipment_catalog_selection_api_4534
 from core import equipment_catalog_management_api_4542
 urlpatterns = [
+    path('api/development-product-catalogs/import-ruud-2026/', ruud_catalog_import_api_4651.import_ruud),
     path('api/development-msr-named-catalogs/', msr_named_catalog_choices_api_4551.msr_named_catalog_choices),
     path('api/development-product-catalogs/', product_catalog_collections_api_4546.collections),
     path('api/development-product-catalogs/<uuid:catalog_id>/', product_catalog_collections_api_4546.collection_detail),

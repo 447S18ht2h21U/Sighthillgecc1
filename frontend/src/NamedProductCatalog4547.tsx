@@ -25,6 +25,25 @@ type API = <T>(
 ) => Promise<T>;
 
 const endpoint = 'development-product-catalogs/';
+const ruudImportPath =
+  'development-product-catalogs/import-ruud-2026/';
+
+type RuudReadiness = {
+  available: boolean;
+  catalog: string;
+  system_count: number;
+  persistent_activation: boolean;
+  reason: string;
+};
+
+type RuudImportResult = {
+  catalog_id: string;
+  catalog_name: string;
+  added: number;
+  total: number;
+  status: 'IMPORTED' | 'ALREADY_PRESENT';
+  persistent_activation: boolean;
+};
 const emptyProduct: Details = {
   brand: '',
   residential_system_type: '',
@@ -49,6 +68,10 @@ export function NamedProductCatalog4547({api}: {api: API}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [ruudReady, setRuudReady] =
+    useState<RuudReadiness | null>(null);
+  const [ruudReadinessError, setRuudReadinessError] =
+    useState('');
 
   const selected = catalogs.find(catalog => catalog.id === catalogId);
   const brands = Array.from(
@@ -57,6 +80,20 @@ export function NamedProductCatalog4547({api}: {api: API}) {
   const visible = products.filter(
     product => !brandFilter || product.brand === brandFilter
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    void api<RuudReadiness>(ruudImportPath).then(result => {
+      if (!cancelled) setRuudReady(result);
+    }).catch(() => {
+      if (!cancelled) {
+        setRuudReadinessError(
+          'Ruud import readiness could not be verified.'
+        );
+      }
+    });
+    return () => { cancelled = true; };
+  }, [api]);
 
   async function refreshCatalogs(preferredId?: string) {
     const next = await api<Catalog[]>(endpoint);
@@ -178,6 +215,39 @@ export function NamedProductCatalog4547({api}: {api: API}) {
 
     {error && <p role="alert" className="error">{error}</p>}
     {notice && <p role="status">{notice}</p>}
+
+    <section aria-label="Ruud catalog import">
+      <h3>Ruud Residential Systems — 2026</h3>
+      <p className="muted">
+        15 complete air-conditioning and furnace configurations,
+        including AHRI references, outdoor models, coils,
+        furnaces, cooling capacities and SEER2 ratings.
+        Existing Goodman records are not changed.
+      </p>
+      <p className="muted" role="status">
+        {ruudReadinessError ||
+          ruudReady?.reason ||
+          'Checking protected import availability...'}
+      </p>
+      <button
+        type="button"
+        disabled={busy || !ruudReady?.available}
+        onClick={() => void run(async () => {
+          const result = await api<RuudImportResult>(
+            ruudImportPath, 'POST', {}
+          );
+          await refreshCatalogs(result.catalog_id);
+          await refreshProducts(result.catalog_id);
+          setNotice(
+            result.added === 15
+              ? 'All 15 Ruud systems imported with audit history.'
+              : 'The 15 Ruud systems are already present.'
+          );
+        })}
+      >
+        Import 15 Ruud Systems
+      </button>
+    </section>
 
     <div className="grid">
       <label>
