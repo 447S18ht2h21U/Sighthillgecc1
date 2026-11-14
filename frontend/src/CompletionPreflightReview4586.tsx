@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { DraftReceiptPackageStatus4807 } from './DraftReceiptPackageStatus4807';
+import { InstallationInspectionReview4841 } from './InstallationInspectionReview4841';
+import { InstallationEvidenceStatus4831 } from './InstallationEvidenceStatus4831';
 
 type CompletionRequirement = {
   key: string;
@@ -264,6 +266,8 @@ export function CompletionPreflightReview4586({
         >
           <h4>Administrative Project Completion</h4>
           <DraftReceiptPackageStatus4807 projectId={projectId} />
+          <InstallationEvidenceStatus4831 projectId={projectId} />
+          <InstallationInspectionReview4841 projectId={projectId} />
           <p><strong>Completion not authorized</strong></p>
           <button
             type="button"

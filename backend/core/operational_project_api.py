@@ -18,7 +18,7 @@ class OperationalProjectPagination(PageNumberPagination):
 class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = OperationalProjectSerializer
     pagination_class = OperationalProjectPagination
-    http_method_names = ['get', 'head', 'options']
+    http_method_names = ['get', 'post', 'head', 'options']
     queryset = Project.objects.none()
 
     def get_queryset(self):
@@ -467,6 +467,508 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
         result["status"] = "VERIFIED_DRAFT_RETAINED"
 
         return Response(result)
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="installation-evidence-status",
+    )
+    def installation_evidence_status(self, request, pk=None):
+        """Restricted read-only installation and FINAL Receipt evidence status."""
+        from django.db import connections, router
+        from django.db.utils import DatabaseError
+        from django.core.exceptions import ValidationError
+        from rest_framework.exceptions import PermissionDenied
+        from .models import (
+            Role, ProjectEvidence, InstallationSchedule,
+            ReceiptDraftPackage,
+        )
+        from .installation_completion_evidence_4815 import (
+            assess_installation_completion_evidence,
+        )
+        from .final_receipt_release_preflight_4812 import (
+            assess_final_receipt_release_preflight,
+        )
+
+        actor = User.objects.filter(
+            pk=getattr(request.user, "pk", None),
+            is_active=True,
+        ).first()
+        if actor is None or actor.role not in (Role.CEO, Role.COMPTROLLER):
+            raise PermissionDenied(
+                "CEO or Comptroller evidence-review access required."
+            )
+
+        # Existing project scoping remains mandatory even for reviewers.
+        project = self.get_object()
+
+        result = {
+            "project_id": str(project.pk),
+            "read_only": True,
+            "status": "PREREQUISITES_MISSING",
+            "installation_schedule_completed": False,
+            "physical_unit_count": 0,
+            "verified_inspection_candidate_count": 0,
+            "internal_acceptance_candidate_verified": False,
+            "installation_source_integrity_verified": False,
+            "installation_provenance_status": "UNVERIFIED",
+            "installation_source_authenticated": False,
+            "trusted_installation_evidence": False,
+            "final_receipt_issuance_authorized": False,
+            "provider_email_authenticated": False,
+            "customer_delivery_verified": False,
+            "completion_authorized": False,
+            "blockers": [],
+        }
+
+        msr = project.current_approved
+        if (
+            project.state == "CANCELLED"
+            or msr is None
+            or msr.status != "APPROVED"
+            or msr.project_id != project.pk
+            or project.current_approved_id != msr.pk
+        ):
+            result["blockers"] = [
+                "Active project with current approved MSR required."
+            ]
+            return Response(result)
+
+        alias = router.db_for_read(ProjectEvidence)
+        connection = connections[alias]
+        required = (
+            ProjectEvidence,
+            InstallationSchedule,
+            ReceiptDraftPackage,
+        )
+
+        try:
+            with connection.cursor() as cursor:
+                tables = set(connection.introspection.table_names(cursor))
+        except DatabaseError:
+            tables = set()
+
+        if any(model._meta.db_table not in tables for model in required):
+            result["status"] = "SCHEMA_UNAVAILABLE"
+            result["blockers"] = [
+                "Required installation evidence storage is unavailable."
+            ]
+            return Response(result)
+
+        try:
+            installation = assess_installation_completion_evidence(project)
+            receipt = assess_final_receipt_release_preflight(project)
+
+            if (
+                installation.project_id != str(project.pk)
+                or receipt.project_id != str(project.pk)
+                or receipt.msr_id != str(msr.pk)
+                or installation.trusted_installation_evidence is not False
+                or installation.final_receipt_issuance_authorized is not False
+                or installation.completion_authorized is not False
+                or receipt.trusted_installation_evidence is not False
+                or receipt.final_receipt_issuance_authorized is not False
+                or receipt.final_receipt_verified is not False
+                or receipt.provider_email_authenticated is not False
+                or receipt.customer_delivery_verified is not False
+                or receipt.completion_authorized is not False
+                or installation.installation_provenance_status
+                    != receipt.installation_provenance_status
+                or installation.installation_source_integrity_verified
+                    is not receipt.installation_source_integrity_verified
+                or installation.acceptance_candidate_verified
+                    is not receipt.acceptance_candidate_verified
+            ):
+                raise ValueError("Evidence authority or identity mismatch.")
+
+            result.update({
+                "status": "EVIDENCE_REVIEW_RELEASE_BLOCKED",
+                "installation_schedule_completed": (
+                    installation.operational_schedule_completed is True
+                ),
+                "physical_unit_count": installation.physical_unit_count,
+                "verified_inspection_candidate_count": (
+                    installation.verified_inspection_candidate_count
+                ),
+                "internal_acceptance_candidate_verified": (
+                    installation.acceptance_candidate_verified is True
+                ),
+                "installation_source_integrity_verified": (
+                    installation.installation_source_integrity_verified is True
+                ),
+                "installation_provenance_status": (
+                    installation.installation_provenance_status
+                ),
+                "blockers": list(dict.fromkeys(
+                    (*installation.blockers, *receipt.blockers)
+                )),
+            })
+        except (ValueError, TypeError, AttributeError,
+                ValidationError, DatabaseError):
+            result["status"] = "EVIDENCE_VERIFICATION_FAILED"
+            result["blockers"] = [
+                "Independent evidence verification failed or is unavailable."
+            ]
+
+        return Response(result)
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="installation-inspection-review-queue",
+    )
+    def installation_inspection_review_queue(self, request, pk=None):
+        """Comptroller-only read of an inspection awaiting independent review."""
+        from django.db import connections, router
+        from django.utils import timezone
+        from .documents import canonical_hash
+        from django.db.utils import DatabaseError
+        from rest_framework.exceptions import PermissionDenied
+        from .models import (
+            Role, ProjectEvidence, InstallationSchedule,
+        )
+        from .post_installation_acceptance_4819 import (
+            INSPECTION_KIND, REVIEW_KIND,
+            _completed_schedule, _check_inspection,
+        )
+
+        actor = User.objects.filter(
+            pk=getattr(request.user, "pk", None),
+            is_active=True,
+        ).first()
+        if actor is None or actor.role != Role.COMPTROLLER:
+            raise PermissionDenied(
+                "Active Comptroller independent-review authority required."
+            )
+
+        project = self.get_object()
+        result = {
+            "project_id": str(project.pk),
+            "read_only": True,
+            "status": "PREREQUISITES_MISSING",
+            "pending_inspection_id": None,
+            "inspection_passed": None,
+            "independent_review_recorded": False,
+            "review_decision": None,
+            "trusted_installation_evidence": False,
+            "final_receipt_issuance_authorized": False,
+            "customer_delivery_verified": False,
+            "completion_authorized": False,
+        }
+
+        msr = project.current_approved
+        if (
+            project.state == "CANCELLED"
+            or msr is None
+            or msr.status != "APPROVED"
+            or msr.project_id != project.pk
+            or project.current_approved_id != msr.pk
+        ):
+            return Response(result)
+
+        alias = router.db_for_read(ProjectEvidence)
+        connection = connections[alias]
+        try:
+            with connection.cursor() as cursor:
+                tables = set(connection.introspection.table_names(cursor))
+        except DatabaseError:
+            tables = set()
+
+        if not {
+            ProjectEvidence._meta.db_table,
+            InstallationSchedule._meta.db_table,
+        }.issubset(tables):
+            result["status"] = "STORAGE_UNAVAILABLE"
+            return Response(result)
+
+        inspections = list(ProjectEvidence.objects.filter(
+            msr=msr,
+            kind=INSPECTION_KIND,
+        ).order_by("pk"))
+
+        reviews = list(ProjectEvidence.objects.filter(
+            msr=msr,
+            kind=REVIEW_KIND,
+        ).order_by("pk"))
+
+        if not inspections:
+            result["status"] = "NO_INSPECTION"
+            return Response(result)
+
+        if len(inspections) != 1 or len(reviews) > 1:
+            result["status"] = "INSPECTION_UNVERIFIED"
+            return Response(result)
+
+        inspection = inspections[0]
+
+        try:
+            schedule = _completed_schedule(project)
+            checked = _check_inspection(
+                inspection, project, msr, schedule
+            )
+            if (
+                inspection.created_by_id
+                    != schedule.installation_manager_id
+                or inspection.created_at > timezone.now()
+            ):
+                raise ValueError("Inspector or chronology mismatch.")
+        except Exception:
+            result["status"] = "INSPECTION_UNVERIFIED"
+            return Response(result)
+
+        result["inspection_passed"] = checked["inspection_passed"]
+        result["inspection_notes"] = checked["notes"]
+        result["inspection_recorded_at"] = inspection.created_at.isoformat()
+        result["independent_review_recorded"] = bool(reviews)
+
+        if reviews:
+            review = reviews[0]
+            data = review.data
+            valid = (
+                type(data) is dict
+                and review.digest == canonical_hash(data)
+                and review.msr_id == msr.pk
+                and review.kind == REVIEW_KIND
+                and data.get("purpose") == REVIEW_KIND
+                and data.get("status") in (
+                    "REJECTED", "CANDIDATE_ACCEPTED"
+                )
+                and data.get("inspection_id") == str(inspection.pk)
+                and data.get("inspection_digest") == inspection.digest
+                and data.get("project_id") == str(project.pk)
+                and data.get("msr_id") == str(msr.pk)
+                and data.get("msr_version") == msr.number
+                and data.get("snapshot_sha256")
+                    == canonical_hash(msr.snapshot)
+                and data.get("schedule_id") == str(schedule.pk)
+                and data.get("inspector_id")
+                    == str(inspection.created_by_id)
+                and data.get("reviewer_id")
+                    == str(review.created_by_id)
+                and review.created_by_id != inspection.created_by_id
+                and User.objects.filter(
+                    pk=review.created_by_id,
+                    is_active=True,
+                    role=Role.COMPTROLLER,
+                ).exists()
+                and type(data.get("independently_examined")) is bool
+                and type(data.get("reason")) is str
+                and 15 <= len(data["reason"].strip()) <= 2000
+                and data.get("trusted_installation_evidence") is False
+                and data.get("final_receipt_issuance_authorized") is False
+                and review.created_at >= inspection.created_at
+                and review.created_at <= timezone.now()
+            )
+            if valid and data["status"] == "CANDIDATE_ACCEPTED":
+                valid = (
+                    checked["inspection_passed"] is True
+                    and data["independently_examined"] is True
+                )
+            if not valid:
+                result["status"] = "INSPECTION_UNVERIFIED"
+                result["independent_review_recorded"] = False
+                return Response(result)
+
+            result["review_decision"] = (
+                "REJECTED" if data["status"] == "REJECTED"
+                else "INTERNAL_CANDIDATE_ACCEPTED"
+            )
+            # Internal decision verified; source authentication is not.
+            result["status"] = "REVIEW_RECORDED_UNVERIFIED"
+            return Response(result)
+
+        result["pending_inspection_id"] = str(inspection.pk)
+        result["status"] = "PENDING_INDEPENDENT_REVIEW"
+        return Response(result)
+
+    def _installation_entry_guard(self, request, role):
+        """Fail closed outside the designated disposable browser database."""
+        import os
+        from pathlib import Path
+        from django.conf import settings
+        from rest_framework.exceptions import PermissionDenied
+        from .models import Role
+
+        actor = User.objects.filter(
+            pk=getattr(request.user, "pk", None),
+            is_active=True,
+        ).first()
+
+        if actor is None or actor.role != role:
+            raise PermissionDenied("Authorized active role required.")
+
+        if (
+            settings.ENVIRONMENT != "development"
+            or settings.DEBUG is not True
+            or settings.DATABASES["default"]["ENGINE"]
+                != "django.db.backends.sqlite3"
+            or os.environ.get(
+                "GECC_INSTALLATION_EVIDENCE_BROWSER_ENABLED"
+            ) != "1"
+        ):
+            raise PermissionDenied(
+                "Installation evidence entry is not enabled."
+            )
+
+        name = str(settings.DATABASES["default"]["NAME"])
+        root = Path(settings.BASE_DIR).resolve().parent
+        expected = (
+            root / "recovery" / "1907P-4834"
+            / "browser-acceptance.sqlite3"
+        ).resolve()
+
+        # Django's test runner converts :memory: into this exact
+        # shared-cache SQLite memory URI for the default test alias.
+        # Reject disk-backed SQLite and all other URI forms.
+        test_memory_names = (
+            ":memory:",
+            "file:memorydb_default?mode=memory&cache=shared",
+        )
+        isolated_test = (
+            name in test_memory_names
+            and os.environ.get("GECC_SQLITE_PATH") == ":memory:"
+            and all(
+                os.environ.get(
+                    f"VERIDIAN_{number}_TEST_INSTALL"
+                ) == "ISOLATED_SQLITE_MEMORY"
+                for number in (
+                    "0071", "0072", "0073", "0074",
+                    "0075", "0076", "0080"
+                )
+            )
+        )
+
+        isolated_browser = (
+            name != ":memory:"
+            and Path(name).resolve() == expected
+            and expected.is_file()
+        )
+
+        if not (isolated_test or isolated_browser):
+            raise PermissionDenied(
+                "Only the protected isolated browser database is eligible."
+            )
+
+        return actor
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="record-installation-inspection",
+    )
+    def record_installation_inspection(self, request, pk=None):
+        """Assigned Installation Manager records an immutable candidate."""
+        from .models import Role
+        from rest_framework.exceptions import ValidationError
+        from .post_installation_acceptance_4819 import (
+            record_post_installation_inspection,
+        )
+
+        actor = self._installation_entry_guard(
+            request, Role.INSTALLATION_MANAGER
+        )
+        project = self.get_object()
+        payload = request.data
+
+        if (
+            not isinstance(payload, dict)
+            or set(payload) != {"inspection_passed", "notes"}
+            or type(payload["inspection_passed"]) is not bool
+            or type(payload["notes"]) is not str
+        ):
+            raise ValidationError(
+                "Explicit inspection outcome and notes required."
+            )
+
+        record = record_post_installation_inspection(
+            actor=actor,
+            project_id=project.pk,
+            inspection_passed=payload["inspection_passed"],
+            notes=payload["notes"],
+        )
+
+        return Response({
+            "project_id": str(project.pk),
+            "inspection_id": str(record.pk),
+            "status": "INSPECTION_CANDIDATE_RECORDED",
+            "read_only": False,
+            "source_authenticated": False,
+            "trusted_installation_evidence": False,
+            "final_receipt_issuance_authorized": False,
+            "customer_delivery_verified": False,
+            "completion_authorized": False,
+        }, status=201)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="review-installation-inspection",
+    )
+    def review_installation_inspection(self, request, pk=None):
+        """Different active Comptroller reviews the recorded candidate."""
+        from .models import Role, ProjectEvidence
+        from .post_installation_acceptance_4819 import (
+            INSPECTION_KIND,
+            review_post_installation_inspection,
+        )
+        from rest_framework.exceptions import ValidationError
+
+        actor = self._installation_entry_guard(
+            request, Role.COMPTROLLER
+        )
+        project = self.get_object()
+        payload = request.data
+
+        if (
+            not isinstance(payload, dict)
+            or set(payload) != {
+                "inspection_id", "accept", "reason",
+                "independently_examined"
+            }
+            or type(payload["inspection_id"]) is not str
+            or type(payload["accept"]) is not bool
+            or type(payload["reason"]) is not str
+            or type(payload["independently_examined"]) is not bool
+        ):
+            raise ValidationError(
+                "Explicit inspection review fields required."
+            )
+
+        msr = project.current_approved
+        if (
+            msr is None
+            or not ProjectEvidence.objects.filter(
+                pk=payload["inspection_id"],
+                msr=msr,
+                kind=INSPECTION_KIND,
+            ).exists()
+        ):
+            raise ValidationError(
+                "Inspection must belong to the selected approved project."
+            )
+
+        record = review_post_installation_inspection(
+            actor=actor,
+            inspection_id=payload["inspection_id"],
+            accept=payload["accept"],
+            reason=payload["reason"],
+            independently_examined=payload["independently_examined"],
+        )
+
+        return Response({
+            "project_id": str(project.pk),
+            "review_id": str(record.pk),
+            "status": (
+                "INTERNAL_CANDIDATE_ACCEPTED"
+                if payload["accept"]
+                else "INSPECTION_CANDIDATE_REJECTED"
+            ),
+            "source_authenticated": False,
+            "trusted_installation_evidence": False,
+            "final_receipt_issuance_authorized": False,
+            "customer_delivery_verified": False,
+            "completion_authorized": False,
+        }, status=201)
 
     def finalize_response(self, request, response, *args, **kwargs):
         response = super().finalize_response(request, response, *args, **kwargs)

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { InstallationInspectionEntry4843 } from './InstallationInspectionEntry4843';
 
 type Api = <T,>(path: string, method?: string, data?: unknown) => Promise<T>;
 type Project = {
@@ -76,11 +77,15 @@ type ProposedDateAssessment = {
 
 export function InstallationScheduling({
   api,
+  actorId,
+  actorRole,
   selectedProjectId,
   onReturnToProject,
   onProjectSelected,
 }: {
   api: Api;
+  actorId: string;
+  actorRole: string;
   selectedProjectId?: string;
   onReturnToProject: () => void;
   onProjectSelected: (projectId: string) => void;
@@ -720,6 +725,23 @@ export function InstallationScheduling({
               : '-'}</td>
           </tr>)}</tbody>
         </table>}
+    {canManage &&
+      actorRole === 'INSTALLATION_MANAGER' &&
+      Boolean(actorId) &&
+      Boolean(projectId) &&
+      schedules.some(
+        schedule =>
+          schedule.project === projectId &&
+          schedule.status === 'COMPLETED' &&
+          schedule.installation_manager === actorId
+      ) && (
+        <InstallationInspectionEntry4843
+          key={projectId}
+          api={api}
+          projectId={projectId}
+        />
+      )}
+
     {schedules.some(schedule => schedule.status === 'COMPLETED') && (
       <div className="installation-completion-guidance">
         <p><strong>Installation completed operationally.</strong></p>

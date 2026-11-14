@@ -204,6 +204,8 @@ function App(){
     </section>}
     {panel==='installation'&&<InstallationScheduling
     api={api}
+    actorId={user.id}
+    actorRole={user.role}
     selectedProjectId={installationFocusId ?? undefined}
     onProjectSelected={(id) => {
       setInstallationFocusId(null);
