@@ -87,6 +87,24 @@ class Project(Entity):
     ownership_revision = models.PositiveBigIntegerField(default=0)
     reviewer = models.ForeignKey(User, on_delete=models.PROTECT, related_name='review_projects')
     state = models.CharField(max_length=20, default='DRAFT')
+
+    # Separate commercial opportunity disposition from operational Project.state.
+    # NULL means historical sales disposition has not been established.
+    class SalesStatus(models.TextChoices):
+        ACTIVE = "ACTIVE", "Active"
+        WON = "WON", "Won"
+        LOST = "LOST", "Lost"
+        CANCELLED = "CANCELLED", "Cancelled"
+        INACTIVE = "INACTIVE", "Inactive"
+
+    sales_status = models.CharField(
+        max_length=16,
+        choices=SalesStatus.choices,
+        null=True,
+        blank=True,
+        default=None,
+    )
+
     current_approved = models.ForeignKey('MSR', null=True, blank=True, on_delete=models.PROTECT, related_name='+')
     pending = models.ForeignKey('MSR', null=True, blank=True, on_delete=models.PROTECT, related_name='+')
 
@@ -2596,3 +2614,43 @@ class InstallationInspectionEvidence4969(_inspection_models.Model):
         raise _inspection_error(
             "Installation inspection evidence cannot be deleted."
         )
+
+
+class ProjectSalesStatusChange(models.Model):
+    """Historical record of a commercial opportunity status transition.
+
+    This record does not authorize installation, MSR approval, or completion.
+    """
+
+    project = models.ForeignKey(
+        "core.Project",
+        on_delete=models.PROTECT,
+        related_name="sales_status_history",
+    )
+    changed_by = models.ForeignKey(
+        "core.User",
+        on_delete=models.PROTECT,
+        related_name="sales_status_changes",
+    )
+    previous_status = models.CharField(
+        max_length=16,
+        null=True,
+        blank=True,
+    )
+    new_status = models.CharField(
+        max_length=16,
+        choices=Project.SalesStatus.choices,
+    )
+    reason = models.TextField()
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-changed_at", "-pk"]
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValueError("Sales status audit entries cannot be edited")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Sales status audit entries cannot be deleted")

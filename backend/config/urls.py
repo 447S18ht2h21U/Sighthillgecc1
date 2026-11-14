@@ -92,3 +92,16 @@ urlpatterns = [
 path('api/sandbox-packages/<uuid:package_id>/connect-check/', sandbox_api.connect_check), path('api/msrs/<uuid:msr_id>/verification-evidence/', release_api.evidence), path('api/signing-reviews/<uuid:plan_id>/release-packages/', release_api.packages), path('api/release-packages/<uuid:package_id>/decisions/', release_api.decision), path('api/release-packages/<uuid:package_id>/documents/<int:document_index>/', release_api.download), path('api/signing-reviews/<uuid:plan_id>/sandbox-package/', sandbox_api.package), path('api/sandbox-packages/<uuid:package_id>/documents/<int:document_index>/', sandbox_api.download), path('api/sandbox-packages/<uuid:package_id>/connect-draft/', sandbox_api.connect_draft), path('api/docusign/status/', docusign_api.status), path('api/docusign/connect/', docusign_api.connect), path('api/docusign/callback/', docusign_api.callback), path('api/csrf/', api.csrf), path('api/dev-login/', api.dev_login), path('api/logout/', api.end_session), path('api/me/', api.me), path('api/activity/', api.activity), path('api/', include(router.urls))]
 
 
+
+
+# Step 1907P-5004: default-disabled sales opportunity status endpoint.
+from django.urls import path as sales_status_path
+from core.sales_status_route_5004 import ControlledSalesStatusDetail
+
+urlpatterns += [
+    sales_status_path(
+        "api/projects/<uuid:project_id>/sales-status/",
+        ControlledSalesStatusDetail.as_view(),
+        name="veridian-sales-status-5004",
+    ),
+]
