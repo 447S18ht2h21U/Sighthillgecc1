@@ -250,6 +250,20 @@ export function InstallationEvidenceStatus4831({
 
           <p>
             Equipment-unit inspections (verified / recorded units):
+              {report.physical_unit_count === 0 && (
+                <strong
+                  role="status"
+                  style={{
+                    display: 'block',
+                    color: '#B42318',
+                    fontWeight: 800,
+                    marginTop: 6,
+                    marginBottom: 6,
+                  }}
+                >
+                  EQUIPMENT INVENTORY MISSING OR INVALID — INSPECTION EVIDENCE INCOMPLETE
+                </strong>
+              )}
             {' '}
             {report.verified_inspection_candidate_count}
             {' / '}
@@ -276,13 +290,34 @@ export function InstallationEvidenceStatus4831({
             Source authentication: Not established
           </p>
 
-          <p>
-            FINAL Receipt issuance: Blocked
-          </p>
-
-          <p>
-            Customer delivery and project completion: Blocked
-          </p>
+          <section aria-label="Final Receipt release readiness">
+            <h4>Final Receipt Release Readiness</h4>
+            <p className="muted">
+              This read-only assessment combines installation and Receipt
+              evidence requirements. It cannot authorize a FINAL Receipt,
+              confirm email delivery, or complete a project.
+            </p>
+            <p>
+              <strong>Installation evidence:</strong>{' '}
+              {report.trusted_installation_evidence === false
+                ? 'Not independently authenticated'
+                : 'Verification unavailable'}
+            </p>
+            <p>
+              <strong>FINAL Receipt issuance:</strong> Blocked
+            </p>
+            <p>
+              <strong>Authenticated customer email delivery:</strong> Not verified
+            </p>
+            <p>
+              <strong>Administrative project completion:</strong> Blocked
+            </p>
+            <p className="muted">
+              Retained draft packages, local sending observations and
+              internal equipment-review candidates do not establish
+              authorized final issuance or authenticated delivery.
+            </p>
+          </section>
 
           {report.blockers.length > 0 && (
             <details>

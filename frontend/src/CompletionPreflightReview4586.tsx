@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { DraftReceiptPackageStatus4807 } from './DraftReceiptPackageStatus4807';
 import { InstallationInspectionReview4841 } from './InstallationInspectionReview4841';
+import { EquipmentUnitReview4880 } from './EquipmentUnitReview4880';
 import { InstallationEvidenceStatus4831 } from './InstallationEvidenceStatus4831';
 
 type CompletionRequirement = {
@@ -59,10 +60,12 @@ type CompletionPreflight = {
 export function CompletionPreflightReview4586({
   projectId,
   projectCode,
+  actorRole,
 }: {
   projectId: string;
   projectCode: string;
-}) {
+
+  actorRole?: string;}) {
   const [report, setReport] = useState<CompletionPreflight | null>(null);
   const [envelopeStatus, setEnvelopeStatus] = useState<EnvelopeStatus | null>(null);
   const [error, setError] = useState('');
@@ -267,7 +270,12 @@ export function CompletionPreflightReview4586({
           <h4>Administrative Project Completion</h4>
           <DraftReceiptPackageStatus4807 projectId={projectId} />
           <InstallationEvidenceStatus4831 projectId={projectId} />
-          <InstallationInspectionReview4841 projectId={projectId} />
+          <>
+<InstallationInspectionReview4841 projectId={projectId} />
+{actorRole === 'COMPTROLLER' && (
+  <EquipmentUnitReview4880 key={projectId} projectId={projectId} />
+)}
+</>
           <p><strong>Completion not authorized</strong></p>
           <button
             type="button"

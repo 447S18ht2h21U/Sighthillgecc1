@@ -2,6 +2,7 @@ from core import catalog_bulk_import_api_4671
 from core import ruud_catalog_import_api_4651
 from core import msr_named_catalog_choices_api_4551
 from core import product_catalog_collections_api_4546
+from core import installation_provider_oauth_api_4984
 from django.urls import path, include
 from core import own_contractor_payment_api
 from core import customer_payment_api_4714
@@ -29,6 +30,11 @@ from core import approved_msr_source_api_4530
 from core import equipment_catalog_selection_api_4534
 from core import equipment_catalog_management_api_4542
 urlpatterns = [
+    path(
+        'api/inspection-evidence/<uuid:project_id>/oauth-read/',
+        installation_provider_oauth_api_4984.connect,
+        name='installation-inspection-oauth-4984',
+    ),
     path('api/development-product-catalogs/bulk-csv/', catalog_bulk_import_api_4671.bulk_csv),
     path('api/development-product-catalogs/import-ruud-2026/', ruud_catalog_import_api_4651.import_ruud),
     path('api/development-msr-named-catalogs/', msr_named_catalog_choices_api_4551.msr_named_catalog_choices),

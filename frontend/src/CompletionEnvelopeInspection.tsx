@@ -1,4 +1,5 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
+import { InstallationInspectionOAuth4984 } from './InstallationInspectionOAuth4984';
 
 type API = <T>(path: string, method?: string, data?: unknown) => Promise<T>;
 
@@ -66,5 +67,6 @@ export function CompletionEnvelopeInspection({ api }: { api: API }) {
       <p><strong>Document sending: Unavailable</strong></p>
       <p className="muted">Local attempt records are not proof of signed completion certificates.</p>
     </div>}
+    <InstallationInspectionOAuth4984 api={api} />
   </section>;
 }

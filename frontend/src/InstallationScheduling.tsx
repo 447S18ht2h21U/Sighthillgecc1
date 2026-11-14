@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { InstallationInspectionEntry4843 } from './InstallationInspectionEntry4843';
+import { EquipmentUnitSelection4872 } from './EquipmentUnitSelection4872';
 
 type Api = <T,>(path: string, method?: string, data?: unknown) => Promise<T>;
 type Project = {
@@ -74,6 +75,33 @@ type ProposedDateAssessment = {
   installation_started: boolean;
   expedited_authorized: boolean;
 };
+
+function uniqueInstallationRecords4893<T extends { id: string }>(
+  records: T[],
+  label: string,
+): T[] {
+  const seen = new Map<string, T>();
+  const unique: T[] = [];
+
+  for (const record of records) {
+    if (!record || typeof record.id !== 'string' || !record.id.trim()) {
+      throw new Error(`${label}: missing stable record identifier.`);
+    }
+
+    const previous = seen.get(record.id);
+    if (previous) {
+      if (JSON.stringify(previous) !== JSON.stringify(record)) {
+        throw new Error(`${label}: conflicting records have the same ID.`);
+      }
+      continue;
+    }
+
+    seen.set(record.id, record);
+    unique.push(record);
+  }
+
+  return unique;
+}
 
 export function InstallationScheduling({
   api,
@@ -156,8 +184,8 @@ export function InstallationScheduling({
           : Promise.resolve(null),
       ]);
 
-      setProjects(visibleProjects);
-      setSchedules(visibleSchedules);
+      setProjects(uniqueInstallationRecords4893(visibleProjects, 'Projects'));
+      setSchedules(uniqueInstallationRecords4893(visibleSchedules, 'Schedules'));
       setPendingStatusAction(current =>
         current && visibleSchedules.some(schedule =>
           schedule.id === current.scheduleId &&
@@ -195,8 +223,8 @@ export function InstallationScheduling({
           readPages<Schedule>('installation-schedules/'),
         ]);
         if (!active) return;
-        setProjects(visibleProjects);
-        setSchedules(visibleSchedules);
+        setProjects(uniqueInstallationRecords4893(visibleProjects, 'Projects'));
+        setSchedules(uniqueInstallationRecords4893(visibleSchedules, 'Schedules'));
         try {
           const eligible = await api<Manager[]>('installation-managers/');
           if (active) {
@@ -727,6 +755,15 @@ export function InstallationScheduling({
         </table>}
     {canManage &&
       actorRole === 'INSTALLATION_MANAGER' &&
+      Boolean(projectId) && (
+        <EquipmentUnitSelection4872
+          key={`equipment-${projectId}`}
+          api={api}
+          projectId={projectId}
+        />
+      )}
+    {canManage &&
+      actorRole === 'INSTALLATION_MANAGER' &&
       Boolean(actorId) &&
       Boolean(projectId) &&
       schedules.some(
@@ -736,7 +773,7 @@ export function InstallationScheduling({
           schedule.installation_manager === actorId
       ) && (
         <InstallationInspectionEntry4843
-          key={projectId}
+          key={`inspection-${projectId}`}
           api={api}
           projectId={projectId}
         />

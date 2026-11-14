@@ -2543,3 +2543,56 @@ class ReceiptDraftPackage(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Retained draft packages cannot be deleted.")
+
+
+# Installation Inspection: immutable, explicitly UNVERIFIED retention.
+# Not the customer Completion Certificate or expedited-signing workflow.
+from uuid import uuid4 as _inspection_uuid4
+from django.db import models as _inspection_models
+from django.conf import settings as _inspection_settings
+from django.core.exceptions import ValidationError as _inspection_error
+
+
+class InstallationInspectionEvidence4969(_inspection_models.Model):
+    id = _inspection_models.UUIDField(
+        primary_key=True, default=_inspection_uuid4, editable=False
+    )
+    msr = _inspection_models.ForeignKey(
+        "core.MSR", on_delete=_inspection_models.PROTECT,
+        related_name="inspection_evidence_4969"
+    )
+    created_by = _inspection_models.ForeignKey(
+        _inspection_settings.AUTH_USER_MODEL,
+        on_delete=_inspection_models.PROTECT
+    )
+    purported_envelope_id = _inspection_models.CharField(max_length=128)
+    bundle_digest = _inspection_models.CharField(max_length=64)
+    source_digest = _inspection_models.CharField(max_length=64)
+    source_data = _inspection_models.JSONField()
+    signed_pdf = _inspection_models.BinaryField()
+    signed_pdf_sha256 = _inspection_models.CharField(max_length=64)
+    certificate_pdf = _inspection_models.BinaryField()
+    certificate_sha256 = _inspection_models.CharField(max_length=64)
+    created_at = _inspection_models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            _inspection_models.UniqueConstraint(
+                fields=["msr", "purported_envelope_id"],
+                name="inspection_envelope_unique_4969"
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding or type(self).objects.filter(
+            pk=self.pk
+        ).exists():
+            raise _inspection_error(
+                "Installation inspection evidence is immutable."
+            )
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise _inspection_error(
+            "Installation inspection evidence cannot be deleted."
+        )

@@ -853,6 +853,497 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(
         detail=True,
+        methods=["get"],
+        url_path="equipment-unit-inventory",
+    )
+    def equipment_unit_inventory(self, request, pk=None):
+        """Read-only approved physical-unit inventory; no capture authority."""
+        from rest_framework.exceptions import PermissionDenied
+        from .models import Role
+        from .equipment_physical_units import physical_units_from_snapshot
+
+        actor = User.objects.filter(
+            pk=getattr(request.user, "pk", None),
+            is_active=True,
+        ).first()
+        if actor is None or actor.role not in (
+            Role.INSTALLATION_MANAGER,
+            Role.COMPTROLLER,
+            Role.CEO,
+        ):
+            raise PermissionDenied(
+                "Authorized equipment inventory viewer required."
+            )
+
+        # get_object() also applies operational project visibility.
+        project = self.get_object()
+        result = {
+            "project_id": str(project.pk),
+            "msr_id": None,
+            "status": "INVENTORY_UNAVAILABLE",
+            "units": [],
+            "read_only": True,
+            "physical_inspection_verified": False,
+            "trusted_installation_evidence": False,
+            "installation_authorized": False,
+            "final_receipt_issuance_authorized": False,
+            "completion_authorized": False,
+        }
+
+        msr = project.current_approved
+        if (
+            project.state == "CANCELLED"
+            or msr is None
+            or msr.status != "APPROVED"
+            or msr.project_id != project.pk
+            or project.current_approved_id != msr.pk
+        ):
+            return Response(result)
+
+        result["msr_id"] = str(msr.pk)
+
+        try:
+            units = physical_units_from_snapshot(
+                msr_id=str(msr.pk),
+                snapshot=msr.snapshot,
+            )
+        except (ValueError, TypeError, AttributeError):
+            return Response(result)
+
+        if not units:
+            return Response(result)
+
+        result["units"] = [
+            {
+                "unit_id": unit.unit_id,
+                "row_number": unit.row_number,
+                "unit_number": unit.unit_number,
+                "brand": unit.brand,
+                "residential_system_type": unit.residential_system_type,
+                "model_number": unit.model_number,
+                "description": unit.description,
+                "category_of_work": unit.category_of_work,
+            }
+            for unit in units
+        ]
+        result["status"] = "APPROVED_UNIT_LIST_AVAILABLE"
+        return Response(result)
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="equipment-unit-review-queue",
+    )
+    def equipment_unit_review_queue(self, request, pk=None):
+        """Read-only physical-unit queue; no decision or trust promotion."""
+        from .models import Role, ProjectEvidence
+        from .documents import canonical_hash
+        from .equipment_physical_units import physical_units_from_snapshot
+        from .equipment_physical_capture_pending_service import (
+            KIND as PENDING_KIND,
+        )
+        from .equipment_physical_inspection_review_service import (
+            REVIEW_KIND,
+        )
+
+        self._installation_entry_guard(request, Role.COMPTROLLER)
+        project = self.get_object()
+        result = {
+            "project_id": str(project.pk),
+            "msr_id": None,
+            "status": "INVENTORY_UNAVAILABLE",
+            "units": [],
+            "read_only": True,
+            "source_authenticated": False,
+            "trusted_installation_evidence": False,
+            "installation_authorized": False,
+            "final_receipt_issuance_authorized": False,
+            "customer_delivery_verified": False,
+            "completion_authorized": False,
+        }
+
+        msr = project.current_approved
+        if (
+            project.state == "CANCELLED"
+            or msr is None
+            or msr.status != "APPROVED"
+            or msr.project_id != project.pk
+            or project.current_approved_id != msr.pk
+        ):
+            return Response(result)
+
+        result["msr_id"] = str(msr.pk)
+        try:
+            units = physical_units_from_snapshot(
+                msr_id=str(msr.pk), snapshot=msr.snapshot
+            )
+        except (ValueError, TypeError, AttributeError):
+            return Response(result)
+
+        if not units:
+            return Response(result)
+
+        pending_records = list(ProjectEvidence.objects.filter(
+            msr=msr, kind=PENDING_KIND,
+        ))
+        review_records = list(ProjectEvidence.objects.filter(
+            msr=msr, kind=REVIEW_KIND,
+        ))
+        snapshot_hash = canonical_hash(msr.snapshot)
+        result["status"] = "QUEUE_AVAILABLE"
+
+        for unit in units:
+            entry = {
+                "unit_id": unit.unit_id,
+                "brand": unit.brand,
+                "model_number": unit.model_number,
+                "status": "NO_INSPECTION",
+                "pending_id": None,
+                "serial_number": None,
+                "inspection_notes": None,
+                "captured_at": None,
+            }
+
+            if any(type(item.data) is not dict for item in pending_records):
+                entry["status"] = "EVIDENCE_INVALID"
+                result["units"].append(entry)
+                continue
+            if any(type(item.data) is not dict for item in review_records):
+                entry["status"] = "EVIDENCE_INVALID"
+                result["units"].append(entry)
+                continue
+
+            matched = [
+                item for item in pending_records
+                if item.data.get("unit_id") == unit.unit_id
+            ]
+            if not matched:
+                result["units"].append(entry)
+                continue
+            if len(matched) != 1:
+                entry["status"] = "EVIDENCE_INVALID"
+                result["units"].append(entry)
+                continue
+
+            pending = matched[0]
+            data = pending.data
+            valid = (
+                pending.digest == canonical_hash(data)
+                and data.get("purpose")
+                    == "PHYSICAL_INSPECTION_PENDING_VERIFICATION"
+                and data.get("project_id") == str(project.pk)
+                and data.get("msr_id") == str(msr.pk)
+                and data.get("msr_version") == msr.number
+                and data.get("snapshot_sha256") == snapshot_hash
+                and data.get("unit_id") == unit.unit_id
+                and data.get("recorded_by")
+                    == str(pending.created_by_id)
+                and data.get("confirmed_in_person") is True
+                and data.get("independently_verified") is False
+                and data.get("trusted_installation_evidence") is False
+                and data.get("installation_authorized") is False
+                and type(data.get("serial_number")) is str
+                and bool(data["serial_number"].strip())
+                and type(data.get("inspection_notes")) is str
+                and 15 <= len(data["inspection_notes"].strip()) <= 2000
+                and type(data.get("captured_at")) is str
+                and bool(data["captured_at"].strip())
+            )
+
+            decisions = [
+                item for item in review_records
+                if (
+                    item.data.get("pending_id") == str(pending.pk)
+                    or item.data.get("unit_id") == unit.unit_id
+                )
+            ]
+
+            if not valid or len(decisions) > 1:
+                entry["status"] = "EVIDENCE_INVALID"
+            elif decisions:
+                # A retained review is not proof of an accepted decision.
+                entry["status"] = "REVIEW_RECORDED_UNVERIFIED"
+            else:
+                entry.update({
+                    "status": "PENDING_INDEPENDENT_REVIEW",
+                    "pending_id": str(pending.pk),
+                    "serial_number": data["serial_number"],
+                    "inspection_notes": data["inspection_notes"],
+                    "captured_at": data["captured_at"],
+                })
+
+            result["units"].append(entry)
+
+        return Response(result)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="review-equipment-unit-inspection",
+    )
+    def review_equipment_unit_inspection(self, request, pk=None):
+        """Comptroller-only independent review of a pending physical unit."""
+        from uuid import UUID
+        from django.db import transaction
+        from rest_framework.exceptions import ValidationError
+        from .documents import canonical_hash
+        from .models import Role, ProjectEvidence
+        from .equipment_physical_capture_pending_service import (
+            KIND as PENDING_KIND,
+        )
+        from .equipment_physical_inspection_review_service import (
+            REVIEW_KIND,
+            review_pending_physical_inspection,
+        )
+
+        actor = self._installation_entry_guard(request, Role.COMPTROLLER)
+        project = self.get_object()
+        payload = request.data
+        required = {
+            "pending_id", "accept_candidate",
+            "review_reason", "independently_examined",
+        }
+        if (
+            not isinstance(payload, dict)
+            or set(payload) != required
+            or type(payload["pending_id"]) is not str
+            or type(payload["accept_candidate"]) is not bool
+            or type(payload["review_reason"]) is not str
+            or type(payload["independently_examined"]) is not bool
+            or not 15 <= len(payload["review_reason"].strip()) <= 2000
+        ):
+            raise ValidationError(
+                "Explicit pending evidence, independent decision "
+                "and written review reason required."
+            )
+
+        try:
+            pending_id = str(UUID(payload["pending_id"]))
+        except (ValueError, TypeError, AttributeError):
+            raise ValidationError("Valid pending inspection identifier required.") from None
+
+        if (
+            payload["accept_candidate"]
+            and payload["independently_examined"] is not True
+        ):
+            raise ValidationError(
+                "Acceptance requires explicit independent examination."
+            )
+
+        with transaction.atomic():
+            msr = project.current_approved
+            if (
+                project.state == "CANCELLED"
+                or msr is None
+                or msr.status != "APPROVED"
+                or msr.project_id != project.pk
+                or project.current_approved_id != msr.pk
+            ):
+                raise ValidationError("Current approved MSR required.")
+
+            pending = ProjectEvidence.objects.select_for_update().filter(
+                pk=pending_id, msr=msr, kind=PENDING_KIND,
+            ).first()
+            if pending is None:
+                raise ValidationError(
+                    "Pending inspection must belong to the selected project."
+                )
+
+            data = pending.data
+            if (
+                type(data) is not dict
+                or pending.digest != canonical_hash(data)
+                or data.get("purpose")
+                    != "PHYSICAL_INSPECTION_PENDING_VERIFICATION"
+                or data.get("project_id") != str(project.pk)
+                or data.get("msr_id") != str(msr.pk)
+                or data.get("msr_version") != msr.number
+                or data.get("snapshot_sha256") != canonical_hash(msr.snapshot)
+                or data.get("recorded_by") != str(pending.created_by_id)
+                or data.get("confirmed_in_person") is not True
+                or data.get("independently_verified") is not False
+                or data.get("trusted_installation_evidence") is not False
+                or data.get("installation_authorized") is not False
+                or type(data.get("unit_id")) is not str
+                or not data["unit_id"].strip()
+            ):
+                raise ValidationError("Pending inspection integrity failed.")
+
+            if pending.created_by_id == actor.pk:
+                raise ValidationError("No self-review permitted.")
+
+            if ProjectEvidence.objects.filter(
+                msr=msr, kind=REVIEW_KIND,
+                data__pending_id=str(pending.pk),
+            ).exists():
+                raise ValidationError(
+                    "An independent decision already exists for this inspection."
+                )
+
+            decision = review_pending_physical_inspection(
+                actor=actor,
+                pending_id=pending.pk,
+                accept_candidate=payload["accept_candidate"],
+                review_reason=payload["review_reason"],
+                independently_examined=payload["independently_examined"],
+            )
+
+        return Response({
+            "project_id": str(project.pk),
+            "msr_id": str(msr.pk),
+            "pending_id": str(pending.pk),
+            "review_id": str(decision.pk),
+            "status": (
+                "INTERNAL_CANDIDATE_ACCEPTED"
+                if payload["accept_candidate"] else "REJECTED"
+            ),
+            "source_authenticated": False,
+            "trusted_installation_evidence": False,
+            "installation_authorized": False,
+            "final_receipt_issuance_authorized": False,
+            "customer_delivery_verified": False,
+            "completion_authorized": False,
+        }, status=201)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="record-equipment-unit-inspection",
+    )
+    def record_equipment_unit_inspection(self, request, pk=None):
+        """Record a development-only pending physical-unit observation."""
+        from datetime import datetime
+        from django.db import transaction
+        from django.utils import timezone
+        from rest_framework.exceptions import ValidationError
+        from .models import Role, InstallationSchedule
+        from .equipment_physical_capture_pending_service import (
+            record_pending_physical_inspection,
+        )
+
+        actor = self._installation_entry_guard(
+            request, Role.INSTALLATION_MANAGER
+        )
+        project = self.get_object()
+        payload = request.data
+
+        required = {
+            "msr_id", "unit_id", "serial_number",
+            "captured_at", "installation_starts_at",
+            "confirmed_in_person", "inspection_notes",
+        }
+        if (
+            not isinstance(payload, dict)
+            or set(payload) != required
+            or any(
+                type(payload[key]) is not str
+                for key in required - {"confirmed_in_person"}
+            )
+            or payload["confirmed_in_person"] is not True
+        ):
+            raise ValidationError(
+                "Explicit equipment identification and in-person "
+                "inspection attestation required."
+            )
+
+        if (
+            not payload["msr_id"].strip()
+            or not payload["unit_id"].strip()
+            or not payload["serial_number"].strip()
+            or not 15 <= len(payload["inspection_notes"].strip()) <= 2000
+        ):
+            raise ValidationError(
+                "Approved equipment, serial number and specific notes required."
+            )
+
+        try:
+            captured_at = datetime.fromisoformat(
+                payload["captured_at"].replace("Z", "+00:00")
+            )
+            starts_at = datetime.fromisoformat(
+                payload["installation_starts_at"].replace("Z", "+00:00")
+            )
+        except (ValueError, TypeError):
+            raise ValidationError(
+                "Valid explicitly entered inspection timestamps required."
+            ) from None
+
+        if (
+            timezone.is_naive(captured_at)
+            or timezone.is_naive(starts_at)
+            or captured_at > timezone.now()
+            or captured_at > starts_at
+        ):
+            raise ValidationError(
+                "Inspection times must be timezone-aware, chronological "
+                "and must not claim a future observation."
+            )
+
+        with transaction.atomic():
+            schedules = list(
+                InstallationSchedule.objects.select_for_update().filter(
+                    project=project,
+                    status__in=(
+                        InstallationSchedule.Status.SCHEDULED,
+                        InstallationSchedule.Status.COMPLETED,
+                    ),
+                )
+            )
+            if (
+                len(schedules) != 1
+                or schedules[0].installation_manager_id != actor.pk
+                or schedules[0].cancelled_at is not None
+                or schedules[0].scheduled_date is None
+                or timezone.localtime(starts_at).date()
+                    != schedules[0].scheduled_date
+            ):
+                raise ValidationError(
+                    "Exactly one eligible schedule assigned to the "
+                    "recording Installation Manager is required, and "
+                    "the stated installation start must match its date."
+                )
+
+            msr = project.current_approved
+            if (
+                project.state == "CANCELLED"
+                or msr is None
+                or msr.status != "APPROVED"
+                or msr.project_id != project.pk
+                or project.current_approved_id != msr.pk
+                or str(msr.pk) != payload["msr_id"]
+            ):
+                raise ValidationError(
+                    "The selected current approved MSR is required."
+                )
+
+            record = record_pending_physical_inspection(
+                actor=actor,
+                project_id=project.pk,
+                msr_id=str(msr.pk),
+                unit_id=payload["unit_id"],
+                serial_number=payload["serial_number"],
+                captured_at=captured_at,
+                installation_starts_at=starts_at,
+                confirmed_in_person=True,
+                inspection_notes=payload["inspection_notes"],
+            )
+
+        return Response({
+            "project_id": str(project.pk),
+            "msr_id": str(msr.pk),
+            "unit_id": payload["unit_id"],
+            "evidence_id": str(record.pk),
+            "status": "PENDING_INDEPENDENT_REVIEW",
+            "source_authenticated": False,
+            "trusted_installation_evidence": False,
+            "installation_authorized": False,
+            "final_receipt_issuance_authorized": False,
+            "customer_delivery_verified": False,
+            "completion_authorized": False,
+        }, status=201)
+
+    @action(
+        detail=True,
         methods=["post"],
         url_path="record-installation-inspection",
     )

@@ -167,6 +167,9 @@ def finish(actor, session_key, state, code, error=None):
     if challenge.context.get('operation') in {'SANDBOX_SIGNING_SEND','SANDBOX_SIGNING_READ'}:
         from .signing_test import finish as finish_test
         return finish_test(actor, challenge, config, token)
+    if challenge.context.get('operation') == 'SANDBOX_INSPECTION_READ':
+        from .installation_provider_oauth_4979 import finish as finish_inspection
+        return finish_inspection(actor, challenge, config, token)
     if challenge.context.get('operation') == 'SANDBOX_COMPLETION_READ':
         from .completion_provider_oauth_4611 import finish as finish_completion
         return finish_completion(actor, challenge, config, token)

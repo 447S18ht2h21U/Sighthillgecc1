@@ -970,3 +970,10 @@ button:focus-visible {
     transition: none !important;
   }
 }
+
+
+/* VERIDIAN secondary navigation: spacing between independent controls. */
+button.veridian-secondary-nav-button {
+  margin-right: 0.75rem;
+  margin-bottom: 0.5rem;
+}

@@ -150,8 +150,8 @@ function App(){
    <div className="veridian-navigation-row"><button className="quiet" type="button" onClick={()=>setPanel('dashboard')}>Project Status Dashboard</button><button className="quiet" type="button" onClick={()=>{setInstallationFocusId(null);setPanel('installation');}}>Installation Scheduling</button>{['INSTALLATION_MANAGER','CEO','COMPTROLLER'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('technicianAssignments')}>Technician Assignments</button>}{['CEO','COMPTROLLER'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('contractorDirectory')}>Contractor Compensation</button>}{user.role==='COMPTROLLER'&&<button className="quiet" type="button" onClick={()=>setPanel('customerPayments')}>Customer Payments</button>}{['customers','accounts','audit','completionInspection','installation','technicianAssignments','contractorDirectory','visibleMsrs','productCatalog'].includes(panel)&&<button className="quiet veridian-return-button" type="button" onClick={()=>setPanel('projects')}>Return to Customers &amp; Projects</button>}</div>
     
    {user.role==='MARKETING'&&<button className="quiet" type="button" onClick={()=>setPanel('marketingMsrs')}>Master Sales Records</button>}
-  {['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('visibleMsrs')}>View Master Sales Records</button>}
-{['SALES_MANAGER','INSTALLATION_MANAGER'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('productCatalog')}>Manage Product Catalog</button>}
+  {['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<button className="quiet veridian-secondary-nav-button" type="button" onClick={()=>setPanel('visibleMsrs')}>View Master Sales Records</button>}
+{['SALES_MANAGER','INSTALLATION_MANAGER'].includes(user.role)&&<button className="quiet veridian-secondary-nav-button" type="button" onClick={()=>setPanel('productCatalog')}>Manage Product Catalog</button>}
   {panel==='productCatalog'&&['SALES_MANAGER','INSTALLATION_MANAGER'].includes(user.role)&&<NamedProductCatalog4547 api={api}/>}
   {panel==='customerPayments'&&user.role==='COMPTROLLER'&&
     <div className="installation-evidence-nav-actions">
@@ -222,11 +222,11 @@ function App(){
       setPanel('projects');
     }}
 />} 
- {panel!=='contractorDirectory'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<button className="quiet" onClick={()=>setPanel('customers')}>Manage customers</button>}
+ {panel!=='contractorDirectory'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<button className="quiet veridian-secondary-nav-button" onClick={()=>setPanel('customers')}>Manage customers</button>}
  {panel==='customers'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<CustomerManagement api={api} onChanged={load} onBack={()=>setPanel('projects')} onCreateProject={id=>{setProjectCustomerId(id);setPanel('project');}}/>}
- {panel!=='contractorDirectory'&&user.role==='COMPTROLLER'&&<button className="quiet" onClick={()=>setPanel('accounts')}>User management</button>}
- {panel!=='contractorDirectory'&&user.role==='COMPTROLLER'&&<button className="quiet" onClick={()=>setPanel('audit')}>Audit history</button>}
-  {panel!=='contractorDirectory'&&user.role==='COMPTROLLER'&&<button className="quiet" onClick={()=>setPanel('completionInspection')}>Completion Envelope Inspection</button>}
+ {panel!=='contractorDirectory'&&user.role==='COMPTROLLER'&&<button className="quiet veridian-secondary-nav-button" onClick={()=>setPanel('accounts')}>User management</button>}
+ {panel!=='contractorDirectory'&&user.role==='COMPTROLLER'&&<button className="quiet veridian-secondary-nav-button" onClick={()=>setPanel('audit')}>Audit history</button>}
+  {panel!=='contractorDirectory'&&user.role==='COMPTROLLER'&&<button className="quiet veridian-secondary-nav-button" onClick={()=>setPanel('completionInspection')}>Completion Envelope Inspection</button>}
  {user.role==='COMPTROLLER'&&panel==='audit'&&<AuditHistory api={api} onBack={()=>setPanel('projects')}/>}
   {user.role==='COMPTROLLER'&&panel==='completionInspection'&&<CompletionEnvelopeInspection api={api}/>}
  {user.role==='COMPTROLLER'&&panel==='accounts'&&<AccountManagement actorId={user.id} api={api} onChanged={load} onBack={()=>setPanel('projects')}/>}
@@ -260,6 +260,7 @@ function App(){
         key={`${selected.id}-${selected.current_approved.id}`}
         projectId={selected.id}
         projectCode={selected.code}
+        actorRole={user.role}
       />
       <p className="muted">
         The exact final Receipt PDF, authenticated evidence of its email
