@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { InstallationInspectionEntry4843 } from './InstallationInspectionEntry4843';
 import { EquipmentUnitSelection4872 } from './EquipmentUnitSelection4872';
+import { EquipmentUnitReview4880 } from './EquipmentUnitReview4880';
 
 type Api = <T,>(path: string, method?: string, data?: unknown) => Promise<T>;
 type Project = {
@@ -780,6 +781,20 @@ export function InstallationScheduling({
               : '-'}</td>
           </tr>)}</tbody>
         </table>}
+    {actorRole === 'COMPTROLLER' && Boolean(projectId) && (
+      <section aria-label="Independent physical equipment review">
+        <h3>Independent Physical Equipment Review</h3>
+        <p className="muted">
+          Review equipment observations recorded for the selected
+          project. An internal review is not trusted installation
+          evidence and does not authorize installation.
+        </p>
+        <EquipmentUnitReview4880
+          key={`equipment-review-${projectId}`}
+          projectId={projectId}
+        />
+      </section>
+    )}
     {canManage &&
       actorRole === 'INSTALLATION_MANAGER' &&
       Boolean(projectId) && (

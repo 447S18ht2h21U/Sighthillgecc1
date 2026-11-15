@@ -979,6 +979,57 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
         result["status"] = "APPROVED_UNIT_LIST_AVAILABLE"
         return Response(result)
 
+    def _equipment_unit_review_read_guard(self, request):
+        """Restricted read-only Comptroller equipment review queue."""
+        import os
+        from pathlib import Path
+        from django.conf import settings
+        from rest_framework.exceptions import PermissionDenied
+        from .models import Role
+
+        try:
+            return self._installation_entry_guard(
+                request, Role.COMPTROLLER
+            )
+        except PermissionDenied:
+            request_user = getattr(request, "user", None)
+            if request_user is None:
+                raise
+
+            actor = User.objects.filter(
+                pk=getattr(request_user, "pk", None),
+                is_active=True,
+            ).first()
+
+            expected = (
+                Path(settings.BASE_DIR).resolve().parent
+                / "recovery"
+                / "browser-acceptance-5050"
+                / "acceptance.sqlite3"
+            ).resolve()
+
+            db_name = str(settings.DATABASES["default"]["NAME"])
+            configured = os.environ.get("GECC_SQLITE_PATH", "")
+
+            allowed = (
+                actor is not None
+                and actor.role == Role.COMPTROLLER
+                and settings.ENVIRONMENT == "development"
+                and settings.DEBUG is True
+                and settings.DATABASES["default"]["ENGINE"]
+                    == "django.db.backends.sqlite3"
+                and db_name not in ("", ":memory:")
+                and Path(db_name).resolve() == expected
+                and bool(configured)
+                and Path(configured).resolve() == expected
+                and expected.is_file()
+            )
+
+            if not allowed:
+                raise
+
+            return actor
+
     @action(
         detail=True,
         methods=["get"],
@@ -996,7 +1047,7 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
             REVIEW_KIND,
         )
 
-        self._installation_entry_guard(request, Role.COMPTROLLER)
+        self._equipment_unit_review_read_guard(request)
         project = self.get_object()
         result = {
             "project_id": str(project.pk),

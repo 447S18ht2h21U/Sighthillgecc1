@@ -137,7 +137,7 @@ export function EquipmentCatalogEditor4534({
                 <p className="muted">
                   Individual category: {line.category_of_work}
                 </p>}
-              <details>
+              <details className="msr-equipment-category-override">
                 <summary>Use a different category for this equipment</summary>
                 <label>
                   Category of Work for this equipment
