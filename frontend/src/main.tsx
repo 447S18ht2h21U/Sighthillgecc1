@@ -81,6 +81,7 @@ function App(){
  const [customers,setCustomers]=useState<Customer[]>([]), [people,setPeople]=useState<Person[]>([]), [projectRefresh,setProjectRefresh]=useState(0), [selected,setSelected]=useState<Project|null>(null);
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null), [reason,setReason]=useState(''), [history,setHistory]=useState<MSR[]>([]);
  const [documents,setDocuments]=useState<PreparedDocument[]>([]);
+ const [primaryWorkCategory,setPrimaryWorkCategory]=useState('');
  const [panel,setPanel]=useState<'projects'|'dashboard'|'installation'|'customer'|'project'|'accounts'|'customers'|'audit'|'completionInspection'|'technicianAssignments'|'contractorDirectory'|'marketingMsrs'|'visibleMsrs' | 'productCatalog' | 'customerPayments'|'salesHistory'>('projects');
   const [projectCustomerId,setProjectCustomerId]=useState('');
   const [workflowIntent,setWorkflowIntent]=useState<'none'|'completion'>('none');
@@ -108,7 +109,19 @@ function App(){
   if(selected?.id&&user&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role))void api<PreparedDocument[]>(`projects/${selected.id}/documents/`).then(d=>{if(!cancelled)setDocuments(d);}).catch(e=>{if(!cancelled)setError((e as Error).message);});
   return()=>{cancelled=true;};
  },[selected?.id,user?.id]);
- function choose(p:Project){setSelected(p);setSnapshot(p.pending?.snapshot??null);setReason('');setHistory([]);}
+ function choose(p:Project){
+  setSelected(p);
+  setSnapshot(p.pending?.snapshot??null);
+  setReason('');
+  setHistory([]);
+  const first = p.pending?.snapshot.equipment.find(
+    line => 'category_of_work' in line
+  );
+  setPrimaryWorkCategory(
+    first && 'category_of_work' in first
+      ? first.category_of_work : ''
+  );
+}
   function reviewDashboardInstallation(id:string) {
     setInstallationFocusId(id);
     setPanel('installation');
@@ -239,7 +252,37 @@ function App(){
  <div className="veridian-guide-banner veridian-guide-banner--info"><strong>Master Sales Record - How to use this screen</strong><p><strong>Step 1 - Complete the record.</strong> Check the customer, work scope, prices, equipment, materials, and financing choice. The financing classification controls the payment option: financed projects use a 50% deposit and 50% at completion; non-financed projects use 100% at completion. A payment exception requires its own documented CEO approval before installation. Approved historical MSRs remain unchanged.</p><p><strong>Step 2 - Save or submit.</strong> Select Save draft to keep editing later. Select Save &amp; submit when the record is ready for review.</p><p><strong>Step 3 - Review and approval.</strong> An authorized reviewer can approve a submitted version or reject it with a reason. A rejected version can be corrected and submitted again.</p><p><strong>Step 4 - Protect approved records.</strong> An approved version is locked. To change commercial information, enter a revision reason and create a new version. Use Version history to review earlier records.</p></div><div className="versionbar"><span>Approved: {selected.current_approved?`Version ${selected.current_approved.number}.0`:'None yet'}</span><span>Pending: {selected.pending?`Version ${selected.pending.number}.0  -  ${selected.pending.status}`:'None'}</span><button className="quiet" onClick={()=>void run(async()=>setHistory(await api<MSR[]>(`projects/${selected.id}/history/`)))}>Version history</button></div>
  {selected.current_approved&&<details><summary>View approved version {selected.current_approved.number}.0</summary><Summary data={selected.current_approved.snapshot}/></details>}
  {history.map(v=><details key={v.id}><summary>Version {v.number}.0  -  {v.status}</summary><p>{v.revision_reason}</p><Summary data={v.snapshot}/></details>)}
- {selected.pending&&snapshot?<><h3>Master Sales Record  -  Version {selected.pending.number}.0</h3><fieldset disabled={!editable||busy}><div className="grid">{(['customer','contact','billing_address','project_location','scope','base_price','discount','tax','total_price','payment_terms','commercial_notes','customer_phone','customer_email','project_city','project_state','project_zip'] as const).map(key=><label key={key}>{FIELD_LABELS[key]}{['scope','payment_terms','commercial_notes'].includes(key)?<textarea aria-label={FIELD_LABELS[key]} value={snapshot[key]??''} onChange={e=>setSnapshot({...snapshot,[key]:e.target.value})}/>:<input aria-label={FIELD_LABELS[key]} value={snapshot[key]??''} onChange={e=>setSnapshot({...snapshot,[key]:e.target.value})}/>}</label>)}<label>Financing<select aria-label="Financing" value={snapshot.financing_type??''} onChange={e=>{const finance=e.target.value;setSnapshot({...snapshot,financing_type:finance,payment_option:finance==='FINANCED'?'50_PERCENT_DEPOSIT':finance==='NON_FINANCED'?'100_PERCENT_COMPLETION':snapshot.payment_option});}}><option value="">Choose financing</option><option value="NON_FINANCED">Non-financed</option><option value="FINANCED">Financed</option></select></label><label>Payment option (set by financing)<input aria-label="Payment option (set by financing)" readOnly value={snapshot.payment_option==='50_PERCENT_DEPOSIT'?'50% deposit / 50% at completion':snapshot.payment_option==='100_PERCENT_COMPLETION'?'100% at completion':'Not established'}/></label></div><EquipmentCatalogEditor4534 api={api} items={snapshot.equipment} onChange={items=>setSnapshot({...snapshot,equipment:items})}/><Lines title="Materials" items={snapshot.materials} onChange={items=>setSnapshot({...snapshot,materials:items})}/></fieldset>{paymentMismatch&&<div role="alert" className="veridian-guide-banner veridian-guide-banner--info"><strong>Payment schedule needs review.</strong><p>This draft's saved payment option does not match its financing classification. Approved historical MSRs will not be changed automatically.</p>{editable&&snapshot&&requiredPaymentOption&&<button type="button" className="quiet" disabled={busy} onClick={()=>setSnapshot({...snapshot,payment_option:requiredPaymentOption})}>Use required payment option in this draft</button>}</div>}{!submitPaymentReady&&editable&&
+ {selected.pending&&snapshot?<><h3>Master Sales Record  -  Version {selected.pending.number}.0</h3><fieldset disabled={!editable||busy}><div className="grid">{(['customer','contact','billing_address','project_location','scope','base_price','discount','tax','total_price','payment_terms','commercial_notes','customer_phone','customer_email','project_city','project_state','project_zip'] as const).map(key=><React.Fragment key={key}><label>{FIELD_LABELS[key]}{['scope','payment_terms','commercial_notes'].includes(key)?<textarea aria-label={FIELD_LABELS[key]} value={snapshot[key]??''} onChange={e=>setSnapshot({...snapshot,[key]:e.target.value})}/>:<input aria-label={FIELD_LABELS[key]} value={snapshot[key]??''} onChange={e=>setSnapshot({...snapshot,[key]:e.target.value})}/>}</label>{key==='scope'&&
+<label>
+  Category of Work
+  <select
+    aria-label="Primary Category of Work"
+    value={primaryWorkCategory}
+    onChange={event=>{
+      const next=event.target.value;
+      setSnapshot({
+        ...snapshot,
+        equipment:snapshot.equipment.map(line=>
+          'category_of_work' in line &&
+          (!primaryWorkCategory ||
+           line.category_of_work===primaryWorkCategory)
+            ? {...line,category_of_work:next}
+            : line
+        )
+      });
+      setPrimaryWorkCategory(next);
+    }}
+  >
+    <option value="">Choose category of work</option>
+    <option value="New installation">New installation</option>
+    <option value="Replacing existing equipment">
+      Replacing existing equipment
+    </option>
+    <option value="Service & maintenance">
+      Service &amp; maintenance
+    </option>
+  </select>
+</label>}</React.Fragment>)}<label>Financing<select aria-label="Financing" value={snapshot.financing_type??''} onChange={e=>{const finance=e.target.value;setSnapshot({...snapshot,financing_type:finance,payment_option:finance==='FINANCED'?'50_PERCENT_DEPOSIT':finance==='NON_FINANCED'?'100_PERCENT_COMPLETION':snapshot.payment_option});}}><option value="">Choose financing</option><option value="NON_FINANCED">Non-financed</option><option value="FINANCED">Financed</option></select></label><label>Payment option (set by financing)<input aria-label="Payment option (set by financing)" readOnly value={snapshot.payment_option==='50_PERCENT_DEPOSIT'?'50% deposit / 50% at completion':snapshot.payment_option==='100_PERCENT_COMPLETION'?'100% at completion':'Not established'}/></label></div><EquipmentCatalogEditor4534 api={api} primaryCategory={primaryWorkCategory} items={snapshot.equipment} onChange={items=>setSnapshot({...snapshot,equipment:items})}/><Lines title="Materials" items={snapshot.materials} onChange={items=>setSnapshot({...snapshot,materials:items})}/></fieldset>{paymentMismatch&&<div role="alert" className="veridian-guide-banner veridian-guide-banner--info"><strong>Payment schedule needs review.</strong><p>This draft's saved payment option does not match its financing classification. Approved historical MSRs will not be changed automatically.</p>{editable&&snapshot&&requiredPaymentOption&&<button type="button" className="quiet" disabled={busy} onClick={()=>setSnapshot({...snapshot,payment_option:requiredPaymentOption})}>Use required payment option in this draft</button>}</div>}{!submitPaymentReady&&editable&&
     <p role="status" className="muted">
       To submit the MSR, choose financing and confirm the required
       payment option. You can still save your draft.

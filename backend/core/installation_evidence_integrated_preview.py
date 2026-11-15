@@ -6,7 +6,7 @@ independently reviewed equipment candidates. No operational authority.
 from dataclasses import dataclass
 from uuid import UUID
 
-from .equipment_physical_units import physical_units_from_snapshot
+from .equipment_physical_units import physical_units_from_snapshot, NEW_MSR_FIELDS
 from .equipment_physical_inspection_verifier import (
     verify_physical_inspection_candidate,
 )
@@ -29,6 +29,20 @@ class InstallationEvidenceIntegratedPreview:
     trusted_installation_evidence: bool = False
     installation_authorized: bool = False
 
+
+
+
+def legacy_equipment_rows_incomplete(snapshot):
+    """Identify incomplete catalog rows without altering approved data."""
+    if type(snapshot) is not dict:
+        return False
+    equipment = snapshot.get("equipment")
+    if type(equipment) is not list or not equipment:
+        return False
+    return any(
+        type(row) is dict and set(row) != NEW_MSR_FIELDS
+        for row in equipment
+    )
 
 def preview_installation_with_physical_reviews(
     *, project_id, installation_starts_at, now=None,
@@ -81,6 +95,13 @@ def preview_installation_with_physical_reviews(
     except (ValueError, TypeError):
         physical_units = ()
         blockers.append("Approved MSR physical-unit inventory is invalid.")
+        if legacy_equipment_rows_incomplete(msr.snapshot):
+            blockers.append(
+                "Legacy approved MSR equipment information is incomplete. "
+                "An authorized new MSR version with complete catalog equipment "
+                "details is required before physical-unit review. "
+                "The historical approved record must remain unchanged."
+            )
 
     if not physical_units:
         blockers.append("No physical units available for verification.")

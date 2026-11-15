@@ -61,6 +61,7 @@ class VisibleMSRViewSet(viewsets.ReadOnlyModelViewSet):
         return (
             MSR.objects
             .filter(project__in=projects)
+            .select_related("project")
             .order_by("-created_at", "-id")
         )
 

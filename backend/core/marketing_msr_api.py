@@ -20,11 +20,13 @@ class MarketingMSRSerializer(serializers.ModelSerializer):
     """Expose only approved commercial MSR fields to Marketing."""
 
     snapshot = serializers.SerializerMethodField()
+    project_code = serializers.CharField(source="project.code", read_only=True)
 
     class Meta:
         model = MSR
         fields = [
             "id",
+            "project_code",
             "number",
             "status",
             "snapshot",
@@ -86,7 +88,7 @@ class MarketingMSRViewSet(viewsets.ReadOnlyModelViewSet):
         ):
             raise PermissionDenied("Marketing MSR viewing is not authorized.")
 
-        return MSR.objects.all().order_by("-created_at", "-id")
+        return MSR.objects.all().select_related("project").order_by("-created_at", "-id")
 
     def finalize_response(self, request, response, *args, **kwargs):
         response = super().finalize_response(

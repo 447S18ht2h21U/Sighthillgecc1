@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 type API = <T>(
   path: string,
@@ -8,6 +8,7 @@ type API = <T>(
 
 type VisibleMSR = {
   id: string;
+  project_code: string;
   number: number;
   status: string;
   snapshot: Record<string, unknown>;
@@ -57,6 +58,15 @@ export function VisibleMSRDirectory({ api }: Props) {
   const [previous, setPrevious] = useState(false);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<VisibleMSR | null>(null);
+  const selectedRecordRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (selected) {
+      selectedRecordRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }
+  }, [selected]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -185,6 +195,7 @@ export function VisibleMSRDirectory({ api }: Props) {
             {matching.map(record => (
               <section key={record.id}>
                 <h3>{customerName(record)}</h3>
+                <p>Project: {record.project_code}</p>
                 <p className="muted">
                   Version {record.number}.0 - {fieldLabel(record.status)}
                 </p>
@@ -222,10 +233,11 @@ export function VisibleMSRDirectory({ api }: Props) {
       )}
 
       {selected && !loading && !error && (
-        <article aria-label="Read-only Master Sales Record">
+        <article ref={selectedRecordRef} aria-label="Read-only Master Sales Record">
           <div className="title">
             <div>
               <h2>{customerName(selected)}</h2>
+              <p>Project: {selected.project_code}</p>
               <p className="muted">
                 MSR version {selected.number}.0 - {fieldLabel(selected.status)}
               </p>

@@ -977,3 +977,40 @@ button.veridian-secondary-nav-button {
   margin-right: 0.75rem;
   margin-bottom: 0.5rem;
 }
+
+/* VERIDIAN READABILITY 5070A */
+html { font-size: 16px; }
+body { font-size: 16px; line-height: 1.5; }
+
+label,
+fieldset label,
+.record-filters label {
+    font-size: 15px !important;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+p, li, dt, dd {
+    font-size: max(14px, 0.9375rem);
+    line-height: 1.55;
+}
+
+.muted, small, .veridian-guide-banner p {
+    font-size: 14px !important;
+    line-height: 1.55;
+}
+
+input, select, textarea {
+    font-size: 16px !important;
+    line-height: 1.5;
+}
+
+button {
+    font-size: 14px !important;
+    line-height: 1.45;
+}
+
+.record-filters section {
+    overflow-wrap: anywhere;
+}
+/* END VERIDIAN READABILITY 5070A */

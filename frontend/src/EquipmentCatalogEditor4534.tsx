@@ -52,10 +52,12 @@ export function EquipmentCatalogEditor4534({
   items,
   onChange,
   api,
+  primaryCategory,
 }: {
   items: EquipmentLine[];
   onChange: (items: EquipmentLine[]) => void;
   api: API;
+  primaryCategory: string;
 }) {
   const [catalogs, setCatalogs] = useState<NamedCatalog[]>([]);
   const [catalogId, setCatalogId] = useState('');
@@ -94,7 +96,7 @@ export function EquipmentCatalogEditor4534({
   }
 
   function add() {
-    if (items.length >= 8) return;
+    if (items.length >= 8 || !categories.includes(primaryCategory)) return;
     const selected = products.find(row => row.id === selectedId);
     if (!selected) return;
 
@@ -106,7 +108,7 @@ export function EquipmentCatalogEditor4534({
       model_number: selected.model_number,
       description: selected.description,
       quantity: 1,
-      category_of_work: categories[0],
+      category_of_work: primaryCategory,
     }]);
     setSelectedId('');
   }
@@ -131,18 +133,29 @@ export function EquipmentCatalogEditor4534({
                 {' — '}{line.residential_system_type}
                 {' — '}{line.description}
               </p>
-              <label>
-                Category of Work
-                <select value={line.category_of_work}
-                  onChange={event => replace(index, {
-                    ...line,
-                    category_of_work: event.target.value,
-                  })}>
-                  {categories.map(value => (
-                    <option key={value} value={value}>{value}</option>
-                  ))}
-                </select>
-              </label>
+              {line.category_of_work !== primaryCategory &&
+                <p className="muted">
+                  Individual category: {line.category_of_work}
+                </p>}
+              <details>
+                <summary>Use a different category for this equipment</summary>
+                <label>
+                  Category of Work for this equipment
+                  <select
+                    value={line.category_of_work}
+                    onChange={event => replace(index, {
+                      ...line,
+                      category_of_work: event.target.value,
+                    })}
+                  >
+                    {categories.map(value => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </details>
               <label>
                 Quantity
                 <input type="number" min="1" max="999" step="1"
@@ -213,7 +226,7 @@ export function EquipmentCatalogEditor4534({
       }
 
       <button type="button" className="msr-add-equipment-primary"
-        disabled={!selectedId || items.length >= 8}
+        disabled={!selectedId || !primaryCategory || items.length >= 8}
         onClick={add}>
         Add Selected Equipment
       </button>
