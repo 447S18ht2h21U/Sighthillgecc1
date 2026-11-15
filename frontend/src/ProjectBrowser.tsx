@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 type API=<T>(path:string,method?:string,data?:unknown)=>Promise<T>;
 type Page<T>={count:number;next:string|null;previous:string|null;results:T[]};
-type ProjectRow={id:string;code:string;location:string;state:string};
+type ProjectRow={id:string;code:string;location:string;state:string;sales_status?:string|null};
 export function ProjectBrowser<T extends ProjectRow>({api,selectedId,refreshKey,onChoose}:{api:API;selectedId?:string;refreshKey:number;onChoose:(project:T)=>void}){
  const [query,setQuery]=useState(''),[state,setState]=useState(''),[sort,setSort]=useState('NEWEST'),[page,setPage]=useState(1);
  const [filters,setFilters]=useState({search:'',state:'',sort:'NEWEST'}),[results,setResults]=useState<Page<T>|null>(null),[error,setError]=useState('');
@@ -13,6 +13,6 @@ export function ProjectBrowser<T extends ProjectRow>({api,selectedId,refreshKey,
   <label>Project order<select aria-label="Project order" value={sort} onChange={e=>setSort(e.target.value)}><option value="NEWEST">Newest first</option><option value="OLDEST">Oldest first</option><option value="CODE">Project code</option></select></label>
   <div className="actions"><button>Search projects</button><button type="button" className="quiet" onClick={()=>{setQuery('');setState('');setSort('NEWEST');setPage(1);setFilters({search:'',state:'',sort:'NEWEST'});}}>Clear project filters</button></div>
  </form><p className="muted">Search the customer record and names recorded in the current approved or pending MSR. Select Search projects to apply filters. Filters change the list; your open project remains available.</p>
- {error&&<p role="alert" className="error">{error}</p>}{results?<><p role="status">{results.count} projects found · Page {page}</p>{results.count===0&&<p>No projects match these filters.</p>}{results.results.map(p=><button className={`project ${selectedId===p.id?'active':''}`} key={p.id} onClick={()=>onChoose(p)}><strong>{p.code}</strong><span>{p.location}</span><span className="badge">{p.state}</span></button>)}<div className="actions"><button className="quiet" disabled={!results.previous} onClick={()=>setPage(n=>n-1)}>Previous projects</button><button className="quiet" disabled={!results.next} onClick={()=>setPage(n=>n+1)}>Next projects</button></div></>:!error&&<p>Loading projects…</p>}
+ {error&&<p role="alert" className="error">{error}</p>}{results?<><p role="status">{results.count} projects found · Page {page}</p>{results.count===0&&<p>No projects match these filters.</p>}{results.results.map(p=><button className={`project ${selectedId===p.id?'active':''}`} key={p.id} onClick={()=>onChoose(p)}><strong>{p.code}</strong><span>{p.location}</span><span className="badge">Project: {p.state}</span>{p.sales_status&&<span className="badge">Sales: {p.sales_status.replace(/_/g," ")}</span>}</button>)}<div className="actions"><button className="quiet" disabled={!results.previous} onClick={()=>setPage(n=>n-1)}>Previous projects</button><button className="quiet" disabled={!results.next} onClick={()=>setPage(n=>n+1)}>Next projects</button></div></>:!error&&<p>Loading projects…</p>}
  </aside>;
 }

@@ -1,3 +1,8 @@
+import os
+
+from django.conf import settings
+from django.db import connection
+from django.db.migrations.recorder import MigrationRecorder
 from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -5,11 +10,51 @@ from rest_framework.pagination import PageNumberPagination
 from .models import Project, User
 from .operational_visibility import operational_project_scope
 
+def operational_sales_status_available():
+    if not settings.DEBUG or os.environ.get("GECC_SALES_STATUS_ENABLED") != "1":
+        return False
+
+    required = {
+        "core_project",
+        "core_projectsalesstatuschange",
+        "django_migrations",
+    }
+
+    if not required.issubset(set(connection.introspection.table_names())):
+        return False
+
+    with connection.cursor() as cursor:
+        columns = {
+            column.name
+            for column in connection.introspection.get_table_description(
+                cursor, "core_project"
+            )
+        }
+
+    if "sales_status" not in columns:
+        return False
+
+    return MigrationRecorder.Migration.objects.using(
+        connection.alias
+    ).filter(
+        app="core",
+        name="0088_sales_status_audit_guard_5003",
+    ).exists()
+
+
 class OperationalProjectSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source='customer.legal_name', read_only=True)
+    sales_status = serializers.SerializerMethodField()
+
+    def get_sales_status(self, obj):
+        if not hasattr(self, "_sales_status_available"):
+            self._sales_status_available = operational_sales_status_available()
+
+        return obj.sales_status if self._sales_status_available else None
+
     class Meta:
         model = Project
-        fields = ['id', 'code', 'customer', 'customer_name', 'location', 'sales_associate', 'state', 'created_at']
+        fields = ['id', 'code', 'customer', 'customer_name', 'location', 'sales_associate', 'state', 'sales_status', 'created_at']
         read_only_fields = fields
 
 class OperationalProjectPagination(PageNumberPagination):
@@ -28,7 +73,12 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
         actor = User.objects.filter(pk=user.pk, is_active=True).first()
         if actor is None:
             return Project.objects.none()
-        return operational_project_scope(actor).select_related('customer').order_by('-created_at', '-id')
+        queryset = operational_project_scope(actor).select_related('customer')
+
+        if not operational_sales_status_available():
+            queryset = queryset.defer('sales_status')
+
+        return queryset.order_by('-created_at', '-id')
 
 
 

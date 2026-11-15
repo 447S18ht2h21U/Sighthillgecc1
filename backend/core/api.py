@@ -123,9 +123,19 @@ class MSRSerializer(serializers.ModelSerializer):
 class ProjectSerializer(serializers.ModelSerializer):
     current_approved = MSRSerializer(read_only=True)
     pending = MSRSerializer(read_only=True)
+    sales_status = serializers.SerializerMethodField()
+
+    def get_sales_status(self, obj):
+        from .operational_project_api import operational_sales_status_available
+
+        if not hasattr(self, "_sales_status_available"):
+            self._sales_status_available = operational_sales_status_available()
+
+        return obj.sales_status if self._sales_status_available else None
+
     class Meta:
         model = Project
-        fields = ['id', 'code', 'customer', 'location', 'sales_associate', 'reviewer', 'state', 'current_approved', 'pending', 'created_at']
+        fields = ['id', 'code', 'customer', 'location', 'sales_associate', 'reviewer', 'state', 'sales_status', 'current_approved', 'pending', 'created_at']
         read_only_fields = fields
 
 class ProjectInput(serializers.Serializer):
