@@ -262,6 +262,13 @@ class ProjectViewSet(PrivateRecordViewSet):
         actor = User.objects.get(pk=self.request.user.pk)
         qs = project_scope(actor).order_by('-created_at', '-id') if actor.is_active else Project.objects.none()
         if self.action != 'list': return qs
+        customer_id = self.request.query_params.get('customer', '').strip()
+        if customer_id:
+            try:
+                requested_customer = uuid.UUID(customer_id)
+            except (ValueError, TypeError, AttributeError):
+                raise ValidationError({'customer': 'Invalid customer identifier.'})
+            qs = qs.filter(customer_id=requested_customer)
         values = list_filters(self.request, {'state': ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'REVISED', 'CANCELLED'], 'sort': ['NEWEST', 'OLDEST', 'CODE']})
         if values['state']: qs = qs.filter(state=values['state'])
         term = values['search']

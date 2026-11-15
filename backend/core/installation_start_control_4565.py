@@ -10,6 +10,8 @@ from .installation_database_schedule_readiness import assess_database_schedule
 from .installation_eligibility import ensure_installation_eligible
 from .expedited_contract_evidence_4566 import assess_contract_evidence
 from .expedited_chain_readiness_4566 import assess_expedited_chain
+from django.db import DatabaseError
+from .installation_evidence_integrated_preview import preview_installation_with_physical_reviews
 
 
 def assess_installation_start(*, project, proposed_start):
@@ -54,6 +56,36 @@ def assess_installation_start(*, project, proposed_start):
         "installation-start authorization are not yet implemented."
     )
 
+    # Independent equipment reviews provide readiness observations only.
+    # Neither reviewed candidates nor supplied times confer start authority.
+    physical_units_required = 0
+    physical_units_reviewed = 0
+    all_physical_units_reviewed = False
+
+    try:
+        equipment = preview_installation_with_physical_reviews(
+            project_id=project.pk,
+            installation_starts_at=proposed_start,
+        )
+    except (DatabaseError, ValidationError, ValueError, TypeError):
+        reasons.append(
+            "Physical-unit review readiness could not be independently verified."
+        )
+    else:
+        physical_units_required = equipment.total_units
+        physical_units_reviewed = equipment.reviewed_candidate_units
+        all_physical_units_reviewed = equipment.all_units_reviewed is True
+
+        if not all_physical_units_reviewed:
+            reasons.append(
+                "All approved physical equipment units require "
+                "independent accepted review."
+            )
+            reasons.extend(
+                "Equipment review: " + str(blocker)
+                for blocker in equipment.blockers
+            )
+
     contract = assess_contract_evidence(project)
     expedited = assess_expedited_chain(project)
 
@@ -71,6 +103,9 @@ def assess_installation_start(*, project, proposed_start):
         "schedule_verified": schedule.schedule_verified is True,
         "commercial_ready": commercial_ready,
         "trusted_equipment_verified": False,
+        "physical_units_required": physical_units_required,
+        "physical_units_reviewed": physical_units_reviewed,
+        "all_physical_units_reviewed": all_physical_units_reviewed,
         "expedited_authorized": False,
         "installation_authorized": False,
         "installation_started": False,

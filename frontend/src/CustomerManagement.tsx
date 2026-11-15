@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { CustomerOpportunityHistory5036 } from './CustomerOpportunityHistory5036';
 
 type API=<T>(path:string,method?:string,data?:unknown)=>Promise<T>;
 type Customer={id:string;legal_name:string;billing_address:string;email:string;phone:string;archived:boolean;revision:string;primary_contact:{id:string;name:string}|null};
@@ -33,7 +34,8 @@ export function CustomerManagement({api,onChanged,onBack,onCreateProject}:{api:A
    <h3>{selected.legal_name}</h3><p className="customer-address">{selected.billing_address}</p><p>{selected.email||'Email not set'}<br/>{selected.phone||'Phone not set'}</p><p>{selected.archived?'Archived — unavailable for new projects':'Active customer'}</p><p>Primary contact: {selected.primary_contact?.name||'None selected'}</p>
    <button className="quiet" disabled={busy} onClick={()=>{closeForms();setEditCustomer(true);setError('');setMessage('');}}>Edit customer</button>
     {!selected.archived&&<button className="quiet" disabled={busy} onClick={()=>onCreateProject(selected.id)}>Create project for this customer</button>}
-   {editCustomer&&<form key={selected.revision} onSubmit={e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.currentTarget));void run(async()=>{await api(`customers/${selected.id}/`,'PATCH',{...f,archived:f.archived==='on',expected_revision:selected.revision});setEditCustomer(false);await refresh();await onChanged();setMessage('Customer changes saved.');});}}>
+   <CustomerOpportunityHistory5036 api={api} customerId={selected.id}/>
+    {editCustomer&&<form key={selected.revision} onSubmit={e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.currentTarget));void run(async()=>{await api(`customers/${selected.id}/`,'PATCH',{...f,archived:f.archived==='on',expected_revision:selected.revision});setEditCustomer(false);await refresh();await onChanged();setMessage('Customer changes saved.');});}}>
     <h3>Edit customer details</h3><fieldset disabled={busy}><div className="grid">
      <label>Customer legal name<input name="legal_name" defaultValue={selected.legal_name} required maxLength={250}/></label>
      <label>Customer billing address<textarea aria-label="Customer billing address" name="billing_address" defaultValue={selected.billing_address} required/></label>

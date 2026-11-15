@@ -56,6 +56,9 @@ type InstallationReadiness = {
     schedule_verified: boolean;
     commercial_ready: boolean;
     trusted_equipment_verified: boolean;
+    physical_units_required?: number;
+    physical_units_reviewed?: number;
+    all_physical_units_reviewed?: boolean;
     expedited_authorized: boolean;
     installation_authorized: boolean;
     installation_started: boolean;
@@ -547,6 +550,30 @@ export function InstallationScheduling({
             <summary>View detailed readiness and installation-start safeguards</summary>
             <h4>Installation Readiness Details</h4>
           {readiness?.installation_start && (
+        <section aria-label="Physical equipment review readiness">
+          <h4>Physical equipment review readiness</h4>
+          <p>
+            Units reviewed: {
+              readiness.installation_start.physical_units_reviewed ?? 0
+            } of {
+              readiness.installation_start.physical_units_required ?? 0
+            }
+          </p>
+          <p>
+            Review status: {
+              readiness.installation_start.all_physical_units_reviewed === true
+                ? 'All recorded unit reviews complete'
+                : 'Incomplete or unavailable'
+            }
+          </p>
+          <p className="muted">
+            Completed equipment reviews do not grant installation-start
+            authorization. Independent trusted evidence and operational
+            approval remain mandatory.
+          </p>
+        </section>
+      )}
+      {readiness?.installation_start && (
             <div className="installation-start-readiness">
               <h4>Installation Start Authorization</h4>
               <p>
