@@ -176,6 +176,9 @@ def finish(actor, session_key, state, code, error=None):
     if challenge.context.get('operation') == 'SANDBOX_RECONCILIATION':
         from .reconciliation import finish as reconcile
         return reconcile(actor, challenge, config, token)
+    if challenge.context.get('operation') == 'SANDBOX_IM_DRAFT_CONTEXT_5181':
+        from .installation_draft_oauth_5181 import finish as finish_im_draft
+        return finish_im_draft(actor, challenge, config, token)
     if challenge.context:
         from .sandbox import finish_draft
         return finish_draft(actor, challenge, config, token)
