@@ -169,3 +169,218 @@ class EquipmentUnitQueue4879Tests(SimpleTestCase):
         )
         with self.assertRaises(PermissionDenied):
             self.read_queue()
+
+    def test_record_queue_review_handoff_remains_untrusted(self):
+        """Cross-endpoint handoff with synthetic, nonpersistent evidence."""
+        from contextlib import nullcontext
+        from datetime import timedelta
+        from uuid import uuid4
+        from django.utils import timezone
+        from rest_framework.exceptions import ValidationError
+        from .models import Role
+
+        pending_id = str(uuid4())
+        recorder = SimpleNamespace(pk=self.recorder_id)
+        reviewer = SimpleNamespace(pk="comptroller-4879")
+
+        self.pending.pk = pending_id
+        self.pending_id = pending_id
+        self.pendings.clear()
+        self.reviews.clear()
+
+        started = timezone.now() - timedelta(days=1)
+        captured = started - timedelta(minutes=30)
+
+        schedule = SimpleNamespace(
+            installation_manager_id=recorder.pk,
+            cancelled_at=None,
+            scheduled_date=timezone.localtime(started).date(),
+        )
+        schedule_query = Mock()
+        schedule_query.filter.return_value = [schedule]
+
+        payload = {
+            "msr_id": self.msr_id,
+            "unit_id": self.unit.unit_id,
+            "serial_number": self.payload["serial_number"],
+            "captured_at": captured.isoformat(),
+            "installation_starts_at": started.isoformat(),
+            "confirmed_in_person": True,
+            "inspection_notes": self.payload["inspection_notes"],
+        }
+
+        authority_fields = (
+            "source_authenticated",
+            "trusted_installation_evidence",
+            "installation_authorized",
+            "final_receipt_issuance_authorized",
+            "customer_delivery_verified",
+            "completion_authorized",
+        )
+
+        def assert_action_untrusted(response):
+            for field in authority_fields:
+                self.assertIn(field, response.data)
+                self.assertIs(response.data[field], False)
+
+        def guard(request, role):
+            if role == Role.INSTALLATION_MANAGER:
+                return recorder
+            if role == Role.COMPTROLLER:
+                return reviewer
+            raise AssertionError("Unexpected authorization role.")
+
+        self.view._installation_entry_guard.side_effect = guard
+
+        def capture(**kwargs):
+            self.assertEqual(kwargs["actor"].pk, recorder.pk)
+            self.assertEqual(kwargs["unit_id"], self.unit.unit_id)
+            self.assertTrue(kwargs["confirmed_in_person"])
+            self.pendings.append(self.pending)
+            return self.pending
+
+        pending_query = Mock()
+        pending_query.filter.return_value.first.return_value = self.pending
+
+        def evidence_records(*args, **kwargs):
+            kind = kwargs.get("kind")
+            if kind == PENDING_KIND:
+                return list(self.pendings)
+            if kind == REVIEW_KIND:
+                if "data__pending_id" in kwargs:
+                    query = Mock()
+                    query.exists.return_value = bool(self.reviews)
+                    return query
+                return list(self.reviews)
+            raise AssertionError("Unexpected evidence query.")
+
+        def review(**kwargs):
+            self.assertEqual(kwargs["actor"].pk, reviewer.pk)
+            self.assertEqual(str(kwargs["pending_id"]), pending_id)
+            record = SimpleNamespace(
+                pk=str(uuid4()),
+                data={
+                    "pending_id": pending_id,
+                    "unit_id": self.unit.unit_id,
+                },
+            )
+            self.reviews.append(record)
+            return record
+
+        with (
+            patch(
+                "core.models.InstallationSchedule.objects.select_for_update",
+                return_value=schedule_query,
+            ),
+            patch(
+                "core.models.ProjectEvidence.objects.select_for_update",
+                return_value=pending_query,
+            ),
+            patch(
+                "core.models.ProjectEvidence.objects.filter",
+                side_effect=evidence_records,
+            ),
+            patch(
+                "core.equipment_physical_capture_pending_service."
+                "record_pending_physical_inspection",
+                side_effect=capture,
+            ) as capture_service,
+            patch(
+                "core.equipment_physical_inspection_review_service."
+                "review_pending_physical_inspection",
+                side_effect=review,
+            ) as review_service,
+            patch(
+                "django.db.transaction.atomic",
+                side_effect=lambda: nullcontext(),
+            ),
+        ):
+            recorded = self.view.record_equipment_unit_inspection(
+                SimpleNamespace(data=payload)
+            )
+            self.assertEqual(recorded.status_code, 201)
+            self.assertEqual(
+                recorded.data["status"],
+                "PENDING_INDEPENDENT_REVIEW",
+            )
+            assert_action_untrusted(recorded)
+            capture_service.assert_called_once()
+            self.assertEqual(len(self.pendings), 1)
+
+            queued = self.read_queue()
+            self.assertEqual(queued.status_code, 200)
+            self.assertEqual(
+                queued.data["units"][0]["status"],
+                "PENDING_INDEPENDENT_REVIEW",
+            )
+            self.assertEqual(
+                queued.data["units"][0]["pending_id"],
+                pending_id,
+            )
+            self.assert_no_authority(queued)
+
+            decision = {
+                "pending_id": pending_id,
+                "accept_candidate": True,
+                "review_reason": (
+                    "Synthetic independent review regression only."
+                ),
+                "independently_examined": True,
+            }
+
+            self.view._installation_entry_guard.side_effect = (
+                lambda request, role: recorder
+            )
+            with self.assertRaises(ValidationError):
+                self.view.review_equipment_unit_inspection(
+                    SimpleNamespace(data=decision)
+                )
+            review_service.assert_not_called()
+
+            self.view._installation_entry_guard.side_effect = guard
+
+            with self.assertRaises(ValidationError):
+                self.view.review_equipment_unit_inspection(
+                    SimpleNamespace(data={
+                        **decision,
+                        "independently_examined": False,
+                    })
+                )
+            review_service.assert_not_called()
+
+            reviewed = self.view.review_equipment_unit_inspection(
+                SimpleNamespace(data=decision)
+            )
+            self.assertEqual(reviewed.status_code, 201)
+            self.assertEqual(
+                reviewed.data["status"],
+                "INTERNAL_CANDIDATE_ACCEPTED",
+            )
+            assert_action_untrusted(reviewed)
+            review_service.assert_called_once()
+
+            with self.assertRaises(ValidationError):
+                self.view.review_equipment_unit_inspection(
+                    SimpleNamespace(data=decision)
+                )
+            review_service.assert_called_once()
+
+            after = self.read_queue()
+            self.assertEqual(
+                after.data["units"][0]["status"],
+                "REVIEW_RECORDED_UNVERIFIED",
+            )
+            self.assertIsNone(after.data["units"][0]["pending_id"])
+            self.assert_no_authority(after)
+
+            original = self.pending.data["purpose"]
+            try:
+                self.pending.data["purpose"] = "TAMPERED_TEST_CLAIM"
+                corrupted = self.read_queue()
+                self.assertEqual(
+                    corrupted.data["units"][0]["status"],
+                    "EVIDENCE_INVALID",
+                )
+                self.assert_no_authority(corrupted)
+            finally:
+                self.pending.data["purpose"] = original
