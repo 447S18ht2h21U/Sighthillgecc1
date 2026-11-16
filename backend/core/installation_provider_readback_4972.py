@@ -33,6 +33,7 @@ class SandboxInspectionReadback4972:
     certificate_pdf: bytes
     signed_pdf_sha256: str
     certificate_sha256: str
+    audit_events: dict | None = None
     status: str = "SANDBOX_READBACK_NOT_INDEPENDENTLY_VERIFIED"
     provider_signature_verified: bool = False
     signer_identity_verified: bool = False
@@ -59,7 +60,7 @@ def _reader(path, token, *, pdf=False):
         r"/restapi/v2[.]1/accounts/"
         r"([0-9a-f-]{36})/envelopes/([0-9a-f-]{36})"
         r"(/recipients|/recipients/1/tabs|"
-        r"/documents/1|/documents/certificate)?"
+        r"/documents/1|/documents/certificate|/audit_events)?"
     )
     match = re.fullmatch(pattern, path) if type(path) is str else None
     if match is None:
@@ -191,11 +192,35 @@ def retrieve_inspection_sandbox_evidence(
         ):
             raise ValidationError("Retrieved PDF integrity failed.")
 
+    # Fixed, read-only DocuSign envelope audit history.
+    # Event collection alone never verifies a signature.
+    audit_path = (
+        f"/restapi/v2.1/accounts/{account_id}"
+        f"/envelopes/{envelope_id}/audit_events"
+    )
+    audit_events = reader(audit_path, bearer_token)
+
+    if (
+        type(audit_events) is not dict
+        or type(audit_events.get("auditEvents")) is not list
+        or not audit_events["auditEvents"]
+        or len(audit_events["auditEvents"]) > 1000
+        or any(
+            type(item) is not dict
+            or type(item.get("eventFields")) is not list
+            for item in audit_events["auditEvents"]
+        )
+    ):
+        raise ValidationError(
+            "Incomplete provider envelope audit history."
+        )
+
     return SandboxInspectionReadback4972(
         account_id=account_id,
         envelope_id=envelope_id,
         envelope_summary=summary,
         recipient_summary=recipients,
+        audit_events=audit_events,
         recipient_tabs=tabs,
         signed_pdf=pdf,
         certificate_pdf=certificate,

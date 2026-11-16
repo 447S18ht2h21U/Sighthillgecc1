@@ -2,6 +2,7 @@
 from dataclasses import replace
 from hashlib import sha256
 from unittest import TestCase
+from django.test import override_settings
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
@@ -36,6 +37,7 @@ def candidate(negative=()):
         envelope_summary={
             "envelopeId": ENVELOPE,
             "status": "completed",
+            "completedDateTime": "2026-11-16T12:15:00Z",
         },
         recipient_summary={
             "signers": [{
@@ -43,6 +45,7 @@ def candidate(negative=()):
                 "name": recipient["name"],
                 "email": recipient["email"],
                 "status": "completed",
+                "signedDateTime": "2026-11-16T12:00:00Z",
             }]
         },
         recipient_tabs=response(envelope, set(negative)),
@@ -66,6 +69,11 @@ def link(envelope, readback, **changes):
 
 
 class OfflineProviderIntakeBridge4975Tests(TestCase):
+    def setUp(self):
+        self.enterContext(
+            override_settings(DEBUG=True, ENVIRONMENT="development")
+        )
+
     def test_readback_attaches_to_existing_unverified_bundle(self):
         envelope, readback = candidate()
         result = link(envelope, readback)
@@ -137,4 +145,68 @@ class OfflineProviderIntakeBridge4975Tests(TestCase):
         settings.DEBUG = False
         envelope, readback = candidate()
         with self.assertRaises(PermissionDenied):
+            link(envelope, readback)
+
+    def test_signing_timestamp_requires_timezone(self):
+        envelope, readback = candidate()
+        readback.recipient_summary["signers"][0][
+            "signedDateTime"
+        ] = "2026-11-16T12:00:00"
+        with self.assertRaises(ValidationError):
+            link(envelope, readback)
+
+    def test_signing_timestamp_rejects_reverse_chronology(self):
+        envelope, readback = candidate()
+        signer = readback.recipient_summary["signers"][0]
+        signer["sentDateTime"] = "2026-11-16T10:00:00Z"
+        signer["deliveredDateTime"] = "2026-11-16T12:00:00Z"
+        signer["signedDateTime"] = "2026-11-16T11:00:00Z"
+        with self.assertRaises(ValidationError):
+            link(envelope, readback)
+
+    def test_chronology_screening_never_grants_signer_trust(self):
+        envelope, readback = candidate()
+        signer = readback.recipient_summary["signers"][0]
+        signer["sentDateTime"] = "2026-11-16T10:00:00Z"
+        signer["deliveredDateTime"] = "2026-11-16T11:00:00Z"
+        signer["signedDateTime"] = "2026-11-16T12:00:00Z"
+        result = link(envelope, readback)
+        self.assertFalse(result.provider_origin_authenticated)
+        self.assertFalse(result.signer_identity_verified)
+        self.assertFalse(result.signature_verified)
+        self.assertFalse(result.signed_date_verified)
+        self.assertFalse(result.completion_authorized)
+
+    def test_completed_signer_without_signed_date_rejected(self):
+        envelope, readback = candidate()
+        del readback.recipient_summary["signers"][0]["signedDateTime"]
+        with self.assertRaises(ValidationError):
+            link(envelope, readback)
+
+    def test_completed_signer_with_blank_signed_date_rejected(self):
+        envelope, readback = candidate()
+        readback.recipient_summary["signers"][0]["signedDateTime"] = ""
+        with self.assertRaises(ValidationError):
+            link(envelope, readback)
+
+    def test_missing_envelope_completion_date_rejected(self):
+        envelope, readback = candidate()
+        del readback.envelope_summary["completedDateTime"]
+        with self.assertRaises(ValidationError):
+            link(envelope, readback)
+
+    def test_early_envelope_completion_date_rejected(self):
+        envelope, readback = candidate()
+        readback.envelope_summary[
+            "completedDateTime"
+        ] = "2026-11-16T11:59:59Z"
+        with self.assertRaises(ValidationError):
+            link(envelope, readback)
+
+    def test_naive_envelope_completion_date_rejected(self):
+        envelope, readback = candidate()
+        readback.envelope_summary[
+            "completedDateTime"
+        ] = "2026-11-16T12:15:00"
+        with self.assertRaises(ValidationError):
             link(envelope, readback)

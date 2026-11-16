@@ -823,7 +823,7 @@ export function InstallationScheduling({
 
     {schedules.some(schedule => schedule.status === 'COMPLETED') && (
       <div className="installation-completion-guidance">
-        <p><strong>Installation completed operationally.</strong></p>
+        <p><strong>Installation schedule: Completed. Physical inspection, independent verification, final Receipt delivery, and project completion require separate evidence and approvals.</strong></p>
         {selectedProjectId && <button
           type="button"
           className="quiet"

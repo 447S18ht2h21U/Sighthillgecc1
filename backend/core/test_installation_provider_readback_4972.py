@@ -16,6 +16,14 @@ PDF = b"%PDF-1.4\n" + b"X" * 200
 def reader(path, token, *, pdf=False):
     if pdf:
         return PDF + (b"A" if path.endswith("/1") else b"B")
+    if path.endswith("/audit_events"):
+        return {
+            "auditEvents": [{
+                "eventFields": [
+                    {"name": "Action", "value": "SyntheticTest"}
+                ]
+            }]
+        }
     if path.endswith("/recipients/1/tabs"):
         return {"radioGroupTabs": []}
     if path.endswith("/recipients"):
@@ -114,3 +122,41 @@ class SandboxReadback4972Tests(TestCase):
             result = execute()
             self.assertFalse(result.provider_signature_verified)
             network.assert_not_called()
+
+
+class ProviderAuditEvent5146Tests(TestCase):
+    def test_history_collected_without_signature_trust(self):
+        result = execute()
+        self.assertEqual(len(result.audit_events["auditEvents"]), 1)
+        self.assertFalse(result.provider_signature_verified)
+        self.assertFalse(result.signer_identity_verified)
+        self.assertFalse(result.completion_authorized)
+
+    def test_missing_audit_history_rejected(self):
+        def missing(path, token, *, pdf=False):
+            if path.endswith("/audit_events"):
+                return {}
+            return reader(path, token, pdf=pdf)
+
+        with self.assertRaises(ValidationError):
+            execute(reader=missing)
+
+    def test_empty_audit_history_rejected(self):
+        def empty(path, token, *, pdf=False):
+            if path.endswith("/audit_events"):
+                return {"auditEvents": []}
+            return reader(path, token, pdf=pdf)
+
+        with self.assertRaises(ValidationError):
+            execute(reader=empty)
+
+    def test_malformed_audit_history_rejected(self):
+        def malformed(path, token, *, pdf=False):
+            if path.endswith("/audit_events"):
+                return {"auditEvents": [
+                    {"eventFields": "not-a-list"}
+                ]}
+            return reader(path, token, pdf=pdf)
+
+        with self.assertRaises(ValidationError):
+            execute(reader=malformed)

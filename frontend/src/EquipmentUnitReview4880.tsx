@@ -26,11 +26,16 @@ const red = '#B42318';
 const green = '#087F75';
 const amber = '#9A6700';
 
+// Current browser acceptance is inspection-review READ ONLY.
+// A separate protected implementation and authorization are required
+// before any decision-submission UI may become available.
+const reviewSubmissionEnabled: boolean = false;
+
 function label(status: string): string {
   switch (status) {
     case 'NO_INSPECTION': return 'NO INSPECTION RECORDED';
-    case 'PENDING_INDEPENDENT_REVIEW': return 'PENDING REVIEW';
-    case 'REVIEW_RECORDED_UNVERIFIED': return 'REVIEW RECORDED — UNVERIFIED';
+    case 'PENDING_INDEPENDENT_REVIEW': return 'AWAITING COMPTROLLER REVIEW';
+    case 'REVIEW_RECORDED_UNVERIFIED': return 'INTERNAL REVIEW RECORDED — SOURCE UNVERIFIED';
     case 'EVIDENCE_INVALID': return 'INVALID EVIDENCE';
     default: return 'UNVERIFIED';
   }
@@ -108,7 +113,8 @@ export function EquipmentUnitReview4880({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!pending || busy || reason.trim().length < 15 ||
+    if (!reviewSubmissionEnabled || !pending || busy ||
+      reason.trim().length < 15 ||
       reason.trim().length > 2000 ||
       (decision === 'accept' && !examined)) return;
 
@@ -177,9 +183,13 @@ export function EquipmentUnitReview4880({
   return (
     <section className="installation-completion-guidance"
       aria-label="Independent equipment-unit inspection review">
-      <h3>Independent Equipment-Unit Inspection Review</h3>
-      <p>Comptroller-only internal review. A recorded decision does not
-        authenticate an installation or authorize a FINAL Receipt.</p>
+      <p>Comptroller-only equipment evidence status. Recording or
+        internally reviewing an inspection does not authenticate an
+        installation, authorize a FINAL Receipt, or complete a project.</p>
+      <p role="status" style={{ fontWeight: 700, color: amber }}>
+        READ-ONLY REVIEW QUEUE — decision submission is disabled in this
+        browser-acceptance environment.
+      </p>
       {loading && <p role="status">Loading equipment-unit review queue...</p>}
       {error && <p role="alert" style={{ color: red, fontWeight: 700 }}>{error}</p>}
       {result && (
@@ -197,24 +207,52 @@ export function EquipmentUnitReview4880({
         </p>}
       {queue?.status === 'QUEUE_AVAILABLE' && (
         <>
+          <p role="status">
+            {queue.units.length} equipment unit(s):{' '}
+            {queue.units.filter(unit =>
+              unit.status === 'PENDING_INDEPENDENT_REVIEW'
+            ).length} awaiting review;{' '}
+            {queue.units.filter(unit =>
+              unit.status === 'REVIEW_RECORDED_UNVERIFIED'
+            ).length} internally reviewed but unverified;{' '}
+            {queue.units.filter(unit =>
+              unit.status === 'NO_INSPECTION'
+            ).length} without an inspection;{' '}
+            {queue.units.filter(unit =>
+              unit.status === 'EVIDENCE_INVALID'
+            ).length} with invalid evidence.
+          </p>
           <div style={{ overflowX: 'auto' }}>
-            <table>
+            <table style={{
+              width: '100%',
+              tableLayout: 'fixed',
+              borderCollapse: 'collapse',
+            }}>
               <thead><tr>
-                <th>Unit</th><th>Equipment</th><th>Serial</th><th>Review status</th>
+                <th>Unit</th><th>Equipment</th><th>Serial (unverified)</th><th>Review status</th>
               </tr></thead>
               <tbody>{queue.units.map(unit => (
                 <tr key={unit.unit_id}>
-                  <td>{unit.unit_id}</td>
-                  <td>{unit.brand} {unit.model_number}</td>
-                  <td>{unit.serial_number || 'Not verified'}</td>
-                  <td><strong style={{ color: color(unit.status), fontWeight: 800 }}>
-                    {label(unit.status)}
-                  </strong></td>
+                  <td style={{ overflowWrap: 'anywhere', verticalAlign: 'top' }}>
+                    {unit.unit_id}
+                  </td>
+                  <td style={{ overflowWrap: 'anywhere', verticalAlign: 'top' }}>
+                    <strong>{unit.brand}</strong>
+                    <div>{unit.model_number}</div>
+                  </td>
+                  <td style={{ overflowWrap: 'anywhere', verticalAlign: 'top' }}>
+                    {unit.serial_number || 'Not verified'}
+                  </td>
+                  <td style={{ overflowWrap: 'anywhere', verticalAlign: 'top' }}>
+                    <strong style={{ color: color(unit.status), fontWeight: 800 }}>
+                      {label(unit.status)}
+                    </strong>
+                  </td>
                 </tr>
               ))}</tbody>
             </table>
           </div>
-          {queue.units.some(unit =>
+          {reviewSubmissionEnabled && queue.units.some(unit =>
             unit.status === 'PENDING_INDEPENDENT_REVIEW') && (
             <form onSubmit={event => void submit(event)}>
               <h4>Record Independent Decision</h4>

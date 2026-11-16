@@ -221,6 +221,43 @@ export function InstallationEvidenceStatus4831({
         Read-only evidence review. No installation certification,
         FINAL Receipt issuance or customer delivery authorization.
       </p>
+      {report && (
+        <div
+          className="veridian-guide-banner veridian-guide-banner--info"
+          aria-label="Installation evidence provenance"
+        >
+          <strong>Installation evidence provenance - read only</strong>
+          <p>
+            <strong>Internal acceptance candidate:</strong>{' '}
+            {report.internal_acceptance_candidate_verified
+              ? 'Internally verified; not externally authenticated'
+              : 'Not verified'}
+          </p>
+          <p>
+            <strong>Retained source integrity:</strong>{' '}
+            {report.installation_source_integrity_verified
+              ? 'Document integrity verified; authenticity not established'
+              : 'Not verified'}
+          </p>
+          <p>
+            <strong>Independent source authentication:</strong>{' '}
+            {report.installation_source_authenticated
+              ? 'Verified'
+              : 'Not established'}
+          </p>
+          <p>
+            <strong>Trusted installation evidence:</strong>{' '}
+            {report.trusted_installation_evidence
+              ? 'Verified'
+              : 'Not established'}
+          </p>
+          <p className="muted">
+            Retained documents and internal acceptance decisions do not
+            authorize FINAL Receipt issuance, customer delivery, or
+            administrative project completion.
+          </p>
+        </div>
+      )}
 
       <button
         type="button"

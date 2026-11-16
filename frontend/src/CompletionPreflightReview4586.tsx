@@ -268,6 +268,37 @@ export function CompletionPreflightReview4586({
           onClick={event => event.stopPropagation()}
         >
           <h4>Administrative Project Completion</h4>
+          <div role="status" className="veridian-guide-banner veridian-guide-banner--info">
+            <strong>Completion evidence readiness — read only</strong>
+            {report ? (
+              <>
+                <p>
+                  {report.evidence_requirements.filter(item =>
+                    item.status === 'READY'
+                  ).length} of {report.evidence_requirements.length}
+                  {' '}requirements ready;{' '}
+                  {report.evidence_requirements.filter(item =>
+                    item.status === 'BLOCKED'
+                  ).length} blocked.
+                </p>
+                <p>
+                  Completion is not authorized. A ready prerequisite does
+                  not establish verified installation, customer Receipt
+                  delivery, or a completed DocuSign certificate.
+                </p>
+              </>
+            ) : (
+              <p>
+                {loading
+                  ? 'Checking authorized completion evidence...'
+                  : 'No validated completion assessment is available.'}
+              </p>
+            )}
+            <p>
+              The Customer Satisfaction Survey is optional and is not
+              a prerequisite for project completion.
+            </p>
+          </div>
           <DraftReceiptPackageStatus4807 projectId={projectId} />
           <InstallationEvidenceStatus4831 projectId={projectId} />
           <>

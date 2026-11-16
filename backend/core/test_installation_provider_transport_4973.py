@@ -77,7 +77,7 @@ class InspectionTransportBoundary4973Tests(TestCase):
 
     def test_extra_paths_and_queries_denied_without_network(self):
         invalid = [
-            BASE + "/audit_events",
+            BASE + "/audit_events/extra",
             BASE + "/recipients/2/tabs",
             BASE + "/recipients/1/tabs/extra",
             BASE + "/documents/2",

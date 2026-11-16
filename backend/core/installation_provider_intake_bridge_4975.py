@@ -6,6 +6,7 @@ Requires later independently established envelope binding and provenance.
 Never sends envelopes, accesses the network, or modifies the database.
 """
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from hashlib import sha256
 from uuid import UUID
 
@@ -122,6 +123,74 @@ def link_unverified_inspection_readback(
 
     intended = planned[0]
     returned = observed[0]
+    # Timestamp screening does not establish authentic signing.
+    timestamps = {}
+    for field in ("sentDateTime", "deliveredDateTime", "signedDateTime"):
+        value = returned.get(field)
+        if value is None:
+            continue
+        if type(value) is not str or not value or len(value) > 64:
+            raise ValidationError("Malformed signer timestamp.")
+        try:
+            parsed = datetime.fromisoformat(
+                value.replace("Z", "+00:00")
+            )
+        except ValueError:
+            raise ValidationError("Malformed signer timestamp.") from None
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValidationError("Timezone-aware signer timestamp required.")
+        timestamps[field] = parsed.astimezone(timezone.utc)
+
+    # A completed signer must have a timestamp to screen.
+    # This still does not authenticate the signature or its origin.
+    if "signedDateTime" not in timestamps:
+        raise ValidationError("Completed signer date is missing.")
+
+    # A completed envelope must not predate its signer's signed time.
+    # Timestamp consistency never proves signer identity or provenance.
+    completed_text = summary.get("completedDateTime")
+    if (
+        type(completed_text) is not str
+        or not completed_text
+        or len(completed_text) > 64
+    ):
+        raise ValidationError("Envelope completion date is missing.")
+    try:
+        envelope_completed = datetime.fromisoformat(
+            completed_text.replace("Z", "+00:00")
+        )
+    except ValueError:
+        raise ValidationError(
+            "Malformed envelope completion timestamp."
+        ) from None
+    if (
+        envelope_completed.tzinfo is None
+        or envelope_completed.utcoffset() is None
+    ):
+        raise ValidationError(
+            "Timezone-aware envelope completion required."
+        )
+    if (
+        "signedDateTime" not in timestamps
+        or timestamps["signedDateTime"]
+        > envelope_completed.astimezone(timezone.utc)
+    ):
+        raise ValidationError(
+            "Envelope completed before manager signing."
+        )
+
+    for earlier, later in (
+        ("sentDateTime", "deliveredDateTime"),
+        ("deliveredDateTime", "signedDateTime"),
+        ("sentDateTime", "signedDateTime"),
+    ):
+        if (
+            earlier in timestamps
+            and later in timestamps
+            and timestamps[earlier] > timestamps[later]
+        ):
+            raise ValidationError("Signer chronology is inconsistent.")
+
     if (
         intended.get("recipientId") != "1"
         or returned.get("recipientId") != "1"
