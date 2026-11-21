@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { InstallationInspectionEntry4843 } from './InstallationInspectionEntry4843';
+import { InstallationManagerInspection5211 } from './InstallationManagerInspection5211';
 import { EquipmentUnitSelection4872 } from './EquipmentUnitSelection4872';
 import { EquipmentUnitReview4880 } from './EquipmentUnitReview4880';
 
@@ -795,6 +796,19 @@ export function InstallationScheduling({
         />
       </section>
     )}
+    {actorRole === 'INSTALLATION_MANAGER' &&
+      Boolean(projectId) &&
+      schedules.some(
+        schedule =>
+          schedule.project === projectId &&
+          schedule.installation_manager === actorId
+      ) && (
+        <InstallationManagerInspection5211
+          key={`inspection-readiness-${projectId}`}
+          api={api}
+          projectId={projectId}
+        />
+      )}
     {canManage &&
       actorRole === 'INSTALLATION_MANAGER' &&
       Boolean(projectId) && (

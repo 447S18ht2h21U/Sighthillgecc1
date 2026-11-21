@@ -1,3 +1,4 @@
+from core import installation_manager_workspace_5211
 from core import installation_draft_status_api_5186
 from core import installation_draft_browser_api_5185
 from core import catalog_bulk_import_api_4671
@@ -32,6 +33,7 @@ from core import approved_msr_source_api_4530
 from core import equipment_catalog_selection_api_4534
 from core import equipment_catalog_management_api_4542
 urlpatterns = [
+    path('api/im-inspection-workspace/<uuid:project_id>/', installation_manager_workspace_5211.workspace),
     path(
         'api/inspection-evidence/<uuid:project_id>/oauth-read/',
         installation_provider_oauth_api_4984.connect,

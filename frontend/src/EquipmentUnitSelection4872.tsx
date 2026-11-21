@@ -166,6 +166,15 @@ export function EquipmentUnitSelection4872({
           EQUIPMENT INVENTORY MISSING OR INVALID — PHYSICAL-UNIT ENTRY BLOCKED
         </p>
       )}
+      {!loading && !error && !available && (
+        <p>
+          Next step: Contact the Sales Manager to review the equipment
+          list on the approved Master Sales Record. Correct an approved
+          record only through its authorized revision workflow. This
+          screen cannot create missing equipment or bypass inventory
+          validation.
+        </p>
+      )}
       {available && (
         <>
           <label htmlFor="approved-physical-unit">Select approved equipment unit

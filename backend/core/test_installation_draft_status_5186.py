@@ -79,6 +79,16 @@ class InstallationDraftStatus5186Tests(SimpleTestCase):
         self.readiness_patch.start()
         self.addCleanup(self.readiness_patch.stop)
 
+        # These legacy unit tests use simplified project objects.
+        # Source integrity is covered by real database-backed tests.
+        self.source_patch = patch.object(
+            service,
+            "verify_retained_installation_source",
+            return_value=False,
+        )
+        self.source_patch.start()
+        self.addCleanup(self.source_patch.stop)
+
     def read(self):
         return service.status(
             actor=self.actor,

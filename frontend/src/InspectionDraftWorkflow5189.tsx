@@ -11,6 +11,7 @@ type Status = {
   authorization_state: string;
   preparation_ready: boolean;
   preparation_state: string;
+  source_stage?: string;
   intent_id: string | null;
   provider_draft_created: boolean;
   provider_request_authorized: boolean;
@@ -158,7 +159,9 @@ export function InspectionDraftWorkflow5189({
           <strong>Inspection source readiness: </strong>
           {status.preparation_ready
             ? 'Independently verified for offline draft preparation.'
-            : 'Not yet verified. Complete the required installation source evidence and preparation review before authorizing a draft.'}
+            : status.source_stage === 'SOURCE_VERIFIED_PREPARATION_PENDING'
+              ? 'Installation source evidence is verified. An authorized CEO or Sales Manager must complete the independent attestation preparation before draft authorization is available.'
+              : 'Not yet verified. The Installation Manager must complete the installation inspection and retain the supporting source PDF. The evidence must pass independent checks before draft authorization.'}
         </p>
       )}
 

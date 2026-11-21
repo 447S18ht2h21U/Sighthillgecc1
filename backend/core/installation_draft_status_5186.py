@@ -7,6 +7,9 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 
 from core.models import Project, ProjectEvidence, User
+from core.installation_source_artifact_4826 import (
+    verify_retained_installation_source,
+)
 from core.installation_attestation_manifest_4941 import verify_attestation_preparation
 from core.installation_provider_oauth_4979 import Role, canonical_hash
 from core.installation_draft_authorization_5179 import KIND
@@ -91,6 +94,7 @@ def status(*, actor, project_id):
         "authorization_state": "NOT_AUTHORIZED",
         "preparation_ready": False,
         "preparation_state": "SOURCE_EVIDENCE_NOT_VERIFIED",
+        "source_stage": "SOURCE_NOT_VERIFIED",
         "intent_id": None,
         "provider_draft_created": False,
         "provider_request_authorized": False,
@@ -113,7 +117,21 @@ def status(*, actor, project_id):
         result["authorization_state"] = "APPROVED_MSR_REQUIRED"
         return result
 
+    # A retained source remains unauthenticated until provider verification.
+    # This read-only check never creates or repairs evidence.
+    try:
+        source_verified = (
+            verify_retained_installation_source(project) is True
+        )
+    except (ValueError, TypeError, ValidationError):
+        source_verified = False
+
     ready = _readiness(project, msr)
+    result["source_stage"] = (
+        "PREPARATION_VERIFIED" if ready else
+        "SOURCE_VERIFIED_PREPARATION_PENDING" if source_verified else
+        "SOURCE_NOT_VERIFIED"
+    )
     result["preparation_ready"] = ready
     result["preparation_state"] = (
         "VERIFIED_FOR_OFFLINE_PREPARATION"
