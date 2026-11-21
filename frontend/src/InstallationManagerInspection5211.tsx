@@ -17,12 +17,26 @@ type EquipmentInventory5215 = {
 type Workspace = {
   project_id: string;
   state: string;
+  internal_review_state: string;
   questions: { id: string; text: string }[];
   answers_recorded_by_this_endpoint: boolean;
   provider_signature_verified: boolean;
   receipt_issuance_authorized: boolean;
   project_completion_authorized: boolean;
 };
+const reviewStates: Record<string, string> = {
+  NOT_READY: 'Inspection review requirements are incomplete.',
+  NOT_RECORDED: 'No installation inspection has been recorded.',
+  AWAITING_INDEPENDENT_REVIEW:
+    'An internal inspection has been recorded and is awaiting Comptroller review.',
+  INTERNAL_CANDIDATE_ACCEPTED:
+    'The Comptroller accepted the internal inspection candidate. DocuSign verification is still required.',
+  INTERNAL_CANDIDATE_REJECTED:
+    'The Comptroller rejected the internal inspection candidate. Corrective action is required.',
+  EVIDENCE_REQUIRES_ATTENTION:
+    'The internal inspection evidence could not be verified. Further review is required.',
+};
+
 const states: Record<string, string> = {
   APPROVED_MSR_REQUIRED: 'A current approved Master Sales Record is required.',
   COMPLETED_INSTALLATION_REQUIRED: 'The installation must be recorded as completed before the inspection review can proceed.',
@@ -49,8 +63,17 @@ export function InstallationManagerInspection5211({
       `im-inspection-workspace/${encodeURIComponent(projectId)}/`
     ).then(result => {
       if (!cancelled) {
-        if (result.project_id !== projectId) {
-          setError('Inspection workspace project mismatch.');
+        if (
+          result.project_id !== projectId ||
+          !Object.prototype.hasOwnProperty.call(
+            reviewStates, result.internal_review_state
+          ) ||
+          result.answers_recorded_by_this_endpoint !== false ||
+          result.provider_signature_verified !== false ||
+          result.receipt_issuance_authorized !== false ||
+          result.project_completion_authorized !== false
+        ) {
+          setError('Inspection workspace failed safety verification.');
         } else {
           setData(result);
         }
@@ -108,7 +131,7 @@ export function InstallationManagerInspection5211({
   }, [api, projectId, revision]);
 
   return (
-    <section className="veridian-guide-banner veridian-guide-banner--info">
+    <section id="installation-manager-inspection" className="veridian-guide-banner veridian-guide-banner--info">
       <h4>Installation Manager inspection</h4>
       <p>
         Review the five required inspection findings below.
@@ -121,6 +144,10 @@ export function InstallationManagerInspection5211({
           <p role="status">
             <strong>Inspection readiness: </strong>
             {states[data.state] ?? 'Inspection review unavailable.'}
+          </p>
+          <p role="status">
+            <strong>Independent inspection review: </strong>
+            {reviewStates[data.internal_review_state]}
           </p>
           <div role="status">
             <strong>Equipment inventory readiness: </strong>

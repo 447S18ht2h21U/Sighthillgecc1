@@ -11,7 +11,83 @@ from core.models import Project, ProjectEvidence, Role, User
 from core.installation_inspection_form_4945 import (
     INSPECTION_IDS, INSPECTION_ITEMS,
 )
-from core.post_installation_acceptance_4819 import INSPECTION_KIND
+from core.post_installation_acceptance_4819 import INSPECTION_KIND, REVIEW_KIND, _check_inspection
+from core.documents import canonical_hash
+
+def internal_review_state(project, msr, schedule, approved, completed):
+    """Inspect existing immutable candidates; never create or approve evidence."""
+    if not approved or not completed:
+        return "NOT_READY"
+
+    inspections = list(ProjectEvidence.objects.filter(
+        msr=msr, kind=INSPECTION_KIND
+    ))
+    reviews = list(ProjectEvidence.objects.filter(
+        msr=msr, kind=REVIEW_KIND
+    ))
+
+    if not inspections and not reviews:
+        return "NOT_RECORDED"
+    if len(inspections) != 1 or len(reviews) > 1:
+        return "EVIDENCE_REQUIRES_ATTENTION"
+
+    inspection = inspections[0]
+    try:
+        data = _check_inspection(inspection, project, msr, schedule)
+    except Exception:
+        return "EVIDENCE_REQUIRES_ATTENTION"
+
+    if (
+        inspection.created_by_id != schedule.installation_manager_id
+        or data.get("inspector_id") != str(schedule.installation_manager_id)
+    ):
+        return "EVIDENCE_REQUIRES_ATTENTION"
+
+    if not reviews:
+        return "AWAITING_INDEPENDENT_REVIEW"
+
+    review = reviews[0]
+    value = review.data
+    if (
+        type(value) is not dict
+        or review.digest != canonical_hash(value)
+        or review.msr_id != msr.pk
+        or review.created_by_id == inspection.created_by_id
+        or value.get("purpose") != REVIEW_KIND
+        or value.get("inspection_id") != str(inspection.pk)
+        or value.get("inspection_digest") != inspection.digest
+        or value.get("project_id") != str(project.pk)
+        or value.get("msr_id") != str(msr.pk)
+        or value.get("msr_version") != msr.number
+        or value.get("snapshot_sha256") != canonical_hash(msr.snapshot)
+        or value.get("schedule_id") != str(schedule.pk)
+        or value.get("inspector_id") != str(inspection.created_by_id)
+        or value.get("reviewer_id") != str(review.created_by_id)
+        or type(value.get("independently_examined")) is not bool
+        or type(value.get("reason")) is not str
+        or not 15 <= len(value["reason"].strip()) <= 2000
+        or value.get("trusted_installation_evidence") is not False
+        or value.get("final_receipt_issuance_authorized") is not False
+        or not User.objects.filter(
+            pk=review.created_by_id,
+            is_active=True,
+            role=Role.COMPTROLLER,
+        ).exists()
+    ):
+        return "EVIDENCE_REQUIRES_ATTENTION"
+
+    if value.get("status") == "CANDIDATE_ACCEPTED":
+        if (
+            data.get("inspection_passed") is not True
+            or value["independently_examined"] is not True
+        ):
+            return "EVIDENCE_REQUIRES_ATTENTION"
+        return "INTERNAL_CANDIDATE_ACCEPTED"
+    if value.get("status") == "REJECTED":
+        return "INTERNAL_CANDIDATE_REJECTED"
+    return "EVIDENCE_REQUIRES_ATTENTION"
+
+
 @api_view(["GET"])
 def workspace(request, project_id):
     if settings.ENVIRONMENT != "development" or settings.DEBUG is not True:
@@ -81,6 +157,9 @@ def workspace(request, project_id):
         "approved_msr": bool(approved),
         "completed_schedule": bool(completed),
         "inspection_already_recorded": recorded,
+        "internal_review_state": internal_review_state(
+            project, msr, schedule, approved, completed
+        ),
         "questions": [
             {"id": key, "text": question}
             for key, question in zip(INSPECTION_IDS, INSPECTION_ITEMS)

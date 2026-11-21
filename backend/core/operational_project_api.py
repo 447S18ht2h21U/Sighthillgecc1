@@ -697,6 +697,7 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
             "read_only": True,
             "status": "PREREQUISITES_MISSING",
             "pending_inspection_id": None,
+            "review_submission_available": False,
             "inspection_passed": None,
             "independent_review_recorded": False,
             "review_decision": None,
@@ -829,6 +830,16 @@ class OperationalProjectViewSet(viewsets.ReadOnlyModelViewSet):
 
         result["pending_inspection_id"] = str(inspection.pk)
         result["status"] = "PENDING_INDEPENDENT_REVIEW"
+
+        # The existing POST guard is authoritative. This read-only
+        # indicator never bypasses the server's database isolation.
+        try:
+            self._installation_entry_guard(request, Role.COMPTROLLER)
+        except PermissionDenied:
+            result["review_submission_available"] = False
+        else:
+            result["review_submission_available"] = True
+
         return Response(result)
 
     def _installation_entry_guard(self, request, role):

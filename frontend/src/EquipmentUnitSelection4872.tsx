@@ -150,7 +150,7 @@ export function EquipmentUnitSelection4872({
   }
 
   return (
-    <section className="installation-completion-guidance"
+    <section id="equipment-inspection-and-serial-numbers" className="installation-completion-guidance"
       aria-label="Equipment inspection and serial numbers">
       <h3>Equipment Inspection & Serial Numbers</h3>
       <p>

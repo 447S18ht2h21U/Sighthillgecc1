@@ -333,6 +333,13 @@ export function InstallationScheduling({
     }
   }
 
+  function goToInspectionSection(id: string) {
+    document.getElementById(id)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }
+
   const projectNames = new Map(projects.map(project => [
     project.id, `${project.code} - ${project.customer_name}`,
   ]));
@@ -796,6 +803,63 @@ export function InstallationScheduling({
         />
       </section>
     )}
+    {actorRole === 'INSTALLATION_MANAGER' &&
+      Boolean(projectId) &&
+      schedules.some(schedule =>
+        schedule.project === projectId &&
+        schedule.installation_manager === actorId
+      ) && (
+        <section className="installation-completion-guidance"
+          aria-label="Inspection workflow next steps">
+          <h3>Inspection workflow — next steps</h3>
+          <p>
+            Work through these sections for the selected project.
+            They record different information and do not replace one another.
+          </p>
+          <ol>
+            <li>
+              <button type="button" className="quiet"
+                onClick={() => goToInspectionSection(
+                  'equipment-inspection-and-serial-numbers'
+                )}>
+                Equipment Inspection &amp; Serial Numbers
+              </button>
+              {' — '}Confirm the approved equipment unit and its details. Record findings after examination.
+            </li>
+            <li>
+              <button type="button" className="quiet"
+                onClick={() => goToInspectionSection(
+                  'installation-manager-inspection'
+                )}>
+                Installation Manager inspection
+              </button>
+              {' — '}Review the five required findings.
+              They are questions for later DocuSign signing, not answers
+              already recorded by this screen.
+            </li>
+            <li>
+              <button type="button" className="quiet"
+                disabled={!schedules.some(schedule =>
+                  schedule.project === projectId &&
+                  schedule.installation_manager === actorId &&
+                  schedule.status === 'COMPLETED'
+                )}
+                onClick={() => goToInspectionSection(
+                  'record-installation-inspection'
+                )}>
+                Record Installation Inspection
+              </button>
+              {' — '}Available after the installation schedule is
+              recorded as completed. Record only an inspection actually
+              performed; an internal candidate still needs independent review.
+            </li>
+          </ol>
+          <p className="muted">
+            None of these steps independently verifies DocuSign signatures,
+            authorizes a final Receipt, or completes the project.
+          </p>
+        </section>
+      )}
     {actorRole === 'INSTALLATION_MANAGER' &&
       Boolean(projectId) &&
       schedules.some(

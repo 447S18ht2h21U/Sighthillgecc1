@@ -23,3 +23,22 @@ def status(request, project_id):
         raise ValidationError(exc.messages) from exc
 
     return Response(result)
+
+@api_view(["GET"])
+def unsigned_pdf_preflight(request, project_id):
+    """Authorized offline verification, with no PDF download or provider I/O."""
+    from core.installation_unsigned_pdf_preflight_5254 import verify_unsigned_pdf
+
+    try:
+        result = verify_unsigned_pdf(
+            actor=request.user,
+            project_id=project_id,
+        )
+    except DjangoPermissionDenied as exc:
+        raise PermissionDenied(str(exc)) from exc
+    except DjangoValidationError as exc:
+        raise ValidationError(exc.messages) from exc
+
+    response = Response(result)
+    response["Cache-Control"] = "private, no-store"
+    return response
