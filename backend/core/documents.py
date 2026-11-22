@@ -58,6 +58,18 @@ def canonical_hash(value):
 def money(value):
     return f'{Decimal(value):,.2f}'
 
+def customer_payment_option_label(snapshot):
+    labels = {
+        '50_PERCENT_DEPOSIT': '50% deposit / 50% balance',
+        '100_PERCENT_COMPLETION': '100% upon completion',
+        'OTHER_APPROVAL_REQUIRED': 'Other - approval required',
+    }
+    option = snapshot.get('payment_option')
+    if option not in labels:
+        raise ValueError('Unknown payment arrangement.')
+    return labels[option]
+
+
 def field_values(kind, record, prepared_at):
     s = record.snapshot
     common = {'project_code': record.project.code, 'msr_version': f'{record.number}.0', 'customer_printed_name': s['customer'], 'project_address': s['project_location']}
@@ -67,7 +79,7 @@ def field_values(kind, record, prepared_at):
             values.update(line_2_description='Approved discount', line_2_amount='-'+money(s['discount']))
         return values
     if kind == 'CONTRACT':
-        return {**common, 'customer_name':s['customer'], 'payment_option':'50% deposit / 50% balance' if s['payment_option']=='50_PERCENT_DEPOSIT' else '100% on completion', 'financing_type':'Financed' if s['financing_type']=='FINANCED' else 'Non-financed'}
+        return {**common, 'customer_name':s['customer'], 'payment_option':customer_payment_option_label(s), 'financing_type':'Financed' if s['financing_type']=='FINANCED' else 'Non-financed'}
     return {**common, 'project_city':s.get('project_city',''), 'project_state':s.get('project_state',''), 'project_zip':s.get('project_zip','')}
 
 def format_customer_equipment_line(item):
@@ -127,12 +139,25 @@ def appendix(record, kind, prepared_at, signing_test=False):
         text(label, '\n'.join(items) or 'None specified in the approved record.')
     rows = [['Approved price','USD'],['Base price',money(s['base_price'])],['Discount',('0.00' if Decimal(str(s['discount'])) == 0 else '-'+money(s['discount']))],['Sales tax',money(s['tax'])],['Total price',money(s['total_price'])]]
     table = Table(rows, colWidths=[350,130]);table.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#e7eee7')),('GRID',(0,0),(-1,-1),.5,colors.HexColor('#c9d4cb')),('ALIGN',(1,1),(1,-1),'RIGHT'),('TOPPADDING',(0,0),(-1,-1),8),('BOTTOMPADDING',(0,0),(-1,-1),8)]));content += [Spacer(1,16),table]
-    text('Payment option','50% deposit / 50% at completion' if s['payment_option']=='50_PERCENT_DEPOSIT' else '100% at completion')
+    text('Payment option',customer_payment_option_label(s))
     text('Payment terms',s['payment_terms'])
     if s.get('financing_type'):
         text('Financing','Financed' if s['financing_type']=='FINANCED' else 'Non-financed')
     if s.get('commercial_notes'):
         text('Commercial notes',s['commercial_notes'])
+    # Disclose the recorded promotional commitment without changing
+    # the agreed project price or treating benefits as discounts.
+    from .msr_document_source import msr_other_details
+    offer = msr_other_details(s)
+    if offer is not None:
+        text('Promotional offer / Other', (
+            offer['type'] + ': ' + offer['notes']
+        ))
+        if offer['type'] not in ('Reduced Price',):
+            text('Promotional benefit', (
+                'Recorded amount: $' + offer['amount'] +
+                '. This is not an additional price deduction.'
+            ))
     text('Installation eligibility','Five Eastern calendar days after the verified customer Contract signature, and after any later applicable cancellation deadline. Verified Contract signature, required payment verification or an approved exception, and other installation prerequisites still apply. The customer Invoice signature is not a pre-installation requirement. No eligibility date has been calculated in this preparation copy.')
     def footer(c, doc):
         c.setFont('Helvetica',8);c.setFillColor(colors.HexColor('#647a6b'));c.drawString(48,25,f'{record.project.code} | MSR {record.number}.0 | Approved detail');c.drawRightString(564,25,f'Page {doc.page}')

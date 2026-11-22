@@ -116,9 +116,15 @@ class ContactSerializer(RecordChangeSerializer):
         return value
 
 class MSRSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+
+    def get_created_by_name(self, obj):
+        user = obj.created_by
+        return user.get_full_name().strip() or user.username
+
     class Meta:
         model = MSR
-        fields = ['id', 'number', 'status', 'snapshot', 'created_by', 'source', 'revision_reason', 'edit_sequence', 'submitted_at', 'approved_at', 'approved_by']
+        fields = ['id', 'number', 'status', 'snapshot', 'created_by', 'prepared_by', 'source', 'revision_reason', 'edit_sequence', 'submitted_at', 'approved_at', 'approved_by', 'created_at', 'created_by_name']
 
 class ProjectSerializer(serializers.ModelSerializer):
     current_approved = MSRSerializer(read_only=True)

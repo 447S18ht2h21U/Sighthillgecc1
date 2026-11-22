@@ -1,7 +1,7 @@
 from datetime import timedelta
 from zoneinfo import ZoneInfo
 EASTERN = ZoneInfo('America/New_York')
-PAYMENT_OPTIONS = ('50_PERCENT_DEPOSIT', '100_PERCENT_COMPLETION')
+PAYMENT_OPTIONS = ('50_PERCENT_DEPOSIT', '100_PERCENT_COMPLETION', 'OTHER_APPROVAL_REQUIRED')
 def installation_eligible_at(customer_contract_signed_at, customer_invoice_signed_at, rescission_deadline):
     """Earliest gate only: scheduling also requires signatures and verified required deposit."""
     if not all((customer_contract_signed_at, customer_invoice_signed_at, rescission_deadline)):

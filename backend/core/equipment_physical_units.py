@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from .equipment_invoice_rows import (
-    MAX_INVOICE_ROWS,
+    MAX_MSR_EQUIPMENT_ROWS,
     NEW_MSR_FIELDS,
     project_equipment_rows,
 )
@@ -40,8 +40,8 @@ def physical_units_from_snapshot(*, msr_id, snapshot):
     equipment = snapshot.get("equipment")
     if type(equipment) is not list or not equipment:
         raise ValueError("An explicit equipment list is required.")
-    if len(equipment) > MAX_INVOICE_ROWS:
-        raise ValueError("More than eight equipment rows are not supported.")
+    if len(equipment) > MAX_MSR_EQUIPMENT_ROWS:
+        raise ValueError("MSR equipment exceeds 100 entries.")
 
     # Reuse the existing customer-facing row validation, but do not
     # make or change an Invoice.

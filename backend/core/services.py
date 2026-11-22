@@ -49,11 +49,15 @@ def next_code(initials):
 from .msr_document_source import msr_other_details
 from .equipment_catalog_policy import validate_equipment_details
 
-SNAPSHOT_FIELDS = {'customer', 'contact', 'billing_address', 'project_location', 'scope', 'equipment', 'materials', 'base_price', 'discount', 'tax', 'total_price', 'payment_option', 'payment_terms', 'commercial_notes', 'financing_type', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip', 'other'}
+SNAPSHOT_FIELDS = {'customer', 'contact', 'billing_address', 'project_location', 'scope', 'equipment', 'materials', 'base_price', 'discount', 'tax', 'total_price', 'payment_option', 'payment_terms', 'commercial_notes', 'financing_type', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip', 'other', 'marketing_promotion'}
 def validate_snapshot(data, complete=False):
     if not isinstance(data, dict) or set(data) - SNAPSHOT_FIELDS:
         raise ValidationError('Invalid or unknown commercial fields.')
     result = copy.deepcopy(data)
+    if 'marketing_promotion' in result and type(result['marketing_promotion']) is not bool:
+        raise ValidationError({
+            'marketing_promotion': 'Must be a checked or unchecked checkbox.'
+        })
     for key in ('customer', 'contact', 'billing_address', 'project_location', 'scope', 'payment_terms', 'commercial_notes', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip'):
         if key in result and (not isinstance(result[key], str) or len(result[key]) > 10000):
             raise ValidationError({key: 'Must be text, at most 10,000 characters.'})
@@ -65,7 +69,7 @@ def validate_snapshot(data, complete=False):
                 type(line) is dict and 'category_of_work' in line
                 for line in result[key]
             ):
-                # The revised eight-row MSR must be validated as a whole.
+                # Validate all catalog equipment rows, including continuation entries.
                 # Historical equipment without work categories remains valid.
                 from .equipment_invoice_rows import project_equipment_rows
                 try:
@@ -127,11 +131,16 @@ def validate_snapshot(data, complete=False):
                 raise ValidationError({key: 'Provide nonnegative USD with at most two decimal places.'})
             result[key] = format(value, '.2f')
     if 'payment_option' in result and result['payment_option'] not in PAYMENT_OPTIONS:
-        raise ValidationError({'payment_option': 'Choose 50% deposit or 100% at completion.'})
+        raise ValidationError({'payment_option': 'Choose a standard payment arrangement or describe other proposed terms.'})
     if 'financing_type' in result and result['financing_type'] not in {'FINANCED', 'NON_FINANCED'}:
         raise ValidationError({'financing_type': 'Choose financed or non-financed.'})
+    if complete and result.get('payment_option') == 'OTHER_APPROVAL_REQUIRED':
+        raise ValidationError({
+            'payment_option':
+                'Other terms require a separate approved authorization workflow before submission.'
+        })
     if complete:
-        required = SNAPSHOT_FIELDS - {'commercial_notes', 'contact', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip', 'other'}
+        required = SNAPSHOT_FIELDS - {'commercial_notes', 'contact', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip', 'other', 'marketing_promotion'}
         missing = [key for key in required if key not in result or (isinstance(result[key], str) and not result[key].strip())]
         if missing:
             raise ValidationError({'required': sorted(missing)})
@@ -161,7 +170,21 @@ def create_project(actor, customer, location, associate, reviewer, duplicate_rea
     if duplicates and not duplicate_reason.strip():
         raise ValidationError({'duplicate_warning': 'A project exists for this customer/location. Supply duplicate_reason to continue.'})
     project = Project.objects.create(code=next_code(associate.initials), customer=customer, location=location.strip(), sales_associate=associate, reviewer=reviewer)
-    draft = MSR.objects.create(project=project, created_by=actor, prepared_by=actor, snapshot={'customer': customer.legal_name, 'billing_address': customer.billing_address, 'project_location': project.location, 'contact': '', 'scope': '', 'equipment': [], 'materials': [], 'base_price': '0.00', 'discount': '0.00', 'tax': '0.00', 'total_price': '0.00', 'payment_option': '100_PERCENT_COMPLETION', 'payment_terms': '', 'commercial_notes': '', 'financing_type': 'NON_FINANCED', 'customer_phone': customer.phone, 'customer_email': customer.email, 'project_city': '', 'project_state': '', 'project_zip': ''})
+    # Select the current primary contact from this customer only.
+    primary_contact = customer.contacts.filter(primary=True).first()
+    contact_name = primary_contact.name if primary_contact else ''
+
+    # Separate a complete US installation address where recognizable.
+    import re
+    address_match = re.fullmatch(
+        r'\s*(.+?),\s*([^,]+),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)\s*',
+        project.location,
+    )
+    project_city = address_match.group(2).strip() if address_match else ''
+    project_state = address_match.group(3).upper() if address_match else ''
+    project_zip = address_match.group(4) if address_match else ''
+
+    draft = MSR.objects.create(project=project, created_by=actor, prepared_by=actor, snapshot={'customer': customer.legal_name, 'billing_address': customer.billing_address, 'project_location': project.location, 'contact': contact_name, 'scope': '', 'equipment': [], 'materials': [], 'base_price': '0.00', 'discount': '0.00', 'tax': '0.00', 'total_price': '0.00', 'payment_option': '100_PERCENT_COMPLETION', 'payment_terms': '', 'commercial_notes': '', 'financing_type': 'NON_FINANCED', 'customer_phone': customer.phone, 'customer_email': customer.email, 'project_city': project_city, 'project_state': project_state, 'project_zip': project_zip})
     project.pending = draft
     project.save()
     audit(actor, 'project.created', project.id, {'code': project.code, 'version': 1, 'duplicate_override': duplicate_reason})
@@ -179,11 +202,108 @@ def transition(actor, msr_id, action, expected_sequence, snapshot=None, reason='
     if type(expected_sequence) is not int or expected_sequence != record.edit_sequence:
         raise ValidationError({'conflict': 'This record changed. Refresh before making another change.'})
     if action == 'edit':
-        if record.status not in {'DRAFT', 'REJECTED'}:
-            raise ValidationError('Only drafts or rejected records can be edited.')
+        manager_correction = record.status == 'SUBMITTED'
+        if manager_correction:
+            if not (
+                actor.role == Role.COMPTROLLER
+                or (
+                    actor.role == Role.SALES_MANAGER
+                    and project.reviewer_id == actor.pk
+                )
+            ):
+                raise ValidationError(
+                    'Only authorized managers may correct a submitted MSR.'
+                )
+            if (
+                not isinstance(reason, str)
+                or not reason.strip()
+                or len(reason) > 2000
+            ):
+                raise ValidationError({
+                    'reason': 'Explain the correction before saving.'
+                })
+        elif record.status not in {'DRAFT', 'REJECTED'}:
+            raise ValidationError(
+                'Only drafts or rejected records can be edited.'
+            )
+
+        if manager_correction:
+            from .msr_catalog_selection_guard_4558 import verify_new_equipment_selections
+
+            before_snapshot = copy.deepcopy(record.snapshot)
+            checked_snapshot = verify_new_equipment_selections(
+                snapshot, before_snapshot
+            )
+            corrected_snapshot = validate_snapshot(
+                checked_snapshot, complete=True
+            )
+
+            if corrected_snapshot == before_snapshot:
+                raise ValidationError({
+                    'snapshot': 'Make a correction before saving.'
+                })
+
+            number = (
+                project.versions.aggregate(n=Max('number'))['n'] or 0
+            ) + 1
+
+            corrected = MSR.objects.create(
+                project=project,
+                number=number,
+                status='SUBMITTED',
+                source=record,
+                revision_reason=reason.strip(),
+                created_by=actor,
+                prepared_by=actor,
+                submitted_at=timezone.now(),
+                snapshot=copy.deepcopy(corrected_snapshot),
+            )
+
+            project.pending = corrected
+            project.state = 'SUBMITTED'
+            project.save()
+
+            changed_fields = {
+                key: {
+                    'before': before_snapshot.get(key),
+                    'after': corrected_snapshot.get(key),
+                }
+                for key in sorted(
+                    set(before_snapshot) | set(corrected_snapshot)
+                )
+                if before_snapshot.get(key) != corrected_snapshot.get(key)
+            }
+
+            audit(
+                actor,
+                'msr.manager_correct',
+                project.id,
+                {
+                    'source_msr_id': str(record.id),
+                    'source_version': record.number,
+                    'msr_id': str(corrected.id),
+                    'version': corrected.number,
+                    'reason': reason.strip(),
+                    'before': before_snapshot,
+                    'after': copy.deepcopy(corrected_snapshot),
+                    'changed_fields': changed_fields,
+                    'corrected_by_role': actor.role,
+                },
+            )
+            return corrected
+
+        before_snapshot = copy.deepcopy(record.snapshot)
         from .msr_catalog_selection_guard_4558 import verify_new_equipment_selections
-        checked_snapshot = verify_new_equipment_selections(snapshot, record.snapshot)
-        record.snapshot = validate_snapshot(checked_snapshot)
+        checked_snapshot = verify_new_equipment_selections(
+            snapshot, record.snapshot
+        )
+        record.snapshot = validate_snapshot(
+            checked_snapshot, complete=manager_correction
+        )
+        if manager_correction and record.snapshot == before_snapshot:
+            raise ValidationError({
+                'snapshot': 'Make a correction before saving.'
+            })
         record.prepared_by = actor
     elif action == 'submit':
         if record.status not in {'DRAFT', 'REJECTED'}:
@@ -208,7 +328,18 @@ def transition(actor, msr_id, action, expected_sequence, snapshot=None, reason='
     record.save()
     project.save()
     # Retain the exact submitted/rejected/approved contents, including prior attempts.
-    audit(actor, f'msr.{action}', project.id, {'msr_id': str(record.id), 'version': record.number, 'edit_sequence': record.edit_sequence, 'reason': reason, 'snapshot': record.snapshot})
+    audit(
+        actor,
+        f'msr.{action}',
+        project.id,
+        {
+            'msr_id': str(record.id),
+            'version': record.number,
+            'edit_sequence': record.edit_sequence,
+            'reason': reason,
+            'snapshot': record.snapshot,
+        },
+    )
     return record
 
 @transaction.atomic

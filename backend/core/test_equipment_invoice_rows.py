@@ -29,6 +29,8 @@ class EquipmentInvoiceRowTests(SimpleTestCase):
         self.assertEqual(WORK_CATEGORIES, {
             "New installation",
             "Replacing existing equipment",
+            "Service",
+            "Repair",
             "Service & maintenance",
         })
 

@@ -6,11 +6,14 @@ remain unchanged and must not be assigned an invented category.
 from copy import deepcopy
 
 MAX_INVOICE_ROWS = 8
+MAX_MSR_EQUIPMENT_ROWS = 100
 
 WORK_CATEGORIES = frozenset({
     "New installation",
     "Replacing existing equipment",
-    "Service & maintenance",
+    "Service",
+    "Repair",
+    "Service & maintenance",  # Historical compatibility.
 })
 
 CATALOG_FIELDS = (
@@ -28,7 +31,7 @@ NEW_MSR_FIELDS = frozenset({
 
 
 def project_equipment_rows(snapshot):
-    """Return exactly eight independent Invoice row dictionaries.
+    """Return all validated equipment entries, padding only short lists to eight rows.
 
     These are proposed customer-facing values only. Identification,
     serial numbers and per-unit prices require separately controlled
@@ -40,8 +43,8 @@ def project_equipment_rows(snapshot):
     equipment = snapshot.get("equipment")
     if type(equipment) is not list:
         raise ValueError("MSR equipment must be a list.")
-    if len(equipment) > MAX_INVOICE_ROWS:
-        raise ValueError("The revised Invoice supports up to eight equipment rows.")
+    if len(equipment) > MAX_MSR_EQUIPMENT_ROWS:
+        raise ValueError("MSR equipment exceeds 100 entries.")
 
     rows = []
     for index, source in enumerate(equipment, 1):
@@ -96,7 +99,7 @@ def project_equipment_rows(snapshot):
 
 
 def invoice_equipment_field_values(snapshot):
-    """Match the 8 x 7 interactive Invoice field naming convention."""
+    """Map equipment fields without silently discarding additional rows."""
     result = {}
     for number, row in enumerate(project_equipment_rows(snapshot), 1):
         for field, value in row.items():

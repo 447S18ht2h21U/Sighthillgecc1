@@ -41,7 +41,8 @@ type API = <T>(
 const categories = [
   'New installation',
   'Replacing existing equipment',
-  'Service & maintenance',
+  'Service',
+  'Repair',
 ];
 
 function isCatalogLine(line: EquipmentLine): line is CatalogEquipmentLine {
@@ -96,7 +97,7 @@ export function EquipmentCatalogEditor4534({
   }
 
   function add() {
-    if (items.length >= 8 || !categories.includes(primaryCategory)) return;
+    if (items.length >= 100 || !categories.includes(primaryCategory)) return;
     const selected = products.find(row => row.id === selectedId);
     if (!selected) return;
 
@@ -137,25 +138,40 @@ export function EquipmentCatalogEditor4534({
                 <p className="muted">
                   Individual category: {line.category_of_work}
                 </p>}
-              <details className="msr-equipment-category-override">
-                <summary>Use a different category for this equipment</summary>
-                <label>
-                  Category of Work for this equipment
-                  <select
-                    value={line.category_of_work}
-                    onChange={event => replace(index, {
-                      ...line,
-                      category_of_work: event.target.value,
-                    })}
-                  >
-                    {categories.map(value => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </details>
+              <div className="msr-equipment-category-override"
+                style={{marginTop:10,marginBottom:12}}>
+                <strong>Work to be Performed on This Equipment</strong>
+                <p className="muted">
+                  Selected from Quick Scope of Work. Choose another type
+                  if this equipment requires different work.
+                </p>
+                {line.category_of_work === 'Service & maintenance' &&
+                  <p className="muted">
+                    Historical category: Service &amp; maintenance
+                  </p>}
+                <div style={{display:'flex',flexWrap:'wrap',gap:14}}>
+                  {categories.map(value => (
+                    <label key={value}
+                      style={{display:'flex',alignItems:'center',gap:6,width:'auto'}}>
+                      <input
+                        type="radio"
+                        name={`equipment-category-${index}`}
+                        style={{width:17,height:17,minWidth:17,margin:0}}
+                        checked={line.category_of_work === value}
+                        onChange={() => replace(index, {
+                          ...line,
+                          category_of_work:value,
+                        })}
+                      />
+                      {value === 'Replacing existing equipment'
+                        ? 'Replacing Equipment'
+                        : value === 'New installation'
+                          ? 'New Installation'
+                          : value}
+                    </label>
+                  ))}
+                </div>
+              </div>
               <label>
                 Quantity
                 <input type="number" min="1" max="999" step="1"
@@ -226,13 +242,13 @@ export function EquipmentCatalogEditor4534({
       }
 
       <button type="button" className="msr-add-equipment-primary"
-        disabled={!selectedId || !primaryCategory || items.length >= 8}
+        disabled={!selectedId || !primaryCategory || items.length >= 100}
         onClick={add}>
         Add Selected Equipment
       </button>
 
       <p className="muted">
-        Maximum eight equipment rows. Catalog descriptions are copied
+        Up to 100 equipment entries per project. Catalog descriptions are copied
         into the draft as historical snapshots.
       </p>
     </section>
