@@ -1,3 +1,5 @@
+from core import synthetic_customer_signer_api_5414
+from core import adult_customer_verification_5401
 from core import installation_manager_workspace_5211
 from core import installation_draft_status_api_5186
 from core import installation_draft_browser_api_5185
@@ -33,6 +35,10 @@ from core import approved_msr_source_api_4530
 from core import equipment_catalog_selection_api_4534
 from core import equipment_catalog_management_api_4542
 urlpatterns = [
+    path('api/projects/<uuid:project_id>/adult-verification/', adult_customer_verification_5401.adult_verification),
+    path('api/projects/<uuid:project_id>/synthetic-signer/status/', synthetic_customer_signer_api_5414.status),
+    path('api/projects/<uuid:project_id>/synthetic-signer/request/', synthetic_customer_signer_api_5414.request_authorization),
+    path('api/projects/<uuid:project_id>/synthetic-signer/approve/', synthetic_customer_signer_api_5414.approve_authorization),
     path('api/im-inspection-workspace/<uuid:project_id>/', installation_manager_workspace_5211.workspace),
     path(
         'api/inspection-evidence/<uuid:project_id>/oauth-read/',

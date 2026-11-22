@@ -335,6 +335,28 @@ def require_approved_customer_signer(*, msr, group, signer_name, signer_email):
 
 def verify_customer_signer_integrity(authorization):
     """Verify immutable approval fields, digest, and matching audit evidence."""
+    if authorization is not None and authorization.authority_basis.startswith(
+        "SYNTHETIC TEST ONLY"
+    ):
+        import os
+        from django.conf import settings
+
+        project = authorization.project
+        allowed = (
+            settings.DEBUG
+            and os.environ.get("GECC_DEV") == "1"
+            and os.environ.get("VERIDIAN_ENVIRONMENT") == "development"
+            and not os.environ.get("PGHOST")
+            and settings.DATABASES["default"]["ENGINE"]
+            == "django.db.backends.sqlite3"
+            and project.code == "104-SA-2026-11-22"
+            and authorization.group == "COMMERCIAL"
+        )
+        if not allowed:
+            raise ValidationError(
+                "Synthetic test authorization cannot establish "
+                "real customer signing authority."
+            )
     import hashlib
     import hmac
     import json

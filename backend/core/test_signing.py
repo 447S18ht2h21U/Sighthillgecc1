@@ -27,6 +27,26 @@ class SigningTests(TestCase):
             requested_by=self.sales,
             approved_by=approver,
         )
+    def record_test_adult_verification(self):
+        """Record synthetic evidence through the real Sales Associate API."""
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from .adult_customer_verification_5401 import adult_verification
+
+        self.project.refresh_from_db()
+
+        path = f"/api/projects/{self.project.pk}/adult-verification/"
+        request = APIRequestFactory().post(
+            path,
+            {"state_of_issue": "MD", "adult_confirmed": True},
+            format="json",
+        )
+        force_authenticate(request, user=self.sales)
+        response = adult_verification(
+            request,
+            project_id=self.project.pk,
+        )
+        self.assertEqual(response.status_code, 201)
+        return response.data["evidence_id"]
     def setup_review(self):
         self.manager.first_name='Review';self.manager.last_name='Manager';self.manager.email='manager@example.invalid';self.manager.save()
         self.comptroller.first_name='Review';self.comptroller.last_name='Comptroller';self.comptroller.email='comptroller@example.invalid';self.comptroller.save()
@@ -37,6 +57,37 @@ class SigningTests(TestCase):
         self.input={'group':'COMMERCIAL','customer_name':'Authorized Customer','customer_email':'customer@example.invalid','gecc_signer':str(self.manager.id),'authority_note':'Synthetic test identity and signing authority reviewed.'}
         self.commercial_authorization = self.authorize_test_customer()
         self.completion_authorization = self.authorize_test_customer(group="COMPLETION_NON_FINANCED")
+        self.record_test_adult_verification()
+    def test_commercial_review_rejects_missing_adult_evidence(self):
+        self.setup_review()
+        with patch(
+            "core.adult_customer_verification_5401.verified_row",
+            return_value=None,
+        ):
+            with self.assertRaisesMessage(
+                ValidationError,
+                "adult-ID verification",
+            ):
+                prepare(self.manager, self.approved.id, self.input)
+
+    def test_commercial_review_retains_adult_evidence_reference(self):
+        self.setup_review()
+        from .adult_customer_verification_5401 import verified_row
+
+        self.project.refresh_from_db()
+        event = verified_row(self.project)
+        self.assertIsNotNone(event)
+
+        plan, created = prepare(
+            self.manager,
+            self.approved.id,
+            self.input,
+        )
+        self.assertTrue(created)
+        self.assertEqual(
+            plan.review["adult_verification_evidence_id"],
+            str(event.pk),
+        )
     def test_plan_customer_authorization_valid(self):
         from .signing import validate_plan_customer_authorization
 
@@ -193,6 +244,7 @@ class SigningTests(TestCase):
             prepare(self.manager,self.project.pending.id,data)
         approved=self.approve()
         self.authorize_test_customer(name="Customer", email="c@example.invalid")
+        self.record_test_adult_verification()
         with self.assertRaisesMessage(ValidationError,'Prepare the contract'):
             prepare(self.manager,approved.id,data)
         generate(self.manager,approved.id,'CONTRACT')

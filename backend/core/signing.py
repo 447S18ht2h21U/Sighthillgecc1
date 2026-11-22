@@ -122,6 +122,15 @@ def prepare(actor, msr_id, data):
         signer_name=customer['name'],
         signer_email=customer['email'],
     )
+    adult_evidence = None
+    if group == 'COMMERCIAL':
+        from .adult_customer_verification_5401 import verified_row
+        adult_evidence = verified_row(project)
+        if adult_evidence is None:
+            raise ValidationError(
+                'Commercial signing review requires the assigned Sales '
+                'Associate adult-ID verification for this approved MSR.'
+            )
     docs = []
     for kind in GROUPS[group]:
         doc = Document.objects.filter(msr=record, kind=kind).order_by('-created_at').first()
@@ -133,6 +142,11 @@ def prepare(actor, msr_id, data):
     review = {'schema_version': 1, 'msr_id': str(record.id), 'msr_version': record.number,
               'snapshot_sha256': canonical_hash(record.snapshot), 'group': group,
               'customer': customer, 'gecc': gecc, 'authority_note': authority, 'customer_authorization_id': str(customer_authorization.id), 'customer_authorization_digest': customer_authorization.digest,
+              'adult_verification_evidence_id': str(adult_evidence.pk) if adult_evidence else None,
+              'adult_verification_synthetic': bool(
+                  adult_evidence and adult_evidence.action ==
+                  'customer.synthetic_adult_test_evidence'
+              ),
               'substitute_reason': reason,
               'documents': [{'id': str(d.id), 'kind': d.kind, 'pdf_sha256': d.pdf_sha256, 'template_sha256': d.template_sha256} for d in docs],
               'envelope_preview': envelope_preview(docs, customer, gecc, group == 'COMMERCIAL')}

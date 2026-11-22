@@ -48,7 +48,7 @@ def completion_renderer_version(kind):
     if kind in ("COMPLETION_FINANCED", "COMPLETION_NON_FINANCED"):
         return "0.2.2"
     if kind in ("CONTRACT", "INVOICE"):
-        return "0.2.3"
+        return "0.2.4"
     return RENDERER_VERSION
 
 
@@ -160,7 +160,7 @@ def appendix(record, kind, prepared_at, signing_test=False):
             ))
     text('Installation eligibility','Five Eastern calendar days after the verified customer Contract signature, and after any later applicable cancellation deadline. Verified Contract signature, required payment verification or an approved exception, and other installation prerequisites still apply. The customer Invoice signature is not a pre-installation requirement. No eligibility date has been calculated in this preparation copy.')
     def footer(c, doc):
-        c.setFont('Helvetica',8);c.setFillColor(colors.HexColor('#647a6b'));c.drawString(48,25,f'{record.project.code} | MSR {record.number}.0 | Approved detail');c.drawRightString(564,25,f'Page {doc.page}')
+        c.setFont('Helvetica',8);c.setFillColor(colors.HexColor('#647a6b'));c.drawString(48,25,f'{record.project.code} | MSR {record.number}.0 | Approved detail');c.drawRightString(564,25,f'Project Detail Page {doc.page}')
     SimpleDocTemplate(stream,pagesize=(612,792),leftMargin=48,rightMargin=48,topMargin=48,bottomMargin=48).build(content,onFirstPage=footer,onLaterPages=footer)
     return PdfReader(BytesIO(stream.getvalue()))
 

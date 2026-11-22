@@ -5,6 +5,7 @@ import { ScopeWorkBuilder, inferPrimaryWorkCategory } from './ScopeWorkBuilder';
 import { MaterialsChecklist5333 } from './MaterialsChecklist5333';
 import './style.css';
 import { SigningReview } from './SigningReview';
+import { SyntheticSignerAuthorization5415 } from './SyntheticSignerAuthorization5415';
 import { DocusignSetup } from './DocusignSetup';
 import { CompletionEnvelopeInspection } from './CompletionEnvelopeInspection';
 import { ComptrollerInspectionReview5247 } from './ComptrollerInspectionReview5247';
@@ -453,7 +454,16 @@ function App(){
         The Customer Satisfaction Survey is optional.
       </p>
     </section>}
-  <SigningReview key={`${selected.id}-${selected.current_approved?.id}`} projectId={selected.id} msrId={selected.current_approved?.id} workflowIntent={workflowIntent} finance={selected.current_approved?.snapshot.financing_type} active={selected.state!=='CANCELLED'} approver={approver} comptroller={user.role==='COMPTROLLER'} actorId={user.id} busy={busy} api={api} run={run}/>
+  {selected.code==='104-SA-2026-11-22'&&selected.current_approved&&selected.state!=='CANCELLED'&&
+  <SyntheticSignerAuthorization5415
+    key={`${selected.id}-${selected.current_approved.id}-synthetic`}
+    projectId={selected.id}
+    actorRole={user.role}
+    busy={busy}
+    api={api}
+    run={run}
+  />}
+<SigningReview key={`${selected.id}-${selected.current_approved?.id}`} projectId={selected.id} msrId={selected.current_approved?.id} actorRole={user.role} workflowIntent={workflowIntent} finance={selected.current_approved?.snapshot.financing_type} active={selected.state!=='CANCELLED'} approver={approver} comptroller={user.role==='COMPTROLLER'} actorId={user.id} busy={busy} api={api} run={run}/>
  {approver&&<button className="quiet" disabled={busy||!reason.trim()} onClick={()=>void run(async()=>{await api(`projects/${selected.id}/state/`,'POST',{action:selected.state==='CANCELLED'?'reopen':'cancel',reason,expected_state:selected.state});await refresh(selected.id);})}>{selected.state==='CANCELLED'?'Reopen project':'Cancel project'}</button>}
  </section></>}</article></div>}<BrandedFooter versionLabel={APP_VERSION_LABEL} /></main></>;
 }
