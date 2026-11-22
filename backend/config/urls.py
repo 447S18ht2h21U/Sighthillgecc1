@@ -115,3 +115,13 @@ urlpatterns += [
         name="veridian-sales-status-5004",
     ),
 ]
+
+# Step 1907P-5465: Comptroller-only read-only payroll register.
+from django.urls import path as _payroll_path_5465
+from core import payroll_weekly_readonly_5465
+urlpatterns.append(
+    _payroll_path_5465(
+        "api/payroll/weekly/",
+        payroll_weekly_readonly_5465.weekly_payroll,
+    )
+)

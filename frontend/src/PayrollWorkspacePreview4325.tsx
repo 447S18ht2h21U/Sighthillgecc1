@@ -138,8 +138,10 @@ function FictionalTable(): React.JSX.Element {
 
 export function PayrollWorkspacePreview4325({
   role,
+  weeklyRegister,
 }: {
   role: PayrollRole4325;
+  weeklyRegister?: React.ReactNode;
 }): React.JSX.Element {
   const [requestedTab, setRequestedTab] = useState<Tab4325>('My Payroll');
   const tabs = availableTabs(role);
@@ -172,9 +174,9 @@ export function PayrollWorkspacePreview4325({
           marginBottom: 20,
         }}
       >
-        <strong>Development preview only.</strong> No live payroll
-        data, payment approval, disbursement, or report export is enabled.
-        Backend authorization is required before release.
+        <strong>Development workspace.</strong> {weeklyRegister
+          ? 'Weekly Payroll reads authorized database records. Other tabs remain design previews. No payment, approval, or export actions are enabled.'
+          : 'Fictional preview only. No operational payroll records, approvals, payments, or exports are enabled.'}
       </div>
 
       <p>
@@ -226,10 +228,11 @@ export function PayrollWorkspacePreview4325({
         {activeTab === 'Weekly Payroll' && managerOrExecutive && (
           <>
             <p>
-              Review the weekly register within your authorized scope.
-              No payroll amounts are calculated by this preview.
+              {weeklyRegister
+                ? 'Read-only recorded payroll obligations. Payment settlement is not independently verified by this register.'
+                : 'Fictional sample register. No payroll amounts are calculated by this preview.'}
             </p>
-            <FictionalTable />
+            {weeklyRegister ?? <FictionalTable />}
           </>
         )}
 

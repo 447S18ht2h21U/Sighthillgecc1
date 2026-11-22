@@ -1,3 +1,4 @@
+import AcceptancePaymentSimulator5477A from './AcceptancePaymentSimulator5477A';
 import { useEffect, useState } from 'react';
 
 type API = <T>(path: string, method?: string, data?: unknown) => Promise<T>;
@@ -116,6 +117,9 @@ export function CustomerPayments4716({
       </button>
     </div>
     <h2>Customer Payment Evidence</h2>
+    {projectId === '5e02a9d2-1028-41ea-a3bd-624116ef3b0b' && (
+      <AcceptancePaymentSimulator5477A />
+    )}
     <p>
       Record the payment, verify its supporting evidence, then separately
       confirm bank availability. All three operations are audited.
