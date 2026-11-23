@@ -68,7 +68,7 @@ export function SyntheticSignerAuthorization5415({
     {error&&<p role="alert" className="error">{error}</p>}
     {!status&&!error&&<p>Loading authorization status...</p>}
 
-    {status&&!status.requested&&actorRole==='SALES_ASSOCIATE'&&
+    {status&&(!status.requested||status.approved)&&actorRole==='SALES_ASSOCIATE'&&
       <form onSubmit={e=>{
         e.preventDefault();
         void run(submitRequest);
@@ -84,12 +84,12 @@ export function SyntheticSignerAuthorization5415({
           </label>
         </div>
         <p className="muted">
-          Use a fictional @example.invalid email address.
+          For Project 104, use a fictional @example.invalid address or a real test inbox explicitly approved in the backend sandbox recipient allowlist. A replacement requires fresh independent approval.
           No real customer permission is asserted.
         </p>
         <button disabled={busy||!name.trim()||
-          !email.trim().toLowerCase().endsWith('@example.invalid')}>
-          Submit synthetic authorization request
+          !email.trim()}>
+          {status.requested ? 'Request replacement synthetic signer' : 'Submit synthetic authorization request'}
         </button>
       </form>
     }

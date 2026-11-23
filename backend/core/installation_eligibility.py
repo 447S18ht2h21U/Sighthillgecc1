@@ -11,6 +11,7 @@ from .models import (
     ProjectEvidence,
 )
 from .rules import EASTERN
+from .commercial_signature_trust_5512 import require_authenticated_commercial_signature
 
 
 def parse_verified_cancellation_deadline(value):
@@ -46,6 +47,7 @@ def verified_signature_time(msr, document_kind):
             f'Verified {document_kind.lower()} signature evidence is required.'
         )
 
+    require_authenticated_commercial_signature(evidence=evidence)
     return evidence.signed_at.astimezone(EASTERN)
 
 
@@ -108,6 +110,12 @@ def ensure_installation_eligible(project):
     contract_signed = verified_signature_time(
         msr,
         CustomerSignatureEvidence.DocumentKind.CONTRACT,
+    )
+
+    # Both customer document signatures are required for normal installation.
+    verified_signature_time(
+        msr,
+        CustomerSignatureEvidence.DocumentKind.INVOICE,
     )
 
     deadline = cancellation_deadline(msr)

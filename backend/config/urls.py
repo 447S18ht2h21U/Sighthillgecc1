@@ -1,3 +1,5 @@
+from core import commercial_signing_api_5577
+from core import commercial_read_oauth_5576
 from core import synthetic_customer_signer_api_5414
 from core import adult_customer_verification_5401
 from core import installation_manager_workspace_5211
@@ -97,6 +99,8 @@ urlpatterns = [
     path('api/release-packages/<uuid:source_id>/signing-tests/', signing_test_api.packages),
     path('api/signing-tests/<uuid:package_id>/decisions/', signing_test_api.decision),
     path('api/signing-tests/<uuid:package_id>/connect/', signing_test_api.connect),
+    path('api/release-packages/<uuid:package_id>/commercial-signing/', commercial_signing_api_5577.commercial_transaction),
+    path('api/commercial-signing-attempts/<uuid:attempt_id>/connect-read/', commercial_read_oauth_5576.connect_read),
     path('api/signing-tests/<uuid:package_id>/documents/<int:document_index>/', signing_test_api.download),
     path('api/signing-test-documents/<uuid:document_id>/', signing_test_api.retained),
 path('api/sandbox-packages/<uuid:package_id>/connect-check/', sandbox_api.connect_check), path('api/msrs/<uuid:msr_id>/verification-evidence/', release_api.evidence), path('api/signing-reviews/<uuid:plan_id>/release-packages/', release_api.packages), path('api/release-packages/<uuid:package_id>/decisions/', release_api.decision), path('api/release-packages/<uuid:package_id>/documents/<int:document_index>/', release_api.download), path('api/signing-reviews/<uuid:plan_id>/sandbox-package/', sandbox_api.package), path('api/sandbox-packages/<uuid:package_id>/documents/<int:document_index>/', sandbox_api.download), path('api/sandbox-packages/<uuid:package_id>/connect-draft/', sandbox_api.connect_draft), path('api/inspection-draft-intents/<uuid:project_id>/authorize/', installation_draft_browser_api_5185.authorize), path('api/inspection-draft-intents/<uuid:project_id>/status/', installation_draft_status_api_5186.status), path('api/inspection-draft-intents/<uuid:project_id>/unsigned-pdf-preflight/', installation_draft_status_api_5186.unsigned_pdf_preflight), path('api/docusign/status/', docusign_api.status), path('api/docusign/connect/', docusign_api.connect), path('api/docusign/callback/', docusign_api.callback), path('api/csrf/', api.csrf), path('api/dev-login/', api.dev_login), path('api/logout/', api.end_session), path('api/me/', api.me), path('api/activity/', api.activity), path('api/', include(router.urls))]

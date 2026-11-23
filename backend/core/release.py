@@ -92,6 +92,10 @@ def binding(plan,evidence):
 
 @transaction.atomic
 def prepare_package(actor,plan_id):
+    reference = SigningPlan.objects.get(pk=plan_id)
+    if reference.group == 'COMMERCIAL':
+        from .commercial_presign_5588 import prepare
+        return prepare(actor, plan_id)
     plan=SigningPlan.objects.select_related('msr__project').get(pk=plan_id)
     lock_record(plan.msr_id)
     plan=SigningPlan.objects.select_related('msr__project').get(pk=plan_id)
@@ -121,6 +125,9 @@ def prepare_package(actor,plan_id):
 
 
 def validate_package(package,check_current=True):
+    if package.payload.get('purpose') == 'FICTIONAL_PRE_SIGN_COMMERCIAL':
+        from .commercial_presign_5588 import validate
+        return validate(package, check_current=check_current)
     if canonical_hash(package.payload)!=package.digest:
         raise ValidationError('Release package integrity verification failed.')
     for entry in package.payload['documents']:
@@ -136,6 +143,10 @@ def validate_package(package,check_current=True):
 
 @transaction.atomic
 def decide(actor,package_id,data):
+    reference = ReleasePackage.objects.get(pk=package_id)
+    if reference.payload.get('purpose') == 'FICTIONAL_PRE_SIGN_COMMERCIAL':
+        from .commercial_presign_5588 import decide as presign_decide
+        return presign_decide(actor,package_id,data)
     package=ReleasePackage.objects.select_related('plan__msr__project').get(pk=package_id)
     lock_record(package.plan.msr_id)
     package=ReleasePackage.objects.select_related('plan__msr__project').get(pk=package_id)
@@ -161,6 +172,9 @@ def decide(actor,package_id,data):
 
 
 def status(package):
+    if package.payload.get('purpose') == 'FICTIONAL_PRE_SIGN_COMMERCIAL':
+        from .commercial_presign_5588 import status as presign_status
+        return presign_status(package)
     try:validate_package(package)
     except ValidationError as exc:return {'status':'BLOCKED','send_available':False,'blockers':[str(exc.detail)]}
     decision=package.decisions.order_by('-created_at','-id').first()
@@ -178,7 +192,7 @@ def status(package):
 
 def describe(package):
     return {'id':str(package.id),'digest':package.digest,'created_by':str(package.created_by_id),'created_at':package.created_at.isoformat(),
-            'evidence_id':package.payload['evidence_id'],'release':status(package),
+            'evidence_id':package.payload.get('evidence_id'),'release':status(package),
             'documents':[{'kind':e['kind'],'filename':e['filename'],'pdf_sha256':e['pdf_sha256'],
                           'download_url':f'/api/release-packages/{package.id}/documents/{i}/'} for i,e in enumerate(package.payload['documents'])],
             'decisions':[{'id':str(d.id),'decision':d.decision,'note':d.note,'created_by':str(d.created_by_id),'created_at':d.created_at.isoformat()} for d in package.decisions.order_by('-created_at','-id')]}

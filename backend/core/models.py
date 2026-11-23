@@ -2654,3 +2654,75 @@ class ProjectSalesStatusChange(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValueError("Sales status audit entries cannot be deleted")
+
+
+class CommercialSigningAttempt(Entity):
+    """Durable commercial send intent; never inferred from sandbox tests."""
+    package = models.OneToOneField(
+        ReleasePackage, on_delete=models.PROTECT,
+        related_name='commercial_attempt',
+    )
+    actor = models.ForeignKey(User, on_delete=models.PROTECT)
+    challenge = models.OneToOneField(
+        DocusignChallenge, null=True, blank=True,
+        on_delete=models.PROTECT,
+    )
+    account_id = models.CharField(max_length=36)
+    envelope_id = models.CharField(max_length=36, blank=True)
+    package_digest = models.CharField(max_length=64)
+    state = models.CharField(max_length=32, default='AUTH_PENDING')
+    first_send_started_at = models.DateTimeField(null=True, blank=True)
+
+
+class CommercialSigningObservation(Entity):
+    """Immutable verified provider observation, not manual signature proof."""
+    attempt = models.ForeignKey(
+        CommercialSigningAttempt, on_delete=models.PROTECT,
+        related_name='observations',
+    )
+    challenge = models.OneToOneField(
+        DocusignChallenge, on_delete=models.PROTECT,
+    )
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    evidence = models.JSONField()
+    digest = models.CharField(max_length=64)
+
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Commercial signing observations are immutable.')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Commercial signing observations cannot be deleted.')
+
+
+class CommercialSigningDocument(Entity):
+    """Retained commercial provider PDF, bound to its observation."""
+    attempt = models.ForeignKey(
+        CommercialSigningAttempt, on_delete=models.PROTECT,
+        related_name='retained_documents',
+    )
+    observation = models.ForeignKey(
+        CommercialSigningObservation, on_delete=models.PROTECT,
+    )
+    document_id = models.CharField(max_length=20)
+    kind = models.CharField(max_length=32)
+    filename = models.CharField(max_length=250)
+    content = models.BinaryField()
+    pdf_sha256 = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['attempt', 'document_id'],
+                name='commercial_sign_document_unique',
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('Retained commercial signing documents are immutable.')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Retained commercial signing documents cannot be deleted.')

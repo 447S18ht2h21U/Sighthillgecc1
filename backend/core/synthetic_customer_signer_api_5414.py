@@ -125,6 +125,36 @@ def response_data(project):
     }
 
 
+
+def controlled_sandbox_recipient_5602(email):
+    """Permit a real inbox only when explicitly allowlisted in development."""
+    import os
+    from .signing_test import address
+
+    raw = os.getenv("GECC_COMMERCIAL_SANDBOX_TEST_EMAILS", "")
+    entries = [item.strip() for item in raw.split(",")]
+
+    if not 2 <= len(entries) <= 10 or any(not item for item in entries):
+        raise ValidationError(
+            "Configure two to ten controlled sandbox recipient addresses."
+        )
+
+    allowed = [address(item) for item in entries]
+
+    if len(set(allowed)) != len(allowed):
+        raise ValidationError(
+            "Controlled sandbox recipient addresses must be distinct."
+        )
+
+    if email not in allowed:
+        raise ValidationError({
+            "signer_email":
+                "This address is not in the controlled sandbox recipient allowlist."
+        })
+
+    return email
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def status(request, project_id):
@@ -169,9 +199,7 @@ def request_authorization(request, project_id):
 
     email = email.strip().lower()
     if not email.endswith("@example.invalid"):
-        raise ValidationError({
-            "signer_email": "Use a fictional @example.invalid address only."
-        })
+        controlled_sandbox_recipient_5602(email)
 
     try:
         validate_email(email)
@@ -194,15 +222,22 @@ def request_authorization(request, project_id):
 
         existing = active_request(project)
         if existing is not None:
-            if (
-                existing.payload["signer_name"] != name.strip()
-                or existing.payload["signer_email"] != email
-            ):
+            same_identity = (
+                existing.payload["signer_name"] == name.strip()
+                and existing.payload["signer_email"] == email
+            )
+
+            if same_identity:
+                return Response(response_data(project), status=200)
+
+            if existing_approval(project, existing) is None:
                 raise ValidationError(
-                    "A different synthetic signer request already exists "
-                    "for this approved MSR."
+                    "The current synthetic request is awaiting independent "
+                    "approval. Do not replace a pending request."
                 )
-            return Response(response_data(project), status=200)
+
+            # Historical requests and approvals remain immutable.
+            # A different signer requires a new request and fresh approval.
 
         audit(
             actor,

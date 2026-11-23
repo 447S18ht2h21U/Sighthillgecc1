@@ -28,6 +28,30 @@ def connect(request):
 def callback(request):
     # Do not render tracebacks containing authorization codes or request data.
     try:
+        from .commercial_send_callback_5573 import (
+            is_commercial_state,
+            finish as finish_commercial,
+        )
+        if is_commercial_state(request.query_params.get('state')):
+            return private(Response(finish_commercial(
+                actor=request.user,
+                session_key=request.session.session_key,
+                state=request.query_params.get('state'),
+                code=request.query_params.get('code'),
+                error=request.query_params.get('error'),
+            )))
+        from .commercial_read_oauth_5576 import (
+            is_commercial_read_state,
+            finish as finish_commercial_read,
+        )
+        if is_commercial_read_state(request.query_params.get('state')):
+            return private(Response(finish_commercial_read(
+                actor=request.user,
+                session_key=request.session.session_key,
+                state=request.query_params.get('state'),
+                code=request.query_params.get('code'),
+                error=request.query_params.get('error'),
+            )))
         from .completion_send_oauth_callback_4628 import (
             is_sender_state, finish as finish_sender,
         )

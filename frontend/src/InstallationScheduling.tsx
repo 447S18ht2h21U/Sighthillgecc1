@@ -1,3 +1,4 @@
+import { FictionalInstallationPractice5643 } from './FictionalInstallationPractice5643';
 import React, { useEffect, useRef, useState } from 'react';
 import { InstallationInspectionEntry4843 } from './InstallationInspectionEntry4843';
 import { InstallationManagerInspection5211 } from './InstallationManagerInspection5211';
@@ -899,6 +900,10 @@ export function InstallationScheduling({
         />
       )}
 
+    {actorRole === 'INSTALLATION_MANAGER' &&
+      projectId === '5e02a9d2-1028-41ea-a3bd-624116ef3b0b' && (
+        <FictionalInstallationPractice5643 />
+      )}
     {schedules.some(schedule => schedule.status === 'COMPLETED') && (
       <div className="installation-completion-guidance">
         <p><strong>Installation schedule: Completed. Physical inspection, independent verification, final Receipt delivery, and project completion require separate evidence and approvals.</strong></p>

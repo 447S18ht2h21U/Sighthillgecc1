@@ -384,10 +384,18 @@ def refresh_other_document_identity(writer, kind):
     page.merge_page(PdfReader(overlay).pages[0])
 
 
-def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=None, signing_test=False):
+def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=None, signing_test=False, pre_sign_commercial_review=None):
     if signing_test and (not release_context or sandbox_review):
         raise ValidationError("Signing tests require a separate verified test review.")
-    review = sandbox_review or (release_context['review'] if release_context else None)
+    if pre_sign_commercial_review is not None:
+        if (kind not in {'CONTRACT', 'INVOICE'}
+                or not isinstance(pre_sign_commercial_review, dict)
+                or sandbox_review is not None or release_context is not None
+                or signing_test):
+            raise ValidationError('Invalid fictional pre-sign commercial document context.')
+        if not all(isinstance(pre_sign_commercial_review.get(k), dict) for k in ('customer', 'gecc')):
+            raise ValidationError('Both reviewed commercial recipients are required.')
+    review = pre_sign_commercial_review or sandbox_review or (release_context['review'] if release_context else None)
     source = template_path(kind)
     reader = PdfReader(source)
     writer = PdfWriter();writer.clone_document_from_reader(reader)
@@ -441,15 +449,15 @@ def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=N
     # A preparation watermark keeps certificates from being mistaken for completed attestations.
     for page in writer.pages:
         overlay=BytesIO();c=canvas.Canvas(overlay,pagesize=(float(page.mediabox.width),float(page.mediabox.height)))
-        c.saveState();c.translate(306,396);c.rotate(35);c.setFillColor(colors.Color(.28,.40,.32,alpha=.13));c.setFont('Helvetica-Bold',27);c.drawCentredString(0,0,'SANDBOX SIGNING TEST' if signing_test else 'SANDBOX TEST - DO NOT SIGN' if sandbox_review else 'UNSIGNED RELEASE REVIEW' if release_context else 'UNSIGNED PREPARATION COPY');c.restoreState();c.save()
+        c.saveState();c.translate(306,396);c.rotate(35);c.setFillColor(colors.Color(.28,.40,.32,alpha=.13));c.setFont('Helvetica-Bold',27);c.drawCentredString(0,0,'FICTIONAL SANDBOX SIGNING TEST' if pre_sign_commercial_review is not None else 'SANDBOX SIGNING TEST' if signing_test else 'SANDBOX TEST - DO NOT SIGN' if sandbox_review else 'UNSIGNED RELEASE REVIEW' if release_context else 'UNSIGNED PREPARATION COPY');c.restoreState();c.save()
         page.merge_page(PdfReader(BytesIO(overlay.getvalue())).pages[0])
-    for page in appendix(record,kind,prepared_at,signing_test=signing_test).pages:
+    for page in appendix(record,kind,prepared_at,signing_test=(signing_test or pre_sign_commercial_review is not None)).pages:
         writer.add_page(page)
     if review:
         summary = BytesIO()
         styles = getSampleStyleSheet()
-        rows = [Paragraph('Sandbox signing test review' if signing_test else 'Sandbox routing review' if sandbox_review else 'Release routing and verification review', styles['Title']),
-                Paragraph('SANDBOX SIGNING TEST. Signatures simulate the workflow only. This is not an actual agreement, work-completion verification, payment instruction or lender authorization.' if signing_test else 'TEST ONLY. Not approved for sending or signing. No work completion or cancellation deadline has been verified.' if sandbox_review else 'UNSIGNED RELEASE REVIEW. Manual verification is recorded below. Sending remains disabled.', styles['BodyText'])]
+        rows = [Paragraph('Fictional pre-sign commercial review' if pre_sign_commercial_review is not None else 'Sandbox signing test review' if signing_test else 'Sandbox routing review' if sandbox_review else 'Release routing and verification review', styles['Title']),
+                Paragraph('FICTIONAL PRE-SIGN SANDBOX TEST. No real customer agreement, actual payment, installation approval or lender authorization is established. Cancellation requirements remain independently enforceable.' if pre_sign_commercial_review is not None else 'SANDBOX SIGNING TEST. Signatures simulate the workflow only. This is not an actual agreement, work-completion verification, payment instruction or lender authorization.' if signing_test else 'TEST ONLY. Not approved for sending or signing. No work completion or cancellation deadline has been verified.' if sandbox_review else 'UNSIGNED RELEASE REVIEW. Manual verification is recorded below. Sending remains disabled.', styles['BodyText'])]
         for label, value in [('Customer signer', review['customer']['name']),
                              ('Customer email', review['customer']['email']),
                              ('GECC signer', review['gecc']['name']),
@@ -467,14 +475,14 @@ def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=N
         SimpleDocTemplate(summary, pagesize=(612, 792)).build(rows)
         for page in PdfReader(BytesIO(summary.getvalue())).pages:
             writer.add_page(page)
-    if signing_test:
+    if signing_test or pre_sign_commercial_review is not None:
         # Repeat a visible test banner on every page, including flowing appendix pages.
         for page in writer.pages:
             overlay=BytesIO();c=canvas.Canvas(overlay,pagesize=(float(page.mediabox.width),float(page.mediabox.height)))
             c.setFillColor(colors.HexColor('#8d2f1b'));c.setFont('Helvetica-Bold',10)
-            c.drawString(36,float(page.mediabox.height)-20,'SANDBOX SIGNING TEST - NO ACTUAL AGREEMENT OR WORK VERIFICATION')
+            c.drawString(36,float(page.mediabox.height)-20,'FICTIONAL SANDBOX SIGNING TEST - NO ACTUAL AGREEMENT OR WORK VERIFICATION')
             c.save();page.merge_page(PdfReader(BytesIO(overlay.getvalue())).pages[0])
-    writer.add_metadata({'/Title':f'GECC {kind} | {record.project.code} | MSR {record.number}.0','/Subject':'Fictional sandbox signing test; no actual agreement or work verification' if signing_test else 'Unsigned preparation copy from an approved immutable MSR','/GECCMSR':str(record.id),'/GECCSnapshotSHA256':canonical_hash(record.snapshot)})
+    writer.add_metadata({'/Title':f'GECC {kind} | {record.project.code} | MSR {record.number}.0','/Subject':'Fictional pre-sign commercial sandbox test; no actual customer agreement' if pre_sign_commercial_review is not None else 'Fictional sandbox signing test; no actual agreement or work verification' if signing_test else 'Unsigned preparation copy from an approved immutable MSR','/GECCMSR':str(record.id),'/GECCSnapshotSHA256':canonical_hash(record.snapshot)})
     stream=BytesIO();writer.write(stream);content=stream.getvalue()
     verify = PdfReader(BytesIO(content));actual=verify.get_fields() or {}
     for name,value in values.items():

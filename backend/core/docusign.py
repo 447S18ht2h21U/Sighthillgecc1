@@ -6,6 +6,7 @@ import os
 import secrets
 from datetime import timedelta
 from urllib.parse import urlencode, urlsplit
+from urllib.error import HTTPError
 from urllib.request import Request, HTTPRedirectHandler, build_opener
 from uuid import UUID
 from django.conf import settings
@@ -124,8 +125,41 @@ def request_json(path, authorization, data=None):
             if not isinstance(result, dict):
                 raise ValueError()
             return result
+    except HTTPError as exc:
+        # Expose only a bounded HTTP status and an allowlisted OAuth error
+        # category. Never expose raw provider bodies, codes or tokens.
+        safe_code = ""
+        try:
+            raw_error = exc.read(4097)
+            if len(raw_error) <= 4096:
+                payload = json.loads(raw_error)
+                if isinstance(payload, dict):
+                    category = payload.get("error")
+                    if category in {
+                        "invalid_client",
+                        "invalid_grant",
+                        "invalid_request",
+                        "unauthorized_client",
+                        "unsupported_grant_type",
+                        "access_denied",
+                        "server_error",
+                        "temporarily_unavailable",
+                    }:
+                        safe_code = category
+        except Exception:
+            pass
+
+        http_status = exc.code if isinstance(exc.code, int) else 0
+        if http_status not in {400, 401, 403, 404, 429, 500, 502, 503}:
+            http_status = 0
+        operation = "token exchange" if path == "/oauth/token" else "account verification"
+        category_text = f"; OAuth category: {safe_code}" if safe_code else ""
+        raise ValidationError(
+            f"DocuSign {operation} failed (HTTP {http_status}{category_text}). "
+            "Check the sandbox OAuth configuration; no retry was performed."
+        ) from None
     except Exception:
-        # Do not expose provider bodies, tokens, codes, request headers, or raw errors.
+        # Never expose provider bodies, tokens, codes, request headers, or raw errors.
         raise ValidationError('Docusign verification could not be completed. Start verification again.') from None
 
 

@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.utils import timezone
@@ -12,6 +12,7 @@ from .models import (
 from rest_framework.exceptions import ValidationError
 from .installation_eligibility import parse_verified_cancellation_deadline
 from .rules import EASTERN
+from .commercial_signature_trust_5512 import require_authenticated_commercial_signature
 
 
 def installation_readiness(project):
@@ -20,6 +21,7 @@ def installation_readiness(project):
         "requirements": {
             "approved_msr": False,
             "contract_signed": False,
+            "invoice_signed": False,
             "cancellation_complete": False,
             "waiting_period_complete": False,
             "deposit_verified": False,
@@ -40,13 +42,41 @@ def installation_readiness(project):
     contract = CustomerSignatureEvidence.objects.filter(
         msr=msr,
         document_kind=CustomerSignatureEvidence.DocumentKind.CONTRACT,
-    ).order_by("-created_at").first()
+        signer_role=CustomerSignatureEvidence.SignerRole.CUSTOMER,
+    ).order_by("-created_at", "-id").first()
 
     if contract:
-        result["requirements"]["contract_signed"] = True
+        try:
+            require_authenticated_commercial_signature(evidence=contract)
+        except ValidationError:
+            result["blocking_reasons"].append(
+                "Authenticated DocuSign contract signature evidence is required."
+            )
+        else:
+            result["requirements"]["contract_signed"] = True
     else:
         result["blocking_reasons"].append(
             "Verified contract signature evidence is required."
+        )
+
+    invoice = CustomerSignatureEvidence.objects.filter(
+        msr=msr,
+        document_kind=CustomerSignatureEvidence.DocumentKind.INVOICE,
+        signer_role=CustomerSignatureEvidence.SignerRole.CUSTOMER,
+    ).order_by("-created_at", "-id").first()
+
+    if invoice:
+        try:
+            require_authenticated_commercial_signature(evidence=invoice)
+        except ValidationError:
+            result["blocking_reasons"].append(
+                "Authenticated DocuSign invoice signature evidence is required."
+            )
+        else:
+            result["requirements"]["invoice_signed"] = True
+    else:
+        result["blocking_reasons"].append(
+            "Verified customer invoice signature evidence is required."
         )
 
     cancellation = ProjectEvidence.objects.filter(
@@ -70,8 +100,10 @@ def installation_readiness(project):
             "Verified cancellation deadline evidence is required."
         )
 
-    if contract:
-        eligible_time = contract.signed_at.astimezone(EASTERN) + timedelta(days=5)
+    # A legacy or unauthenticated signature date cannot satisfy the wait.
+    if result["requirements"]["contract_signed"]:
+        fifth_day = contract.signed_at.astimezone(EASTERN).date() + timedelta(days=5)
+        eligible_time = datetime.combine(fifth_day, time.min, tzinfo=EASTERN)
 
         if timezone.now().astimezone(EASTERN) >= eligible_time:
             result["requirements"]["waiting_period_complete"] = True
