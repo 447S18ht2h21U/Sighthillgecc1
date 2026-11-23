@@ -328,6 +328,23 @@ def transition(actor, msr_id, action, expected_sequence, snapshot=None, reason='
     record.save()
     project.save()
     # Retain the exact submitted/rejected/approved contents, including prior attempts.
+    # Capture previous and new values in the existing audit chain.
+    draft_audit_details_5697E = {}
+    if action == 'edit':
+        after_snapshot = copy.deepcopy(record.snapshot)
+        changed_fields = {
+            key: {
+                'before': before_snapshot.get(key),
+                'after': after_snapshot.get(key),
+            }
+            for key in sorted(set(before_snapshot) | set(after_snapshot))
+            if before_snapshot.get(key) != after_snapshot.get(key)
+        }
+        draft_audit_details_5697E = {
+            'before': copy.deepcopy(before_snapshot),
+            'after': after_snapshot,
+            'changed_fields': changed_fields,
+        }
     audit(
         actor,
         f'msr.{action}',
@@ -338,6 +355,8 @@ def transition(actor, msr_id, action, expected_sequence, snapshot=None, reason='
             'edit_sequence': record.edit_sequence,
             'reason': reason,
             'snapshot': record.snapshot,
+
+            **draft_audit_details_5697E,
         },
     )
     return record

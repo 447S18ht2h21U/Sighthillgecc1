@@ -4,7 +4,10 @@ from copy import deepcopy
 
 from django.test import TestCase
 
-from .models import MSR, AuditEvent
+from .models import (
+    MSR, AuditEvent, EquipmentCatalogItem,
+    ProductCatalogCollection, ProductCatalogMembership,
+)
 from .services import transition, revise
 from . import tests as foundation_tests
 from rest_framework.exceptions import PermissionDenied
@@ -19,6 +22,29 @@ class MSREquipmentLifecycleTests(TestCase):
     def setUp(self):
         # Reuse the proven project, account and audit fixtures.
         foundation_tests.FoundationTests.setUp(self)
+        # Create real, active test-only catalog identities.
+        # Never bypass production catalog-selection validation.
+        self.catalog_5697J = ProductCatalogCollection.objects.create(
+            name="Goodman Equipment Test Catalog",
+            description="Disposable regression fixture",
+            created_by=self.manager,
+        )
+        self.products_5697J = {}
+        for model in ("GZV9S", "GZV8S"):
+            equipment = EquipmentCatalogItem.objects.create(
+                brand="Goodman",
+                residential_system_type="Heat Pumps (R-32)",
+                model_number=model,
+                description="Up to 21.0 SEER2",
+                created_by=self.manager,
+            )
+            ProductCatalogMembership.objects.create(
+                catalog=self.catalog_5697J,
+                equipment=equipment,
+                created_by=self.manager,
+            )
+            self.products_5697J[model] = equipment
+
         self.snapshot["customer"] = "Mary Johnson"
         self.snapshot["equipment"] = [{
             "brand": "Goodman",
@@ -26,6 +52,8 @@ class MSREquipmentLifecycleTests(TestCase):
             "model_number": "GZV9S",
             "description": "Up to 21.0 SEER2",
             "quantity": 1,
+            "catalog_id": str(self.catalog_5697J.id),
+            "equipment_id": str(self.products_5697J["GZV9S"].id),
         }]
         self.snapshot["other"] = {
             "type": "Reduced Price",
@@ -46,6 +74,81 @@ class MSREquipmentLifecycleTests(TestCase):
         return transition(
             self.manager, submitted.id,
             "approve", submitted.edit_sequence,
+        )
+
+
+    def test_draft_save_before_after_5697J(self):
+        original = deepcopy(self.project.pending.snapshot)
+
+        saved = transition(
+            self.sales,
+            self.project.pending_id,
+            "edit",
+            0,
+            snapshot=deepcopy(self.snapshot),
+        )
+
+        first_event = AuditEvent.objects.get(
+            entity_id=self.project.id,
+            action="msr.edit",
+        )
+
+        self.assertEqual(first_event.payload["before"], original)
+        self.assertEqual(
+            first_event.payload["after"], saved.snapshot
+        )
+        self.assertEqual(
+            first_event.payload["changed_fields"]["customer"]["before"],
+            original.get("customer"),
+        )
+        self.assertEqual(
+            first_event.payload["changed_fields"]["customer"]["after"],
+            "Mary Johnson",
+        )
+
+        updated_snapshot = deepcopy(saved.snapshot)
+        updated_snapshot["customer"] = "Mary Johnson-Smith"
+
+        second = transition(
+            self.sales,
+            saved.id,
+            "edit",
+            saved.edit_sequence,
+            snapshot=updated_snapshot,
+        )
+
+        events = list(
+            AuditEvent.objects.filter(
+                entity_id=self.project.id,
+                action="msr.edit",
+            ).order_by("sequence")
+        )
+
+        self.assertEqual(len(events), 2)
+
+        second_event = events[-1]
+        self.assertEqual(
+            second_event.payload["before"],
+            saved.snapshot,
+        )
+        self.assertEqual(
+            second_event.payload["after"],
+            second.snapshot,
+        )
+        self.assertEqual(
+            second_event.payload["changed_fields"]["customer"],
+            {
+                "before": "Mary Johnson",
+                "after": "Mary Johnson-Smith",
+            },
+        )
+        self.assertEqual(
+            second_event.payload["version"],
+            saved.number,
+        )
+        self.assertEqual(
+            second_event.payload["edit_sequence"],
+            second.edit_sequence,
         )
 
     def test_customer_equipment_and_other_survive_approval(self):
@@ -96,6 +199,12 @@ class MSREquipmentLifecycleTests(TestCase):
         new_data = deepcopy(revised.snapshot)
         new_data["customer"] = "Mary Johnson-Smith"
         new_data["equipment"][0]["model_number"] = "GZV8S"
+        new_data["equipment"][0]["catalog_id"] = str(
+            self.catalog_5697J.id
+        )
+        new_data["equipment"][0]["equipment_id"] = str(
+            self.products_5697J["GZV8S"].id
+        )
         new_data["other"]["notes"] = "Revised approved price reduction"
 
         edited = transition(

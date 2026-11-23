@@ -1043,3 +1043,28 @@ section[aria-label="MSR equipment catalog selection"]
   margin-top: 0.75rem;
 }
 /* END VERIDIAN EQUIPMENT CATEGORY LAYOUT 5086 */
+
+
+/* STEP 1907P-5691: aligned navigation controls */
+.veridian-navigation-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.veridian-navigation-row > button,
+.veridian-navigation-row > button.veridian-secondary-nav-button {
+  flex: 0 0 auto;
+  align-self: center;
+  margin-top: 0;
+  margin-bottom: 0;
+  margin-right: 0;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}

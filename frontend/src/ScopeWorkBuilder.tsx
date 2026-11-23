@@ -99,18 +99,18 @@ export function ScopeWorkBuilder({
       }}
     >
       <h4>Quick Scope of Work</h4>
-      <p style={{fontSize: '16px', lineHeight: 1.5}}>
-        Select all work that applies. VERIDIAN writes the descriptions.
-        Use Describe for custom work.
-      </p>
-      {WORK_OPTIONS.map(option => (
-        <div key={option.label} style={{marginBottom: 14}}>
+      <p>Select all that apply.</p>
+
+      <div style={{display:'flex',flexDirection:'column',gap:14,marginBottom:18}}>
+        {WORK_OPTIONS.map(option => (
           <label
+            key={option.label}
             style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 10,
-              cursor: 'pointer',
+              display:'flex',
+              alignItems:'center',
+              gap:12,
+              width:'auto',
+              cursor:'pointer',
             }}
           >
             <input
@@ -120,46 +120,61 @@ export function ScopeWorkBuilder({
                 changeSelection(option.label, event.target.checked)
               }
               style={{
-                width: 18,
-                height: 18,
-                minWidth: 18,
-                margin: 0,
-                marginTop: 2,
-                flex: '0 0 18px',
+                width:18,
+                height:18,
+                minWidth:18,
+                margin:0,
+                flex:'0 0 18px',
               }}
             />
-            <span>
-              <strong>{option.label}</strong>
-              <small style={{display:'block',marginTop:4}}>
-                {option.description}
-              </small>
-            </span>
+            <strong style={{fontSize:'1.05rem'}}>{option.label}</strong>
           </label>
-        </div>
-      ))}
-
-      <div style={{marginBottom: 14}}>
-        <label style={{display:'block'}}>
-          <strong>Describe - Additional or custom work</strong>
-          <small style={{display:'block',marginTop:4,marginBottom:8}}>
-            Only type details not already covered above.
-          </small>
-          <textarea
-            aria-label="Describe additional or custom work"
-            value={custom}
-            onChange={event =>
-              onChange(compose(selected, event.target.value))
-            }
-            placeholder="Only type details not covered above..."
-            rows={3}
-          />
-        </label>
+        ))}
       </div>
 
-      <p className="muted">
-        Review the generated Scope of work field below.
-        You may edit it directly before saving or submitting.
-      </p>
+      <details style={{marginBottom:18}}>
+        <summary style={{
+          display:'inline-block',
+          cursor:'pointer',
+          background:'#142B3B',
+          color:'#FFFFFF',
+          padding:'10px 14px',
+          borderRadius:4,
+          fontWeight:600,
+        }}>
+          Instructions
+        </summary>
+        <div style={{padding:'12px 0'}}>
+          <p>
+            Select one or more work categories. VERIDIAN combines
+            their descriptions in the Final Scope of Work below.
+          </p>
+          {WORK_OPTIONS.map(option => (
+            <p key={option.label}>
+              <strong>{option.label}:</strong> {option.description}
+            </p>
+          ))}
+          <p>
+            Add custom details only when the standard descriptions
+            do not cover the proposed work. Review the final wording
+            before saving or submitting.
+          </p>
+        </div>
+      </details>
+
+      <label style={{display:'block'}}>
+        <strong>Additional or custom work (optional)</strong>
+        <textarea
+          aria-label="Describe additional or custom work"
+          value={custom}
+          onChange={event =>
+            onChange(compose(selected, event.target.value))
+          }
+          placeholder="Describe any additional work not covered above..."
+          rows={3}
+          style={{width:'100%',resize:'vertical',marginTop:8}}
+        />
+      </label>
     </section>
   );
 }

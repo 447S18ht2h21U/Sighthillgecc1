@@ -1,3 +1,4 @@
+from core import customer_duplicate_lookup_5668
 from core import commercial_signing_api_5577
 from core import commercial_read_oauth_5576
 from core import synthetic_customer_signer_api_5414
@@ -37,6 +38,8 @@ from core import approved_msr_source_api_4530
 from core import equipment_catalog_selection_api_4534
 from core import equipment_catalog_management_api_4542
 urlpatterns = [
+    path('api/customer-duplicate-lookup/', customer_duplicate_lookup_5668.lookup),
+
     path('api/projects/<uuid:project_id>/adult-verification/', adult_customer_verification_5401.adult_verification),
     path('api/projects/<uuid:project_id>/synthetic-signer/status/', synthetic_customer_signer_api_5414.status),
     path('api/projects/<uuid:project_id>/synthetic-signer/request/', synthetic_customer_signer_api_5414.request_authorization),
@@ -127,5 +130,15 @@ urlpatterns.append(
     _payroll_path_5465(
         "api/payroll/weekly/",
         payroll_weekly_readonly_5465.weekly_payroll,
+    )
+)
+
+# Step 1907P-5697K: Read-only MSR draft-save history.
+from core import msr_draft_history_5697K
+urlpatterns.append(
+    path(
+        "api/projects/<uuid:project_id>/draft-history/",
+        msr_draft_history_5697K.draft_history,
+        name="msr-draft-history-5697K",
     )
 )
