@@ -11,6 +11,7 @@ type Project = {
   code: string;
   location: string;
   state: string;
+  customer: string;
 };
 
 type ProjectPage = {
@@ -23,13 +24,16 @@ export function SalesWorkspace5690({
   onStartNew,
   onFindProjects,
   onOpenProject,
+  customerNames,
 }: {
   api: API;
+  customerNames: Record<string, string>;
   onStartNew: () => void;
   onFindProjects: () => void;
   onOpenProject: (id: string) => void;
 }) {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [refreshSequence, setRefreshSequence] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -47,11 +51,11 @@ export function SalesWorkspace5690({
       });
 
     return () => { closed = true; };
-  }, [api]);
+  }, [api, refreshSequence]);
 
   return (
     <section aria-label="Sales Workspace">
-      <p>What would you like to do?</p>
+      <h2 style={{textAlign:"center",fontSize:"24px",fontWeight:700,color:"#142B3B",margin:"12px 0 24px"}}>What would you like to do?</h2>
 
       <div style={{
         display: 'grid',
@@ -84,7 +88,23 @@ export function SalesWorkspace5690({
         </div>
       </div>
 
-      <h2>My projects</h2>
+      <div style={{
+        display:'flex',
+        justifyContent:'flex-start',
+        alignItems:'center',
+        gap:16
+      }}>
+        <h2 style={{margin:0}}>My projects</h2>
+        <button type="button" className="quiet"
+          disabled={loading}
+          onClick={()=>{
+            setLoading(true);
+            setError('');
+            setRefreshSequence(value=>value+1);
+          }}>
+          Refresh
+        </button>
+      </div>
       <p className="muted">
         Your five most recent authorized projects.
       </p>
@@ -106,6 +126,9 @@ export function SalesWorkspace5690({
           >
             {project.code}
           </button>
+          <p style={{fontWeight:700,marginBottom:4}}>
+            {customerNames[project.customer] || 'Customer name unavailable'}
+          </p>
           <p>{project.location}</p>
           <p className="muted">Status: {project.state}</p>
         </div>

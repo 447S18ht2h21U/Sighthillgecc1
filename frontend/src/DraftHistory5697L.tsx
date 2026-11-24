@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import RestoreDraft5706A from './RestoreDraft5706A';
 
 type Change5697L = {
   before: unknown;
@@ -26,62 +27,98 @@ export type DraftHistoryResponse5697L = {
   more_available: boolean;
 };
 
+const LABELS: Record<string, string> = {
+  customer: 'Customer name',
+  contact: 'Customer contact',
+  project_location: 'Installation address',
+  scope: 'Scope of Work',
+  equipment: 'Equipment',
+  materials: 'Materials',
+  base_price: 'Base price',
+  total_price: 'Total price',
+  financing_type: 'Financing',
+  payment_option: 'Payment arrangement',
+  payment_terms: 'Payment terms',
+  commercial_notes: 'Commercial notes',
+  marketing_promotion: 'Marketing promotion',
+};
+
+function fieldLabel5697L(key: string): string {
+  return LABELS[key] ??
+    key.replaceAll('_', ' ').replace(/\b\w/g,
+      letter => letter.toUpperCase());
+}
+
 function displayValue5697L(value: unknown): string {
-  if (value === undefined || value === null || value === '') {
+  if (value === null || value === undefined || value === '') {
     return 'Not entered';
   }
-
-  if (typeof value === 'string') return value;
-
-  return JSON.stringify(value, null, 2) ?? 'Not entered';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'string' || typeof value === 'number') {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value.length
+      ? value.map((item, index) =>
+          `${index + 1}. ${displayValue5697L(item)}`
+        ).join('\n')
+      : 'None';
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, item]) =>
+        `${fieldLabel5697L(key)}: ${displayValue5697L(item)}`
+      ).join('\n') || 'None';
+  }
+  return String(value);
 }
 
-function fieldLabel5697L(value: string): string {
-  return value.replaceAll('_', ' ');
-}
-
-export default function DraftHistory5697L({
-  projectId,
+export default function DraftHistory5697L({  projectId,
+  saveSequence,
   load,
+  canRestore,
+  unsavedChanges,
+  restore,
 }: {
   projectId: string;
+  saveSequence: number;
+  canRestore: boolean;
+  unsavedChanges: boolean;
+  restore: (entryId: string, reason: string) => Promise<void>;
   load: (id: string) => Promise<DraftHistoryResponse5697L>;
 }) {
   const [open, setOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const loaderRef = useRef(load);
+  loaderRef.current = load;
   const [loading, setLoading] = useState(false);
   const [history, setHistory] =
     useState<DraftHistoryResponse5697L | null>(null);
   const [error, setError] = useState('');
 
-  async function toggle() {
-    if (open) {
-      setOpen(false);
-      return;
-    }
-
-    setOpen(true);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
     setLoading(true);
     setError('');
 
-    try {
-      const response = await load(projectId);
-
+    loaderRef.current(projectId).then(response => {
+      if (cancelled) return;
       if (response.project_id !== projectId) {
         throw new Error('Draft history project does not match.');
       }
-
       setHistory(response);
-    } catch (caught) {
+    }).catch(caught => {
+      if (cancelled) return;
       setHistory(null);
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : 'Unable to load draft history.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+      setError(caught instanceof Error
+        ? caught.message : 'Unable to load draft history.');
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [open, projectId, saveSequence, refreshKey]);
 
   return (
     <div style={{ margin: '14px 0 22px' }}>
@@ -89,7 +126,7 @@ export default function DraftHistory5697L({
         type="button"
         className="quiet"
         aria-expanded={open}
-        onClick={() => { void toggle(); }}
+        onClick={() => setOpen(value => !value)}
       >
         {open ? 'Hide draft history' : 'Draft history'}
       </button>
@@ -111,6 +148,11 @@ export default function DraftHistory5697L({
             formal Version history.
           </p>
 
+          <button type="button" className="quiet"
+            disabled={loading}
+            onClick={() => setRefreshKey(value => value + 1)}>
+            Refresh history
+          </button>
           {loading && <p role="status">Loading draft history...</p>}
 
           {error && <p role="alert" className="error">{error}</p>}
@@ -143,16 +185,18 @@ export default function DraftHistory5697L({
                   >
                     <summary style={{ cursor: 'pointer' }}>
                       <strong>{savedAt} ET</strong>
-                      {' ? '}
+                      {' - '}
                       {entry.actor_name}
-                      {' ? Version '}
+                      {' - Version '}
                       {entry.version ?? '?'}
                       .0
-                      {' ? Save '}
+                      {' - Save '}
                       {entry.edit_sequence ?? '?'}
-                      {' ? '}
+                      {' - '}
                       {entry.has_explicit_comparison
-                        ? `${changes.length} changed field(s)`
+                        ? (changes.length === 0
+                            ? 'Saved - no changes'
+                            : `${changes.length} changed field(s)`)
                         : 'Saved snapshot'}
                     </summary>
 
@@ -190,6 +234,13 @@ export default function DraftHistory5697L({
                       </p>
                     )}
 
+                    {canRestore && (
+                      <RestoreDraft5706A
+                        entryId={entry.id}
+                        disabled={unsavedChanges || loading}
+                        restore={restore}
+                      />
+                    )}
                     <details style={{ marginTop: 12 }}>
                       <summary>View saved snapshot</summary>
                       <pre style={{
@@ -198,7 +249,7 @@ export default function DraftHistory5697L({
                         maxHeight: 400,
                         overflowY: 'auto',
                       }}>
-                        {JSON.stringify(entry.snapshot, null, 2)}
+                        {displayValue5697L(entry.snapshot)}
                       </pre>
                     </details>
                   </details>

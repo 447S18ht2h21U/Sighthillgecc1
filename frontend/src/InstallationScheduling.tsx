@@ -361,6 +361,90 @@ export function InstallationScheduling({
     {error && <p role="alert" className="error">{error}</p>}
     {message && <p role="status">{message}</p>}
 
+    {!canManage && <section
+      className="installation-readiness"
+      aria-label="Check installation readiness"
+    >
+      <h3>Check installation readiness</h3>
+      <p className="muted">
+        Select a project to review its installation requirements.
+        This read-only assessment does not authorize scheduling or installation.
+      </p>
+      <label>
+        Project
+        <select
+          value={projectId}
+          onChange={event => {
+            const id = event.target.value;
+            selectedProjectRef.current = id;
+            readinessRequestId.current += 1;
+            setReadiness(null);
+            setReadinessError('');
+            setReadinessLoading(Boolean(id));
+            setProjectId(id);
+            if (id) onProjectSelected(id);
+          }}
+        >
+          <option value="">Choose project</option>
+          {projects.map(project =>
+            <option key={project.id} value={project.id}>
+              {project.code} - {project.customer_name}
+            </option>
+          )}
+        </select>
+      </label>
+      {projectId && <div
+        className="installation-readiness-summary"
+        role="status"
+        aria-live="polite"
+      >
+        <h4>Installation Readiness - Current Assessment</h4>
+        {readinessLoading
+          ? <p>Checking current project requirements...</p>
+          : readinessError
+            ? <p role="alert">
+                Readiness could not be verified: {readinessError}
+              </p>
+            : readiness && readiness.project_id === projectId
+              ? <>
+                  <p><strong>
+                    {readiness.eligible
+                      ? 'Current scheduling requirements satisfied'
+                      : 'Requirements still outstanding'}
+                  </strong></p>
+                  <ul>
+                    {([
+                      ['approved_msr', 'Project sales record approved'],
+                      ['contract_signed', 'Customer Contract signed'],
+                      ['cancellation_complete', 'Customer cancellation period complete'],
+                      ['waiting_period_complete', 'Required waiting period complete'],
+                      ['deposit_verified', 'Required payment independently verified'],
+                    ] as const).map(([key, label]) =>
+                      <li key={key}>
+                        {readiness.requirements[key]
+                          ? 'COMPLETE'
+                          : 'NOT COMPLETE'}: {label}
+                      </li>
+                    )}
+                  </ul>
+                  {readiness.blocking_reasons.length > 0 && <>
+                    <p><strong>Scheduling is blocked because:</strong></p>
+                    <ul>
+                      {readiness.blocking_reasons.map((reason, index) =>
+                        <li key={index}>{reason}</li>
+                      )}
+                    </ul>
+                  </>}
+                </>
+              : <p>Readiness has not been established.</p>}
+        <p className="muted">
+          This is a read-only assessment. An authorized installation
+          scheduler must separately assess a proposed date.
+          No appointment or installation-start authorization is created here.
+        </p>
+      </div>}
+    </section>}
+
     {canManage && <form onSubmit={event => {
       event.preventDefault();
       void perform(async () => {

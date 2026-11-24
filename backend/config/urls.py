@@ -142,3 +142,14 @@ urlpatterns.append(
         name="msr-draft-history-5697K",
     )
 )
+
+# Step 1907P-5704: Controlled historical MSR draft restoration.
+from core import msr_draft_restore_5704
+
+urlpatterns.append(
+    path(
+        "api/projects/<uuid:project_id>/restore-draft/",
+        msr_draft_restore_5704.restore_draft,
+        name="msr-draft-restore-5704",
+    )
+)

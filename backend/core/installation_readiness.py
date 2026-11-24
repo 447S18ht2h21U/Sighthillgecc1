@@ -21,7 +21,6 @@ def installation_readiness(project):
         "requirements": {
             "approved_msr": False,
             "contract_signed": False,
-            "invoice_signed": False,
             "cancellation_complete": False,
             "waiting_period_complete": False,
             "deposit_verified": False,
@@ -57,26 +56,6 @@ def installation_readiness(project):
     else:
         result["blocking_reasons"].append(
             "Verified contract signature evidence is required."
-        )
-
-    invoice = CustomerSignatureEvidence.objects.filter(
-        msr=msr,
-        document_kind=CustomerSignatureEvidence.DocumentKind.INVOICE,
-        signer_role=CustomerSignatureEvidence.SignerRole.CUSTOMER,
-    ).order_by("-created_at", "-id").first()
-
-    if invoice:
-        try:
-            require_authenticated_commercial_signature(evidence=invoice)
-        except ValidationError:
-            result["blocking_reasons"].append(
-                "Authenticated DocuSign invoice signature evidence is required."
-            )
-        else:
-            result["requirements"]["invoice_signed"] = True
-    else:
-        result["blocking_reasons"].append(
-            "Verified customer invoice signature evidence is required."
         )
 
     cancellation = ProjectEvidence.objects.filter(

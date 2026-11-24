@@ -61,8 +61,10 @@ def installation_payment_readiness(project):
         )
 
     required_deposit = (
-        approved_total * HALF
-    ).quantize(MONEY, rounding=ROUND_HALF_UP)
+        (approved_total * HALF).quantize(MONEY, rounding=ROUND_HALF_UP)
+        if payment_option == "50_PERCENT_DEPOSIT"
+        else Decimal("0.00")
+    )
 
     payments = CustomerPayment.objects.filter(
         project=project,
@@ -104,10 +106,21 @@ def installation_payment_readiness(project):
             "A valid CEO payment exception permits payment after completion. "
             "Other installation requirements still apply."
         )
-    elif qualifying_funds >= required_deposit:
+    elif (
+        payment_option == "50_PERCENT_DEPOSIT"
+        and qualifying_funds >= required_deposit
+    ):
         payment_ready = True
         explanation = (
             "The required deposit is confirmed available at the bank."
+        )
+    elif payment_option == "100_PERCENT_COMPLETION":
+        payment_ready = False
+        explanation = (
+            "The approved MSR specifies 100% payment upon completion. "
+            "No advance deposit is due under these terms. Installation "
+            "requires an independently approved CEO payment exception; "
+            "no valid exception has been verified."
         )
     else:
         payment_ready = False

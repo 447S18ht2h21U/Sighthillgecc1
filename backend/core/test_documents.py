@@ -37,7 +37,7 @@ class DocumentTests(TestCase):
         doc,_ = generate(self.manager,approved.id,'CONTRACT')
         reader = PdfReader(BytesIO(bytes(doc.content)));fields = reader.get_fields()
         self.assertGreaterEqual(len(reader.pages),4)
-        self.assertEqual(fields['payment_option']['/V'],'100% on completion')
+        self.assertEqual(fields['payment_option']['/V'],'100% upon completion')
         self.assertEqual(fields['financing_type']['/V'],'Non-financed')
         self.assertFalse(fields['cancellation_deadline'].get('/V'))
         self.assertIn('five calendar days',' '.join(p.extract_text() for p in reader.pages).lower())

@@ -16,7 +16,14 @@ class InstallationReadinessTests(TestCase):
     def test_ready_project_reports_ready(self):
         self.fixture.prepare_installation_state()
 
-        result = installation_readiness(self.project)
+        # Test-only authenticated provider evidence simulation.
+        # Production DocuSign verification remains fail-closed.
+        from unittest.mock import patch
+        with patch(
+            "core.installation_readiness."
+            "require_authenticated_commercial_signature"
+        ):
+            result = installation_readiness(self.project)
 
         self.assertTrue(result["eligible"])
 
@@ -50,7 +57,7 @@ class InstallationReadinessTests(TestCase):
         )
 
 
-    def test_non_financed_project_without_deposit_reports_blocked(self):
+    def test_completion_payment_without_ceo_exception_reports_blocked(self):
         self.fixture.prepare_installation_state(
             financed=False,
             deposit=False,
@@ -62,7 +69,7 @@ class InstallationReadinessTests(TestCase):
         self.assertFalse(result["requirements"]["deposit_verified"])
         self.assertTrue(
             any(
-                "Deposit required:" in reason
+                "CEO payment exception" in reason
                 for reason in result["blocking_reasons"]
             )
         )

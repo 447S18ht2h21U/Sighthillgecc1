@@ -443,7 +443,7 @@ function CommercialSandboxSend5610({
         <input type="checkbox" checked={fictional}
           style={{width:'auto',flex:'0 0 auto',margin:'3px 0 0'}}
           onChange={event=>setFictional(event.target.checked)}/>
-        <span>I confirm Project 104 is fictional and the documents
+        <span>I confirm this selected project is fictional and the documents
         are sandbox-only tests.</span>
       </label>
       <label style={{display:'flex',alignItems:'flex-start',gap:'10px',marginBottom:'12px'}}>

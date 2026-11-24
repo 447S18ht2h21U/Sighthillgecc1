@@ -25,7 +25,10 @@ from .customer_signer_authorization_services import (
     require_approved_customer_signer,
 )
 
-PROJECT_CODE = "104-SA-2026-11-22"
+PROJECT_CODES = frozenset({
+    "104-SA-2026-11-22",
+    "105-SA-2026-11-23",
+})
 REQUEST_ACTION = "customer.synthetic_signer_authorization_requested"
 GROUP = "COMMERCIAL"
 
@@ -47,7 +50,7 @@ def require_fictional_project(actor, project_id):
     project = (
         operational_project_scope(actor)
         .select_related("current_approved", "customer")
-        .filter(pk=project_id, code=PROJECT_CODE)
+        .filter(pk=project_id, code__in=PROJECT_CODES)
         .first()
     )
     if project is None:

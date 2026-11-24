@@ -1,3 +1,4 @@
+import { SalesPricing5762 } from './SalesPricing5762';
 import DraftHistory5697L, { type DraftHistoryResponse5697L } from './DraftHistory5697L';
 import { FictionalFinalReceipt5647 } from './FictionalFinalReceipt5647';
 import { FictionalInspectionReview5645 } from './FictionalInspectionReview5645';
@@ -106,7 +107,7 @@ function completeDraftAddress(data: Snapshot): Snapshot {
   };
 }
 type MSRStep5696D =
-  'customer'|'scope'|'equipment'|'pricing'|'review';
+  'customer'|'scope'|'equipment'|'pricing'|'review'|'documents';
 
 const MSR_STEPS_5696D: {
   id:MSRStep5696D;
@@ -117,6 +118,7 @@ const MSR_STEPS_5696D: {
   {id:'equipment',label:'3. Equipment'},
   {id:'pricing',label:'4. Pricing'},
   {id:'review',label:'5. Review'},
+  {id:'documents',label:'6. Documents & Signing'},
 ];
 
 
@@ -135,6 +137,7 @@ function App(){
  const [user,setUser]=useState<Person|null>(null), [ready,setReady]=useState(false), [error,setError]=useState(''), [busy,setBusy]=useState(false);
  const [customers,setCustomers]=useState<Customer[]>([]), [people,setPeople]=useState<Person[]>([]), [projectRefresh,setProjectRefresh]=useState(0), [selected,setSelected]=useState<Project|null>(null);
  const [msrFeedback,setMsrFeedback]=useState('');
+ const [showSalesInstructions5723,setShowSalesInstructions5723]=useState(false);
  const [msrStep5696D,setMsrStep5696D]=
    useState<MSRStep5696D>('customer');
  const [msrSavedBaseline5696D,setMsrSavedBaseline5696D]=
@@ -348,6 +351,32 @@ function App(){
     await run(() => openProjectDetail(id));
   }
  async function change(action:string){if(!selected?.pending)return;setMsrFeedback('');await api(`msrs/${selected.pending.id}/transition/`,'POST',{action,expected_sequence:selected.pending.edit_sequence,snapshot,reason});await refresh(selected.id);if(action==='edit')setMsrFeedback('Draft saved successfully.');}
+
+ function returnHome5726(){
+   if(busy) return;
+
+   if(panel==='projects' && selected && snapshot &&
+      JSON.stringify(snapshot)!==msrSavedBaseline5696D &&
+      !window.confirm(
+        'You have unsaved Master Sales Record changes. ' +
+        'Return Home without saving them?'
+      )) return;
+
+   const destination: typeof panel =
+     user?.role==='SALES_ASSOCIATE' ? 'salesWorkspace' :
+     user?.role==='SALES_MANAGER' ||
+     user?.role==='COMPTROLLER' ? 'projects' :
+     user?.role==='MARKETING' ? 'marketingMsrs' :
+     'dashboard';
+
+   setSelected(null);
+   setInstallationFocusId(null);
+   setWorkflowIntent('none');
+   setMsrFeedback('');
+   setError('');
+   setPanel(destination);
+ }
+
  if(!ready)return <main><p>Opening workspace...</p></main>;
  if(!user)return <main className="login"><div className="gecc-login-identity"><strong><span className="gecc-login-line">Green Energy</span><span className="gecc-login-line">Contracting Corporation</span></strong><span>Business Operations &amp; Management System</span></div><h1>Sign in</h1><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void run(async()=>{await csrf();await api('dev-login/','POST',Object.fromEntries(f));await csrf();const actor=await api<Person>('me/');if(['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(actor.role)){await load();setPanel(actor.role==='SALES_ASSOCIATE'?'salesWorkspace':'projects');}else if(actor.role==='MARKETING'){setPanel('marketingMsrs');}else{setPanel('dashboard');}setUser(actor);});}}><label>Username<input name="username" autoComplete="username" required/></label><label>Password<input name="password" type="password" autoComplete="current-password" required/></label><button disabled={busy}>Sign in</button></form>{error&&<p role="alert" className="error">{error}</p>}<div className="login-bottom"><div className="login-product-brand">VERIDIAN</div><p className="login-platform-tagline">Integrated Business Platform</p><p className="login-environment">Local Development Environment</p><div className="login-credit-bar"><BrandedFooter versionLabel={APP_VERSION_LABEL} /></div></div></main>;
  const managerCanCorrect=Boolean(
@@ -368,11 +397,57 @@ function App(){
    snapshot.payment_terms.trim()
  );
  return <><header><div className="brand">VERIDIAN <span>Business Operations &amp; Management System</span></div><div>{user.username} <span className="badge">{user.role.replaceAll('_',' ')}</span><button className="quiet" onClick={()=>void run(async()=>{await api('logout/','POST',{});setUser(null);setSelected(null);setInstallationFocusId(null);setPanel('projects');})}>Sign out</button></div></header><main>
- <div className="title"><div>{panel==='contractorDirectory'?<p className="eyebrow">VERIDIAN / CONTRACTOR COMPENSATION</p>:panel==='technicianAssignments'||panel==='installation'||panel==='dashboard'?<p className="eyebrow">VERIDIAN / OPERATIONS</p>:null}<h1>{panel==='salesWorkspace'?'Sales Workspace':panel==='payrollPreview'?'Payroll - Design Preview':panel==='financialReports'?'Corporate Financial Reports':panel==='customerPayments'?'Customer Payments':panel==='productCatalog'?'Product Catalog':panel==='contractorDirectory'?'Contractor Directory':panel==='technicianAssignments'?'Technician Assignments':panel==='installation'?'Installation Scheduling':panel==='dashboard'?'Project Status Dashboard':panel==='visibleMsrs'?'Master Sales Records':panel==='salesHistory'?'Sales Opportunity History':'Customers & projects'}</h1></div><div className="actions">{panel!=='contractorDirectory'&&panel!=='visibleMsrs'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<button className="quiet" onClick={()=>void run(()=>refresh(selected?.id))} disabled={busy}>Refresh</button>}{panel!=='contractorDirectory'&&panel!=='visibleMsrs'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<><button onClick={()=>setPanel('customer')}>Add customer</button><button disabled={busy} onClick={()=>void run(async()=>{await load();setProjectCustomerId('');setPanel('project');})}>Create project</button></>}</div></div>
+ <div className="title"><div>{panel==='contractorDirectory'?<p className="eyebrow">VERIDIAN / CONTRACTOR COMPENSATION</p>:panel==='technicianAssignments'||panel==='installation'||panel==='dashboard'?<p className="eyebrow">VERIDIAN / OPERATIONS</p>:null}<h1>{panel==='salesWorkspace'?'Sales Workspace':panel==='payrollPreview'?'Payroll - Design Preview':panel==='financialReports'?'Corporate Financial Reports':panel==='customerPayments'?'Customer Payments':panel==='productCatalog'?'Product Catalog':panel==='contractorDirectory'?'Contractor Directory':panel==='technicianAssignments'?'Technician Assignments':panel==='installation'?'Installation Scheduling':panel==='dashboard'?'Project Status Dashboard':panel==='visibleMsrs'?'Commercial Records':panel==='salesHistory'?'Sales Opportunity History':'Customers & projects'}</h1></div><div className="actions">{panel!=='salesWorkspace'&&panel!=='contractorDirectory'&&panel!=='visibleMsrs'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<button className="quiet" onClick={()=>void run(()=>refresh(selected?.id))} disabled={busy}>Refresh</button>}{panel!=='salesWorkspace'&&panel!=='contractorDirectory'&&panel!=='visibleMsrs'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<><button onClick={()=>setPanel('customer')}>Add customer</button><button disabled={busy} onClick={()=>void run(async()=>{await load();setProjectCustomerId('');setPanel('project');})}>Create project</button></>}</div></div>
  {error&&<div role="alert" className="error">{error}</div>}
-   <div className="veridian-navigation-row" style={{display:"flex",flexWrap:"nowrap",overflowX:"auto",gap:"8px",alignItems:"center",whiteSpace:"nowrap",paddingBottom:"6px"}}><button className="quiet" type="button" onClick={()=>setPanel('dashboard')}>Project Status Dashboard</button><button className="quiet" type="button" onClick={()=>setPanel('salesHistory')}>Sales Opportunity History</button><button className="quiet" type="button" onClick={()=>{setInstallationFocusId(null);setPanel('installation');}}>Installation Scheduling</button>{['INSTALLATION_MANAGER','CEO','COMPTROLLER'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('technicianAssignments')}>Technician Assignments</button>}{['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('payrollPreview')}>Payroll (Design Preview)</button>}{user.role==='COMPTROLLER'&&<button className="quiet" type="button" onClick={()=>setPanel('financialReports')}>Corporate Financial Reports</button>}{user.role==='COMPTROLLER'&&<button className="quiet" type="button" onClick={()=>setPanel('customerPayments')}>Customer Payments</button>}{['customers','accounts','audit','completionInspection','installation','technicianAssignments','contractorDirectory','visibleMsrs','productCatalog','salesHistory'].includes(panel)&&<button className="quiet veridian-return-button" type="button" onClick={()=>setPanel('projects')}>Return to Customers &amp; Projects</button>}{['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<button className="quiet veridian-secondary-nav-button" type="button" onClick={()=>setPanel('visibleMsrs')}>View Master Sales Records</button>}{panel!=='contractorDirectory'&&panel!=='productCatalog'&&panel!=='salesHistory'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<button className="quiet veridian-secondary-nav-button" onClick={()=>setPanel('customers')}>Manage customers</button>}</div>
+   <div className="veridian-navigation-row" style={{display:"flex",flexWrap:"nowrap",overflowX:"auto",gap:"8px",alignItems:"center",whiteSpace:"nowrap",paddingBottom:"6px"}}><button type="button" disabled={busy} onClick={returnHome5726} aria-label="Home" style={{background:"#087F75",color:"#FFFFFF",border:"1px solid #087F75",borderRadius:4,padding:"10px 14px",fontWeight:700,display:"inline-flex",alignItems:"center",gap:8,cursor:busy?"not-allowed":"pointer"}}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 10 9-7 9 7"/><path d="M5 9v12h14V9"/><path d="M9 21v-7h6v7"/></svg>Home</button><button className="quiet" type="button" onClick={()=>setPanel('dashboard')}>Project Status Dashboard</button><button className="quiet" type="button" onClick={()=>setPanel('salesHistory')}>Sales Opportunity History</button><button className="quiet" type="button" onClick={()=>{setInstallationFocusId(null);setPanel('installation');}}>Installation Scheduling</button>{['INSTALLATION_MANAGER','CEO','COMPTROLLER'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('technicianAssignments')}>Technician Assignments</button>}{['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('payrollPreview')}>Payroll</button>}{user.role==='COMPTROLLER'&&<button className="quiet" type="button" onClick={()=>setPanel('financialReports')}>Corporate Financial Reports</button>}{user.role==='COMPTROLLER'&&<button className="quiet" type="button" onClick={()=>setPanel('customerPayments')}>Customer Payments</button>}{['customers','accounts','audit','completionInspection','installation','technicianAssignments','contractorDirectory','visibleMsrs','productCatalog','salesHistory'].includes(panel)&&<button className="quiet veridian-return-button" type="button" onClick={()=>setPanel('projects')}>Return to Customers &amp; Projects</button>}{['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<button className="quiet veridian-secondary-nav-button" type="button" onClick={()=>setPanel('visibleMsrs')}>Commercial Records</button>}{panel!=='contractorDirectory'&&panel!=='productCatalog'&&panel!=='salesHistory'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<button className="quiet veridian-secondary-nav-button" onClick={()=>setPanel('customers')}>Manage customers</button>}
+    {panel==='salesWorkspace'&&
+      <button className="quiet" type="button"
+        aria-expanded={showSalesInstructions5723}
+        onClick={()=>setShowSalesInstructions5723(value=>!value)}>
+        {showSalesInstructions5723?'Close instructions':'Instructions'}
+      </button>}
+    </div>
 
-   {user.role==='MARKETING'&&<button className="quiet" type="button" onClick={()=>setPanel('marketingMsrs')}>Master Sales Records</button>}
+
+{panel==='salesWorkspace'&&showSalesInstructions5723&&
+  <section aria-label="Sales Workspace instructions"
+    style={{border:'1px solid #D7E3E7',borderRadius:8,
+      padding:'16px 20px',margin:'12px 0 18px'}}>
+    <h2>Sales Workspace instructions</h2>
+    <p className="muted">
+      Choose the action that matches the work you need to do.
+    </p>
+    <dl style={{display:'grid',
+      gridTemplateColumns:'minmax(160px,230px) 1fr',
+      gap:'10px 16px'}}>
+      <dt><strong>Start new sale</strong></dt>
+      <dd>Begin a new job for a new or existing customer.
+        Each new job gets its own project and Master Sales Record.</dd>
+      <dt><strong>Continue existing sale</strong></dt>
+      <dd>Find an existing project and resume its work.</dd>
+      <dt><strong>My projects</strong></dt>
+      <dd>Open one of your five most recent authorized projects.</dd>
+      <dt><strong>Refresh</strong></dt>
+      <dd>Reload your recent projects.</dd>
+      <dt><strong>Project Status Dashboard</strong></dt>
+      <dd>Review project progress and outstanding actions.</dd>
+      <dt><strong>Sales Opportunity History</strong></dt>
+      <dd>Review recorded sales opportunities and their status.</dd>
+      <dt><strong>Installation Scheduling</strong></dt>
+      <dd>Review installation scheduling and readiness information.</dd>
+      <dt><strong>Payroll</strong></dt>
+      <dd>Open the payroll design preview.
+        Operational payroll is not activated here.</dd>
+      <dt><strong>Commercial Records</strong></dt>
+      <dd>Review saved commercial details and Master Sales Record
+        history without changing records. Drafts are not approved
+        agreements.</dd>
+      <dt><strong>Manage customers</strong></dt>
+      <dd>Find existing customers and manage authorized customer information.</dd>
+    </dl>
+  </section>}
+
+{user.role==='MARKETING'&&<button className="quiet" type="button" onClick={()=>setPanel('marketingMsrs')}>Master Sales Records</button>}
 
 {['SALES_MANAGER','INSTALLATION_MANAGER'].includes(user.role)&&<button className="quiet veridian-secondary-nav-button" type="button" onClick={()=>setPanel('productCatalog')}>Manage Product Catalog</button>}
   {panel==='productCatalog'&&['SALES_MANAGER','INSTALLATION_MANAGER'].includes(user.role)&&<NamedProductCatalog4547 api={api}/>}
@@ -459,6 +534,7 @@ function App(){
  {panel==='salesWorkspace'&&user.role==='SALES_ASSOCIATE'&&
     <SalesWorkspace5690
       api={api}
+      customerNames={Object.fromEntries(customers.map(c => [c.id, c.legal_name]))}
       onStartNew={()=>{
         setCustomerPath('new');
         setPanel('customer');
@@ -618,15 +694,100 @@ function App(){
         }}>
         Back to My projects
       </button>}
-    {!selected?<section className="empty"><h2>Your commercial workspace</h2><p>Select a project to prepare its Master Sales Record or review an approval.</p></section>:<><section><div className="title"><div><h2>{selected.code}</h2><p className="muted">{selected.location}</p></div><span className="badge" style={{fontSize:"1.25rem",fontWeight:800,padding:"8px 12px"}}>{selected.state}</span></div>
- <details className="veridian-msr-instructions-5686" style={{marginBottom:"16px"}}><summary style={{display:"inline-block",cursor:"pointer",background:"#142B3B",color:"#FFFFFF",padding:"10px 14px",borderRadius:"4px",fontWeight:600}}>Instructions</summary><div className="veridian-guide-banner veridian-guide-banner--info"><strong>Master Sales Record - How to use this screen</strong><p><strong>Step 1 - Complete the record.</strong> Check the customer, work scope, prices, equipment, materials, and financing choice. Financing classification and the customer's payment arrangement are selected separately. A payment exception requires its own documented CEO approval before installation. Approved historical MSRs remain unchanged.</p><p><strong>Step 2 - Save or submit.</strong> Select Save draft to keep editing later. Select Save &amp; submit when the record is ready for review.</p><p><strong>Step 3 - Review and approval.</strong> The assigned Sales Manager or Comptroller can correct a submitted MSR with a reason. Saving creates a new version and preserves the original. A different authorized reviewer must approve the corrected version.</p><p><strong>Step 4 - Protect approved records.</strong> An approved version is locked. To change commercial information, enter a revision reason and create a new version. Use Version history to review earlier records.</p></div></details><div className="versionbar"><span style={{fontSize:"1.125rem",fontWeight:700}}>Approved: {selected.current_approved?`Version ${selected.current_approved.number}.0`:'None yet'}</span><span style={{fontSize:"1.125rem",fontWeight:700}}>Pending: {selected.pending?`Version ${selected.pending.number}.0  -  ${selected.pending.status}`:'None'}</span><button className="quiet" onClick={()=>void run(async()=>setHistory(await api<MSR[]>(`projects/${selected.id}/history/`)))}>Version history</button></div>
- <DraftHistory5697L
-   key={selected.id}
-   projectId={selected.id}
+    {!selected?<section className="empty"><h2>Your commercial workspace</h2><p>Select a project to prepare its Master Sales Record or review an approval.</p></section>:<><section><div style={{
+      display:'flex',
+      justifyContent:'space-between',
+      alignItems:'baseline',
+      flexWrap:'wrap',
+      gap:'8px 24px',
+      marginBottom:8
+    }}>
+      <h2 style={{margin:0}}>
+        {selected.code}
+        {(selected.pending || selected.current_approved) &&
+          <span style={{fontSize:'0.8em',fontWeight:600}}>
+            {' | Version '}
+            {selected.pending?.number ??
+              selected.current_approved?.number}.0
+          </span>}
+      </h2>
+      <div style={{
+        display:'flex',
+        gap:12,
+        flexWrap:'wrap',
+        alignItems:'baseline',
+        fontWeight:700
+      }}>
+        <span style={{fontSize:'1.5rem',fontWeight:700}}>
+          Approval: {selected.current_approved
+            ? `Version ${selected.current_approved.number}.0`
+            : 'None yet'}
+        </span>
+        <span>
+          {selected.pending
+            ? selected.current_approved
+              ? `Pending: Version ${selected.pending.number}.0 - ${selected.pending.status}`
+              : `Status: ${selected.pending.status}`
+            : `Status: ${selected.state}`}
+        </span>
+      </div>
+    </div>
+    <div style={{marginBottom:12}}>
+      <p style={{fontSize:'1rem',fontWeight:700,margin:'4px 0'}}>
+        {customers.find(c=>c.id===selected.customer)?.legal_name ||
+          selected.pending?.snapshot.customer ||
+          selected.current_approved?.snapshot.customer ||
+          'Customer name unavailable'}
+      </p>
+      <p style={{fontSize:'1rem',fontWeight:700,margin:'4px 0'}}>{selected.location}</p>
+    </div>
+
+<div style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:12,margin:"12px 0 16px"}}>
+<details className="veridian-msr-instructions-5686" style={{margin:0,padding:0,border:"none",background:"transparent"}}><summary style={{display:"inline-block",cursor:"pointer",background:"#142B3B",color:"#FFFFFF",padding:"10px 14px",borderRadius:"4px",fontWeight:600}}>Instructions</summary><div className="veridian-guide-banner veridian-guide-banner--info"><strong>Master Sales Record - How to use this screen</strong><p><strong>Step 1 - Complete the record.</strong> Check the customer, work scope, prices, equipment, materials, and financing choice. Financing classification and the customer's payment arrangement are selected separately. A payment exception requires its own documented CEO approval before installation. Approved historical MSRs remain unchanged.</p><p><strong>Step 2 - Save or submit.</strong> Select Save draft to keep editing later. Select Submit for approval when the record is ready for review.</p><p><strong>Step 3 - Review and approval.</strong> The assigned Sales Manager or Comptroller can correct a submitted MSR with a reason. Saving creates a new version and preserves the original. A different authorized reviewer must approve the corrected version.</p><p><strong>Step 4 - Protect approved records.</strong> An approved version is locked. To change commercial information, enter a revision reason and create a new version. Use Version history to review earlier records.</p></div></details>
+<button className="quiet" onClick={()=>void run(async()=>setHistory(await api<MSR[]>(`projects/${selected.id}/history/`)))}>Version history</button>
+
+ {user.role==='SALES_ASSOCIATE'&&!selected.pending&&
+    <button type="button" className="quiet"
+      onClick={()=>setMsrStep5696D('documents')}
+      aria-current={
+        msrStep5696D==='documents'?'step':undefined}>
+      6. Documents &amp; Signing
+    </button>}
+  <DraftHistory5697L
+    key={selected.id}
+    projectId={selected.id}
+    saveSequence={selected.pending?.edit_sequence ?? 0}
+    canRestore={Boolean(editable &&
+      selected.pending &&
+      ['DRAFT', 'REJECTED'].includes(selected.pending.status))}
+    unsavedChanges={Boolean(snapshot &&
+      JSON.stringify(snapshot) !== msrSavedBaseline5696D)}
+    restore={async (entryId, restoreReason) => {
+      if (!selected.pending) {
+        throw new Error('No active draft is available.');
+      }
+      if (snapshot &&
+          JSON.stringify(snapshot) !== msrSavedBaseline5696D) {
+        throw new Error('Save or discard unsaved changes first.');
+      }
+      await api(
+        `projects/${selected.id}/restore-draft/`,
+        'POST',
+        {
+          history_entry_id: entryId,
+          expected_msr_id: selected.pending.id,
+          expected_sequence: selected.pending.edit_sequence,
+          reason: restoreReason,
+        }
+      );
+      await refresh(selected.id);
+      setMsrFeedback('Earlier draft restored as a new audited save.');
+    }}
    load={(id)=>api<DraftHistoryResponse5697L>(
      `projects/${id}/draft-history/`
    )}
  />
+</div>
  {selected.current_approved&&<details><summary>View approved version {selected.current_approved.number}.0</summary><Summary data={selected.current_approved.snapshot}/></details>}
  {history.map(v=><details key={v.id}>
       <summary>Version {v.number}.0 - {v.status}</summary>
@@ -637,7 +798,7 @@ function App(){
       <Summary data={v.snapshot}/>
     </details>)}
  {selected.pending&&snapshot?<>
-<h3>Master Sales Record  -  Version {selected.pending.number}.0</h3>
+
 {user.role==='SALES_ASSOCIATE'&&
   <div style={{
     margin:'16px 0',
@@ -661,25 +822,14 @@ function App(){
         </button>
       )}
     </div>
-    <p style={{margin:'0 0 12px'}}>
-      <strong>
-        {MSR_STEPS_5696D.find(s=>s.id===msrStep5696D)?.label}
-      </strong>
-      <span className="muted">
-        {' '}? Navigation installed; section grouping is next.
-      </span>
-    </p>
+
     <div style={{
       display:'flex',
       gap:12,
       alignItems:'center',
       flexWrap:'wrap'
     }}>
-      {editable&&selected.pending.status!=='SUBMITTED'&&
-        <button type="button" disabled={busy}
-          onClick={()=>void run(()=>change('edit'))}>
-          Save draft
-        </button>}
+
       <strong role="status" aria-live="polite">
         {busy?'Processing...':
           snapshot&&
@@ -687,12 +837,11 @@ function App(){
             ?'Unsaved changes'
             :'No unsaved changes detected'}
       </strong>
-      {msrFeedback&&
-        <span style={{color:'#087F75',fontWeight:700}}>
-          {msrFeedback}
-        </span>}
+
     </div>
   </div>}
+{(user.role!=='SALES_ASSOCIATE'||
+       msrStep5696D!=='documents')&&<>
 <fieldset disabled={!editable||busy}>
   <div style={{
     display:'flex',
@@ -716,18 +865,57 @@ function App(){
         : 'Assigned manager unavailable'}</div>
     </div>
   </div>
-  <div className="grid">{(['customer','contact','billing_address','project_location','customer_phone','customer_email','project_city','project_state','project_zip','scope','base_price','discount','tax','total_price','payment_terms','commercial_notes'] as const)
+  <div className="grid">{(['customer','contact','customer_phone','customer_email','billing_address','project_location','project_city','project_state','project_zip','scope','base_price','discount','tax','total_price','payment_terms','commercial_notes'] as const)
 .map(key=><React.Fragment key={key}>
 {(user.role!=='SALES_ASSOCIATE'||
   msrGroup5696G(key)===msrStep5696D||
   (key==='base_price'&&msrStep5696D==='pricing'))&&
-<>{key==='scope'&&<ScopeWorkBuilder value={snapshot.scope} onChange={value=>{setSnapshot({...snapshot,scope:value});setPrimaryWorkCategory(inferPrimaryWorkCategory(value));}}/>}
+<>
+{user.role==='SALES_ASSOCIATE'&&msrStep5696D==='customer'&&
+ key==='customer'&&
+ <h3 style={{gridColumn:'1 / -1',margin:'4px 0'}}>
+   Customer information
+ </h3>}
+{user.role==='SALES_ASSOCIATE'&&msrStep5696D==='customer'&&
+ key==='billing_address'&&
+ <h3 style={{gridColumn:'1 / -1',margin:'12px 0 4px'}}>
+   Addresses
+ </h3>}
+{key==='scope'&&<ScopeWorkBuilder value={snapshot.scope} onChange={value=>{setSnapshot({...snapshot,scope:value});setPrimaryWorkCategory(inferPrimaryWorkCategory(value));}}/>}
 {key==='base_price'&&
  (user.role!=='SALES_ASSOCIATE'||msrStep5696D==='equipment')&&
  <div style={{gridColumn:'1 / -1'}}><EquipmentCatalogEditor4534 api={api} primaryCategory={primaryWorkCategory} items={snapshot.equipment} onChange={items=>setSnapshot({...snapshot,equipment:items})}/><MaterialsChecklist5333 items={snapshot.materials} onChange={items=>setSnapshot({...snapshot,materials:items})}/></div>}
 {(key!=='base_price'||user.role!=='SALES_ASSOCIATE'||
   msrStep5696D==='pricing')&&
- <label style={key==='scope'?{gridColumn:'1 / -1'}:undefined}>{key==='scope'?'Final Scope of Work - Review before submitting':FIELD_LABELS[key]}{['scope','payment_terms','commercial_notes'].includes(key)?<textarea aria-label={key==='scope'?'Final Scope of Work - Review before submitting':FIELD_LABELS[key]} rows={key==='scope'?8:undefined} style={key==='scope'?{width:'100%',minHeight:'180px',resize:'vertical'}:undefined} value={snapshot[key]??''} onChange={e=>setSnapshot({...snapshot,[key]:e.target.value})}/>:<input aria-label={FIELD_LABELS[key]} value={snapshot[key]??''} onChange={e=>setSnapshot({...snapshot,[key]:e.target.value})}/>}</label>}
+  (user.role!=='SALES_ASSOCIATE'||
+  msrStep5696D!=='pricing')&&
+  <label style={key==='scope'?{gridColumn:'1 / -1'}:undefined}>{key==='scope'?'Final Scope of Work - Review before submitting':FIELD_LABELS[key]}{['scope','payment_terms','commercial_notes'].includes(key)?<textarea aria-label={key==='scope'?'Final Scope of Work - Review before submitting':FIELD_LABELS[key]} rows={key==='scope'?8:undefined} style={key==='scope'?{width:'100%',minHeight:'180px',resize:'vertical'}:undefined} value={snapshot[key]??''} onChange={e=>setSnapshot({...snapshot,[key]:e.target.value})}/>:<input aria-label={FIELD_LABELS[key]} value={snapshot[key]??''} onChange={e=>setSnapshot({...snapshot,[key]:e.target.value})}/>}</label>}
+
+{key==='project_location'&&
+  <div style={{gridColumn:'1 / -1',marginBottom:8}}>
+    <button type="button" className="quiet"
+      disabled={!editable || !snapshot.billing_address.trim()}
+      onClick={()=>{
+        const address = snapshot.billing_address.trim();
+        const match = address.match(
+          /^\s*.+?,\s*([^,]+),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)\s*$/
+        );
+        setSnapshot({
+          ...snapshot,
+          project_location:address,
+          project_city:match ? match[1].trim() : '',
+          project_state:match ? match[2].toUpperCase() : '',
+          project_zip:match ? match[3] : ''
+        });
+      }}>
+      Same as billing address
+    </button>
+    <p className="muted" style={{margin:'5px 0'}}>
+      Copies the billing address into the installation address.
+      Check the city, state and ZIP before saving.
+    </p>
+  </div>}
+
 {key==='contact'&&
   <div style={{
     gridColumn:'1 / -1',
@@ -737,24 +925,13 @@ function App(){
     flexWrap:'wrap',
     marginBottom:8
   }}>
-    <label style={{
-      display:'flex',
-      alignItems:'center',
-      gap:8,
-      width:'auto'
-    }}>
-      <input
-        type="checkbox"
-        style={{width:18,height:18,minWidth:18,margin:0}}
-        checked={Boolean(snapshot.customer) &&
-          snapshot.contact===snapshot.customer}
-        onChange={e=>setSnapshot({
-          ...snapshot,
-          contact:e.target.checked?snapshot.customer:''
-        })}
-      />
-      Same as customer
-    </label>
+    <button type="button" className="quiet"
+      disabled={!editable||busy||!snapshot.customer.trim()}
+      onClick={()=>setSnapshot({
+        ...snapshot,contact:snapshot.customer
+      })}>
+      Use customer name as contact
+    </button>
     {customers.find(c=>c.id===selected.customer)?.primary_contact?.name &&
       <button type="button" className="quiet"
         onClick={()=>{
@@ -768,7 +945,11 @@ function App(){
   </div>}
 </>}</React.Fragment>)}
 
-{(user.role!=='SALES_ASSOCIATE'||msrStep5696D==='pricing')&&<>
+{user.role==='SALES_ASSOCIATE'&&
+ msrStep5696D==='pricing'&&
+ <SalesPricing5762 value={snapshot} onChange={setSnapshot}/>}
+
+{user.role!=='SALES_ASSOCIATE'&&<>
 <div style={{gridColumn:'1 / -1',margin:'10px 0 14px'}}>
       <label style={{display:'flex',alignItems:'center',gap:10,width:'auto'}}>
         <input
@@ -808,17 +989,52 @@ function App(){
     <option value="100_PERCENT_COMPLETION">100% upon completion</option>
     <option value="OTHER_APPROVAL_REQUIRED">Other - Describe proposed terms</option>
   </select>
-</label></>}</div></fieldset>{!submitPaymentReady&&editable&&
+</label></>}</div></fieldset>
+{user.role==='SALES_ASSOCIATE'&&editable&&
+ selected.pending.status!=='SUBMITTED'&&
+ (msrStep5696D==='customer'||
+  msrStep5696D==='scope'||
+  msrStep5696D==='equipment'||
+  msrStep5696D==='pricing')&&
+ <div style={{display:'flex',flexWrap:'wrap',
+              gap:12,margin:'16px 0',alignItems:'center'}}>
+   <button type="button" disabled={busy}
+     onClick={()=>void run(()=>change('edit'))}>
+     Save draft
+   </button>
+   <button type="button" className="quiet" disabled={busy}
+     onClick={()=>void run(async()=>{
+       if(!selected?.pending||!snapshot)
+         throw new Error('No editable draft is available.');
+       if(JSON.stringify(snapshot)!==msrSavedBaseline5696D){
+         await change('edit');
+       }
+       setMsrStep5696D(
+         msrStep5696D==='customer'?'scope':
+         msrStep5696D==='scope'?'equipment':
+         msrStep5696D==='equipment'?'pricing':'review'
+       );
+     })}>
+     Continue
+   </button>
+ </div>}
+{!submitPaymentReady&&editable&&
     (user.role!=='SALES_ASSOCIATE'||
      msrStep5696D==='pricing'||msrStep5696D==='review')&&
     <p role="status" className="muted">
       Choose financing and an agreed payment arrangement. Other terms can be saved in a draft but require a separate approval workflow before submission.
     </p>}
 
+</>}
 {user.role==='SALES_ASSOCIATE'&&msrStep5696D==='review'&&snapshot&&
  <section style={{padding:18,border:'1px solid #D7E3E7',
                    borderRadius:8,margin:'16px 0'}}>
-  <h3>Review your Master Sales Record</h3>
+  <h3 style={{fontSize:'1.2rem',marginBottom:6}}>
+      Review Your Sale - Master Sales Record (MSR)
+    </h3>
+    <p className="muted" style={{fontSize:'0.95rem',marginTop:0}}>
+      Review the information below before submitting it for approval.
+    </p>
   <p><strong>Customer:</strong> {snapshot.customer}</p>
   <p><strong>Installation:</strong> {snapshot.project_location}</p>
   <p><strong>Scope of Work:</strong></p>
@@ -829,16 +1045,25 @@ function App(){
   <p><strong>Material lines:</strong> {snapshot.materials.length}</p>
   <p><strong>Base price:</strong> ${snapshot.base_price}</p>
   <p><strong>Total price:</strong> ${snapshot.total_price}</p>
-  <p><strong>Financing:</strong> {snapshot.financing_type||'Not selected'}</p>
+   {!(Number(snapshot.total_price)>0)&&
+     <p role="alert" style={{fontWeight:700,color:"#8A3B16"}}>
+       Enter a total project price greater than $0 before
+       submitting for approval.
+     </p>}
+  <p><strong>Financing:</strong> {snapshot.financing_type==='FINANCED'?'Financed':snapshot.financing_type==='NON_FINANCED'?'Non-financed':'Not selected'}</p>
   <p><strong>Payment arrangement:</strong>
-    {' '+(snapshot.payment_option||'Not selected')}
+    {' '+(snapshot.payment_option==='100_PERCENT_COMPLETION'?'100% upon completion':snapshot.payment_option==='50_PERCENT_DEPOSIT'?'50% deposit before installation; balance after installation':snapshot.payment_option==='OTHER_APPROVAL_REQUIRED'?'Other terms - additional approval required':'Not selected')}
   </p>
   <p className="muted">
     Saving a draft does not submit or approve this record.
   </p>
  </section>}
-<div className="actions">{editable&&selected.pending.status!=='SUBMITTED'&&<><button disabled={busy} onClick={()=>void run(()=>change('edit'))}>Save draft</button>{(user.role!=='SALES_ASSOCIATE'||
- msrStep5696D==='review')&&<button disabled={busy||!submitPaymentReady} title={!submitPaymentReady?'Choose financing and an authorized payment arrangement before submitting.':undefined} onClick={()=>void run(async()=>{setMsrFeedback('');if(!submitPaymentReady)throw new Error('Choose financing and an authorized payment arrangement before submitting.');await api(`msrs/${selected.pending!.id}/transition/`,'POST',{action:'edit',expected_sequence:selected.pending!.edit_sequence,snapshot});const p=await api<Project>(`projects/${selected.id}/`);choose(p);await api(`msrs/${p.pending!.id}/transition/`,'POST',{action:'submit',expected_sequence:p.pending!.edit_sequence});await refresh(selected.id);setMsrFeedback('Master Sales Record submitted for review. Approval is still required.');})}>Save & submit</button>}</>}{managerCanCorrect&&editable&&
+<div className="actions">{editable&&selected.pending.status!=='SUBMITTED'&&<>
+    {user.role!=='SALES_ASSOCIATE'&&
+      <button disabled={busy} onClick={()=>void run(()=>change('edit'))}>
+        Save draft
+      </button>}{(user.role!=='SALES_ASSOCIATE'||
+ msrStep5696D==='review')&&<div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:18,gridColumn:"1 / -1",margin:"12px 0"}}><button disabled={busy||!submitPaymentReady||!(Number(snapshot.total_price)>0)} title={!submitPaymentReady?'Choose financing and an authorized payment arrangement before submitting.':undefined} onClick={()=>void run(async()=>{setMsrFeedback('');if(!submitPaymentReady)throw new Error('Choose financing and an authorized payment arrangement before submitting.');if(!(Number(snapshot.total_price)>0))throw new Error('Enter a total project price greater than $0 before submitting.');await api(`msrs/${selected.pending!.id}/transition/`,'POST',{action:'edit',expected_sequence:selected.pending!.edit_sequence,snapshot});const p=await api<Project>(`projects/${selected.id}/`);choose(p);await api(`msrs/${p.pending!.id}/transition/`,'POST',{action:'submit',expected_sequence:p.pending!.edit_sequence});await refresh(selected.id);setMsrFeedback('Master Sales Record submitted for review. Approval is still required.');})}>Submit for approval</button><div style={{flex:"1 1 270px",maxWidth:680}}><div style={{fontSize:"1.15rem",fontWeight:800,lineHeight:1.35,color:"#142B3B"}}>No documents are sent to the customer at this stage.</div><div style={{fontSize:"0.95rem",fontWeight:600,lineHeight:1.5,marginTop:5}}>Manager approval and required checks must be completed before documents are sent.</div></div></div>}</>}{managerCanCorrect&&editable&&
       <button
         disabled={busy||!reason.trim()}
         onClick={()=>void run(async()=>{
@@ -863,8 +1088,10 @@ function App(){
         onClick={()=>void run(()=>change('approve'))}>
         Approve version
       </button><button disabled={busy||!reason.trim()||selected.pending.prepared_by===user.id||selected.pending.created_by===user.id} className="quiet" onClick={()=>void run(()=>change('reject'))}>Reject with reason</button></>}</div></>:<p className="muted">The approved record is locked. Create a revision to change any commercial field.</p>}{msrFeedback&&<p role="status" aria-live="polite" style={{color:"#087F75",fontWeight:700}}>{msrFeedback}</p>}{error&&<p role="alert" className="error">{error}</p>}
- <label>Review note / revision reason<textarea aria-label="Review note / revision reason" value={reason} onChange={e=>setReason(e.target.value)}/></label>{selected.state!=='CANCELLED'&&selected.current_approved&&!selected.pending&&<button disabled={busy||!reason.trim()} onClick={()=>void run(async()=>{await api(`projects/${selected.id}/revision/`,'POST',{reason,expected_approved_id:selected.current_approved!.id});await refresh(selected.id);})}>Create revision</button>}
- {selected.code==='104-SA-2026-11-22' && <FictionalProjectJourney5519 key={`${selected.id}-${selected.current_approved?.id ?? 'pending'}`} projectId={selected.id}
+ {(user.role!=='SALES_ASSOCIATE'||msrStep5696D==='review')&&<label>Review note / revision reason<textarea aria-label="Review note / revision reason" value={reason} onChange={e=>setReason(e.target.value)}/></label>}{selected.state!=='CANCELLED'&&selected.current_approved&&!selected.pending&&<button disabled={busy||!reason.trim()} onClick={()=>void run(async()=>{await api(`projects/${selected.id}/revision/`,'POST',{reason,expected_approved_id:selected.current_approved!.id});await refresh(selected.id);})}>Create revision</button>}
+ {(user.role!=='SALES_ASSOCIATE'||
+       msrStep5696D==='documents')&&<>
+  {selected.code==='104-SA-2026-11-22' && <FictionalProjectJourney5519 key={`${selected.id}-${selected.current_approved?.id ?? 'pending'}`} projectId={selected.id}
     onOpenInstallation={() => {
       setInstallationFocusId(selected.id);
       setEvidenceProjectId(selected.id);
@@ -876,7 +1103,95 @@ function App(){
           setInstallationFocusId(selected.id);
           setPanel('customerPayments');
         }
-      : undefined} approved={Boolean(selected.current_approved)} projectState={selected.state} completionVisible={Boolean(approver && selected.current_approved)} />}<div id="journey-documents-5519" className="documents"><h3>Documents</h3><InspectionDraftWorkflow5189 api={api} projectId={selected.id} actorRole={user.role}/><ApprovedMSRSource4530 api={api} projectId={selected.id}/><FictionalDocumentPreviews4525/><div className="veridian-guide-banner veridian-guide-banner--info"><strong>Contracts and Invoices - Preparation Guide</strong><p><strong>Step 1 - Check approval.</strong> A contract or invoice can be prepared after the Master Sales Record is approved.</p><p><strong>Step 2 - Prepare the documents.</strong> Select Prepare contract or Prepare invoice. Each action creates an unsigned preparation copy.</p><p><strong>Step 3 - Review the PDFs.</strong> Download each prepared document. Check the customer information, work details, pricing, and payment terms before proceeding.</p><p><strong>Step 4 - Review signing.</strong> Use the Signing review section to check who will sign and in what order. For contracts and invoices, the customer signs first. Preparing or downloading a PDF does not mean it has been sent or signed. Electronic sending is not yet enabled.</p></div><p className="muted">Prepare unsigned interactive PDFs from the current approved MSR. Completion certificates are preparation copies; work completion and signature dates stay blank.</p>{selected.current_approved&&approver&&selected.state!=='CANCELLED'&&<div className="actions">{['CONTRACT','INVOICE',...(selected.current_approved.snapshot.financing_type==='FINANCED'?['COMPLETION_FINANCED']:selected.current_approved.snapshot.financing_type==='NON_FINANCED'?['COMPLETION_NON_FINANCED']:[])].map(kind=><button className="quiet" disabled={busy} key={kind} onClick={()=>void run(async()=>{await api(`msrs/${selected.current_approved!.id}/documents/`,'POST',{kind});setDocuments(await api<PreparedDocument[]>(`projects/${selected.id}/documents/`));})}>{kind==='CONTRACT'?'Prepare contract':kind==='INVOICE'?'Prepare invoice':'Prepare completion certificate'}</button>)}</div>}{!selected.current_approved&&<p className="muted">Document preparation becomes available after approval.</p>}{documents.map(doc=><div key={doc.id} className="document-row"><div><strong>{doc.kind.replaceAll('_',' ')}</strong><span>MSR {doc.msr_version}.0 - Unsigned preparation copy - Renderer {doc.renderer_version}</span><span>Prepared {new Date(doc.created_at).toLocaleString('en-US',{dateStyle:'medium',timeStyle:'short',timeZone:'America/New_York'})} ET</span></div><a href={doc.download_url}>Download PDF</a></div>)}</div>
+      : undefined} approved={Boolean(selected.current_approved)} projectState={selected.state} completionVisible={Boolean(approver && selected.current_approved)} />}<div id="journey-documents-5519" className="documents">
+    {user.role==='SALES_ASSOCIATE'&&
+      <h3 style={{fontSize:'1.35rem',margin:'8px 0 16px'}}>
+        6. Documents &amp; Signing
+      </h3>}
+    {!selected.current_approved&&
+      <div role="status" style={{
+        border:'2px solid #C39A58',
+        borderRadius:8,
+        padding:16,
+        margin:'12px 0 18px'
+      }}>
+        <strong style={{display:'block',
+          fontSize:'1.2rem',marginBottom:8}}>
+          APPROVAL REQUIRED
+        </strong>
+        <p style={{fontSize:'0.98rem',lineHeight:1.55}}>
+      The Master Sales Record (MSR) must be approved before
+      customer documents can be prepared.
+    </p>
+        <p style={{fontSize:'0.98rem',lineHeight:1.55}}>
+      Only an authorized Sales Manager or CEO may send documents
+      for signature after all required checks pass.
+    </p>
+        <p style={{fontSize:'0.98rem',lineHeight:1.55}}>
+      <strong>Next step:</strong> {
+        selected.pending?.status==='SUBMITTED'
+          ? 'Wait for authorized review and approval.'
+          : 'Return to Review and submit the MSR for approval.'
+      }
+    </p>
+      </div>}
+    <h3 style={{fontSize:'1.12rem',margin:'22px 0 8px'}}>
+      Customer Documents
+    </h3>
+    <p className="muted" style={{
+      fontSize:'0.93rem',lineHeight:1.5,margin:'0 0 14px'
+    }}>
+      Prepare and review customer documents after MSR approval.
+    </p>
+    <InspectionDraftWorkflow5189 api={api} projectId={selected.id} actorRole={user.role}/><ApprovedMSRSource4530 api={api} projectId={selected.id}/><FictionalDocumentPreviews4525/>{user.role==='SALES_ASSOCIATE'
+ ? <section style={{
+     border:'1px solid #D7E3E7',
+     borderRadius:8,
+     padding:18,
+     margin:'18px 0',
+     fontSize:'0.98rem',
+     lineHeight:1.65
+   }}>
+     <h3 style={{fontSize:'1.12rem',margin:'0 0 10px'}}>
+       Document Preparation
+     </h3>
+     <ol style={{paddingLeft:24,margin:'6px 0 12px'}}>
+       <li>Confirm Master Sales Record approval.</li>
+       <li>Prepare the Agreement and Invoice.</li>
+       <li>
+         Review customer information, equipment,
+         pricing, and payment terms.
+       </li>
+       <li>Verify signing requirements before sending.</li>
+     </ol>
+     <p className="muted">
+       Preparing or downloading a PDF does not send it
+       to the customer.
+     </p>
+     <details>
+       <summary style={{cursor:'pointer',fontWeight:700}}>
+         Document preparation instructions
+       </summary>
+       <p>
+         Authorized employees prepare unsigned copies after approval.
+         Each PDF must be checked before signing.
+       </p>
+     </details>
+     <details style={{marginTop:16}}>
+       <summary style={{cursor:'pointer',fontWeight:700}}>
+         Signing instructions
+       </summary>
+       <p>
+         For contracts and invoices, the customer signs first.
+         Preparing a PDF is not proof of signing.
+         Electronic sending is not yet enabled.
+       </p>
+     </details>
+   </section>
+ : <div className="veridian-guide-banner veridian-guide-banner--info"><strong>Contracts and Invoices - Preparation Guide</strong><p><strong>Step 1 - Check approval.</strong> A contract or invoice can be prepared after the Master Sales Record is approved.</p><p><strong>Step 2 - Prepare the documents.</strong> Select Prepare contract or Prepare invoice. Each action creates an unsigned preparation copy.</p><p><strong>Step 3 - Review the PDFs.</strong> Download each prepared document. Check the customer information, work details, pricing, and payment terms before proceeding.</p><p><strong>Step 4 - Review signing.</strong> Use the Signing review section to check who will sign and in what order. For contracts and invoices, the customer signs first. Preparing or downloading a PDF does not mean it has been sent or signed. Electronic sending is not yet enabled.</p></div>}{user.role!=='SALES_ASSOCIATE'&&
+      <p className="muted">Prepare unsigned interactive PDFs from the current approved MSR. Completion certificates are preparation copies; work completion and signature dates stay blank.</p>}{selected.current_approved&&approver&&selected.state!=='CANCELLED'&&<div className="actions">{['CONTRACT','INVOICE',...(selected.current_approved.snapshot.financing_type==='FINANCED'?['COMPLETION_FINANCED']:selected.current_approved.snapshot.financing_type==='NON_FINANCED'?['COMPLETION_NON_FINANCED']:[])].map(kind=><button className="quiet" disabled={busy} key={kind} onClick={()=>void run(async()=>{await api(`msrs/${selected.current_approved!.id}/documents/`,'POST',{kind});setDocuments(await api<PreparedDocument[]>(`projects/${selected.id}/documents/`));})}>{kind==='CONTRACT'?'Prepare contract':kind==='INVOICE'?'Prepare invoice':'Prepare completion certificate'}</button>)}</div>}{!selected.current_approved&&
+      user.role!=='SALES_ASSOCIATE'&&
+      <p className="muted">Document preparation becomes available after approval.</p>}{documents.map(doc=><div key={doc.id} className="document-row"><div><strong>{doc.kind.replaceAll('_',' ')}</strong><span>MSR {doc.msr_version}.0 - Unsigned preparation copy - Renderer {doc.renderer_version}</span><span>Prepared {new Date(doc.created_at).toLocaleString('en-US',{dateStyle:'medium',timeStyle:'short',timeZone:'America/New_York'})} ET</span></div><a href={doc.download_url}>Download PDF</a></div>)}</div>
  {approver && selected.current_approved &&
     <section className="documents">
       <h3 id="journey-completion-5519">Project Completion Review</h3>
@@ -925,6 +1240,7 @@ function App(){
     run={run}
   />}
 <div id="journey-signing-5519"><SigningReview key={`${selected.id}-${selected.current_approved?.id}`} projectId={selected.id} msrId={selected.current_approved?.id} actorRole={user.role} workflowIntent={workflowIntent} finance={selected.current_approved?.snapshot.financing_type} active={selected.state!=='CANCELLED'} approver={approver} comptroller={user.role==='COMPTROLLER'} actorId={user.id} busy={busy} api={api} run={run}/></div>
+  </>}
  {approver&&<button className="quiet" disabled={busy||!reason.trim()} onClick={()=>void run(async()=>{await api(`projects/${selected.id}/state/`,'POST',{action:selected.state==='CANCELLED'?'reopen':'cancel',reason,expected_state:selected.state});await refresh(selected.id);})}>{selected.state==='CANCELLED'?'Reopen project':'Cancel project'}</button>}
  </section></>}</article></div>}<BrandedFooter versionLabel={APP_VERSION_LABEL} /></main></>;
 }

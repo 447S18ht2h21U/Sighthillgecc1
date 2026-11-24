@@ -22,7 +22,10 @@ STATES = frozenset(
 )
 ACTION = "customer.adult_id_attested"
 SYNTHETIC_ACTION = "customer.synthetic_adult_test_evidence"
-SYNTHETIC_PROJECT_CODE = "104-SA-2026-11-22"
+SYNTHETIC_PROJECT_CODES = frozenset({
+    "104-SA-2026-11-22",
+    "105-SA-2026-11-23",
+})
 
 
 def synthetic_allowed(project):
@@ -31,7 +34,7 @@ def synthetic_allowed(project):
     return (
         settings.DEBUG
         and os.environ.get("GECC_DEV") == "1"
-        and project.code == SYNTHETIC_PROJECT_CODE
+        and project.code in SYNTHETIC_PROJECT_CODES
     )
 
 

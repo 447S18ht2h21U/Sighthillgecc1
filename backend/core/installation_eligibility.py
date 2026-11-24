@@ -112,11 +112,8 @@ def ensure_installation_eligible(project):
         CustomerSignatureEvidence.DocumentKind.CONTRACT,
     )
 
-    # Both customer document signatures are required for normal installation.
-    verified_signature_time(
-        msr,
-        CustomerSignatureEvidence.DocumentKind.INVOICE,
-    )
+    # Authenticated customer Contract signature remains mandatory.
+    # A separate Invoice signature is not required before installation.
 
     deadline = cancellation_deadline(msr)
 

@@ -83,13 +83,13 @@ class CommercialSignatureIntegrationTests(SimpleTestCase):
 
         self.assertFalse(result["eligible"])
         self.assertFalse(result["requirements"]["contract_signed"])
-        self.assertFalse(result["requirements"]["invoice_signed"])
+        self.assertNotIn("invoice_signed", result["requirements"])
         self.assertFalse(result["requirements"]["waiting_period_complete"])
         self.assertTrue(any(
             "Authenticated DocuSign contract" in reason
             for reason in result["blocking_reasons"]
         ))
-        self.assertTrue(any(
-            "Authenticated DocuSign invoice" in reason
+        self.assertFalse(any(
+            "invoice signature" in reason.lower()
             for reason in result["blocking_reasons"]
         ))

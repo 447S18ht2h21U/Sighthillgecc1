@@ -317,7 +317,7 @@ class InstallationPaymentReadinessTests(TestCase):
         self.assertEqual(result["qualifying_funds"], Decimal("0.00"))
         self.assertEqual(result["msr_id"], str(exception_msr.pk))
 
-    def test_revoked_ceo_exception_restores_deposit_requirement(self):
+    def test_revoked_ceo_exception_restores_approval_requirement(self):
         from .ceo_payment_exception_services import revoke_payment_exception
 
         exception, exception_msr = self.approve_real_ceo_exception()
@@ -332,7 +332,9 @@ class InstallationPaymentReadinessTests(TestCase):
 
         self.assertFalse(result["payment_ready"])
         self.assertFalse(result["ceo_exception_valid"])
-        self.assertEqual(result["remaining_deposit"], Decimal("5000.00"))
+        self.assertEqual(result["remaining_deposit"], Decimal("0.00"))
+        self.assertEqual(result["required_deposit"], Decimal("0.00"))
+        self.assertIn("CEO payment exception", result["explanation"])
 
     def test_ceo_exception_does_not_transfer_to_new_msr(self):
         self.approve_real_ceo_exception()

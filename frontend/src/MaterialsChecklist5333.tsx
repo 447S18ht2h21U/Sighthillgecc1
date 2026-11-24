@@ -55,16 +55,15 @@ export function MaterialsChecklist5333({
       style={{gridColumn:'1 / -1',marginTop:12,marginBottom:16}}>
       <h3>Materials Included</h3>
       <p className="muted">
-        Select all materials included in the project. Enter the agreed
-        quantity and confirm the unit. Individual selling prices are not used.
-        For submitted records, confirmed units are saved through a new
-        manager correction. Earlier versions stay unchanged.
+        Select the materials needed for this job and enter
+        the proposed quantity for each one.
+        The Installation Manager will verify the requirements.
       </p>
 
       <div style={{
         display:'grid',
-        gridTemplateColumns:'repeat(auto-fit,minmax(255px,1fr))',
-        gap:12
+        gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',
+        gap:'10px 14px'
       }}>
         {choices.map(choice => {
           const description = `${choice.name} (${choice.unit})`;
@@ -110,6 +109,8 @@ export function MaterialsChecklist5333({
                     type="number"
                     min="0.01"
                     step="any"
+                    style={{width:110,maxWidth:'100%',
+                      boxSizing:'border-box'}}
                     value={items[index].quantity}
                     onChange={event => replace(index, {
                       quantity:event.target.value
@@ -134,7 +135,7 @@ export function MaterialsChecklist5333({
       </div>
 
       <div style={{marginTop:18}}>
-        <strong>Other Materials ? Describe</strong>
+        <strong>Other Materials / Describe</strong>
         <p className="muted">
           Use this only for materials not listed above.
           Include the measuring unit in each description.
@@ -162,6 +163,8 @@ export function MaterialsChecklist5333({
                   aria-label={`Other material quantity ${index + 1}`}
                   min="0.01"
                   step="any"
+                  style={{width:110,maxWidth:'100%',
+                    boxSizing:'border-box'}}
                   value={items[index].quantity}
                   onChange={event => replace(index, {
                     quantity:event.target.value

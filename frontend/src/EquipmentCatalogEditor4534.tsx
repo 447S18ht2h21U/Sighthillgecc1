@@ -118,32 +118,64 @@ export function EquipmentCatalogEditor4534({
     <section aria-label="MSR equipment catalog selection">
       <h3>Equipment</h3>
       <p className="muted">
-        Choose a catalog and select active equipment. Each new row stores
-        its own equipment details, quantity, and category of work.
-        Historical approved MSRs are not changed.
+        Check each equipment item below. Choose the work needed
+        and enter the quantity.
       </p>
 
       {error && <p role="status">{error}</p>}
 
       {items.map((line, index) => (
-        <div className="line" key={index}>
+        <div className="line" key={index}
+          style={{
+            display:'grid',
+            gridTemplateColumns:'110px max-content minmax(0,1fr)',
+            gap:'10px 14px',
+            alignItems:'end',
+            width:'100%',
+            boxSizing:'border-box',
+            border:'1px solid #D7E3E7',
+            borderRadius:8,
+            padding:'12px 16px',
+            marginBottom:12
+          }}>
+          <h4 style={{
+            gridColumn:'1 / -1',
+            fontSize:'1.1rem',
+            margin:0,
+            color:'#142B3B'
+          }}>
+            Equipment {index + 1}
+          </h4>
           {isCatalogLine(line) ? (
             <>
-              <p>
+              <p style={{
+                gridColumn:'1 / -1',
+                margin:'0 0 2px',
+                lineHeight:1.5,
+                overflowWrap:'anywhere'
+              }}>
                 <strong>{line.brand} — {line.model_number}</strong>
                 {' — '}{line.residential_system_type}
                 {' — '}{line.description}
               </p>
               {line.category_of_work !== primaryCategory &&
-                <p className="muted">
+                <p className="muted" style={{
+                  gridColumn:'1 / -1',margin:0
+                }}>
                   Individual category: {line.category_of_work}
                 </p>}
               <div className="msr-equipment-category-override"
-                style={{marginTop:10,marginBottom:12}}>
-                <strong>Work to be Performed on This Equipment</strong>
+                style={{
+                  gridColumn:'1 / -1',
+                  order:3,
+                  borderTop:'1px solid #D7E3E7',
+                  paddingTop:12,
+                  margin:'4px 0 0',
+                  minWidth:0
+                }}>
+                <strong>Work required for this equipment</strong>
                 <p className="muted">
-                  Selected from Quick Scope of Work. Choose another type
-                  if this equipment requires different work.
+                  Choose one. It can differ from the overall Scope of Work.
                 </p>
                 {line.category_of_work === 'Service & maintenance' &&
                   <p className="muted">
@@ -172,9 +204,16 @@ export function EquipmentCatalogEditor4534({
                   ))}
                 </div>
               </div>
-              <label>
+              <label style={{
+                width:110,
+                maxWidth:'100%',
+                gridColumn:'1',
+                order:1,
+                margin:0
+              }}>
                 Quantity
                 <input type="number" min="1" max="999" step="1"
+                  style={{width:'100%',boxSizing:'border-box'}}
                   value={line.quantity}
                   onChange={event => {
                     const value = Number(event.target.value);
@@ -189,18 +228,33 @@ export function EquipmentCatalogEditor4534({
               </label>
             </>
           ) : (
-            <p>
+            <p style={{gridColumn:"1 / -1",margin:0,overflowWrap:"anywhere"}}>
               Historical equipment entry: {line.description}
               {' — Quantity: '}{line.quantity}
             </p>
           )}
           <button type="button" className="quiet"
+            style={{
+              alignSelf:'end',
+              justifySelf:'start',
+              gridColumn:'2',
+              order:2,
+              whiteSpace:'nowrap'
+            }}
             onClick={() => onChange(items.filter((_, i) => i !== index))}>
-            Remove
+            Remove equipment
           </button>
         </div>
       ))}
 
+      <div style={{
+        borderTop:'1px solid #D7E3E7',
+        paddingTop:16,
+        marginTop:12
+      }}>
+      <h4 style={{fontSize:'1.1rem',margin:'0 0 12px'}}>
+        Add another equipment item
+      </h4>
       <label>
         Product Catalog
         <select
@@ -248,9 +302,10 @@ export function EquipmentCatalogEditor4534({
       </button>
 
       <p className="muted">
-        Up to 100 equipment entries per project. Catalog descriptions are copied
-        into the draft as historical snapshots.
+        Choose an active product and select Add Selected Equipment.
+        Saved equipment details are retained with the record.
       </p>
+      </div>
     </section>
   );
 }

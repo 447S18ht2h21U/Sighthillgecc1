@@ -26,8 +26,8 @@ RENDERER_VERSION = '0.2.0'
 TEMPLATE_DIR = Path(os.getenv('GECC_PDF_TEMPLATE_DIR', str(Path(__file__).parent / 'pdf_templates')))
 APPROVED_TEMPLATES = json.loads((Path(__file__).parent / 'pdf_templates' / 'manifest.json').read_text())
 TEMPLATES = {
-    'CONTRACT': 'GECC-Project-SOW-Agreement-Interactive.pdf',
-    'INVOICE': 'GECC-HVAC-Invoice-Interactive.pdf',
+    'CONTRACT': 'GECC-Project-SOW-Agreement-20261124-Interactive.pdf',
+    'INVOICE': 'GECC-HVAC-Invoice-20261124-Interactive.pdf',
     'COMPLETION_FINANCED': 'GECC-Completion-Certificate-Financed-Interactive.pdf',
     'COMPLETION_NON_FINANCED': 'GECC-Completion-Certificate-Non-Financed-Interactive.pdf',
 }
@@ -384,6 +384,55 @@ def refresh_other_document_identity(writer, kind):
     page.merge_page(PdfReader(overlay).pages[0])
 
 
+
+def sync_invoice_payment_radio_5810(writer, selected):
+    """Synchronize approved Invoice payment choice and visible selection."""
+    from pypdf.generic import NameObject as PaymentNameObject
+
+    if selected not in {'/A', '/B'}:
+        raise ValidationError('Invalid Invoice payment choice.')
+
+    seen = set()
+    parent_field = None
+
+    for ref in writer.pages[0].get('/Annots', []):
+        widget = ref.get_object()
+        parent_ref = widget.get('/Parent')
+        parent = parent_ref.get_object() if parent_ref else widget
+
+        if str(parent.get('/T', '')) != 'payment_option':
+            continue
+
+        if str(parent.get('/FT')) != '/Btn':
+            raise ValidationError('Invoice payment field type changed.')
+
+        appearance = widget.get('/AP')
+        normal = appearance.get('/N') if appearance else None
+        normal = normal.get_object() if normal else {}
+
+        options = [
+            str(key) for key in normal.keys()
+            if str(key) != '/Off'
+        ]
+
+        if len(options) != 1 or options[0] not in {'/A', '/B'}:
+            raise ValidationError('Invoice radio appearance changed.')
+
+        option = options[0]
+        if option in seen:
+            raise ValidationError('Duplicate Invoice payment option.')
+
+        seen.add(option)
+        widget[PaymentNameObject('/AS')] = PaymentNameObject(
+            option if option == selected else '/Off'
+        )
+        parent_field = parent
+
+    if seen != {'/A', '/B'} or parent_field is None:
+        raise ValidationError('Incomplete Invoice payment options.')
+
+    parent_field[PaymentNameObject('/V')] = PaymentNameObject(selected)
+
 def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=None, signing_test=False, pre_sign_commercial_review=None):
     if signing_test and (not release_context or sandbox_review):
         raise ValidationError("Signing tests require a separate verified test review.")
@@ -400,7 +449,14 @@ def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=N
     reader = PdfReader(source)
     writer = PdfWriter();writer.clone_document_from_reader(reader)
     refresh_completion_identity(writer, kind)
-    refresh_other_document_identity(writer, kind)
+    if kind == 'CONTRACT' and source.name == 'GECC-Project-SOW-Agreement-20261124-Interactive.pdf':
+        if hashlib.sha256(source.read_bytes()).hexdigest() != 'aa232edd26628cedab0b444783610abdfa885c32c76c62a96631ead3dfecb192':
+            raise ValidationError('Corrected Agreement fingerprint mismatch.')
+    elif kind == 'INVOICE' and source.name == 'GECC-HVAC-Invoice-20261124-Interactive.pdf':
+        if hashlib.sha256(source.read_bytes()).hexdigest() != 'c6a51c16dc793cfe832d67c1d829652c0813ad960be63586b4c3c7502dee07d8':
+            raise ValidationError('Corrected Invoice fingerprint mismatch.')
+    else:
+        refresh_other_document_identity(writer, kind)
     fields = writer.get_fields() or {}
     if not SIGNATURE_FIELDS.issubset(fields) or any(fields[name].get('/FT')!='/Sig' for name in SIGNATURE_FIELDS):
         raise ValidationError('The template lacks required native signature fields.')
@@ -441,6 +497,8 @@ def render_pdf(kind, record, prepared_at, sandbox_review=None, release_context=N
                     values[name] = 'See detail' if width >= 45 else 'Detail'
                 writer.update_page_form_field_values(page,{name:(values[name],'/Helv',fontsize)},auto_regenerate=False)
     writer.update_page_form_field_values(None,values,auto_regenerate=False)
+    if kind == 'INVOICE':
+        sync_invoice_payment_radio_5810(writer, values['payment_option'])
     # Lock populated commercial fields while leaving signatures/actor/date fields interactive.
     for ref in writer.root_object['/AcroForm']['/Fields']:
         field = ref.get_object()

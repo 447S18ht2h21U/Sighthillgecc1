@@ -126,7 +126,7 @@ export function VisibleMSRDirectory({ api }: Props) {
       <div className="title">
         <div>
           <p className="eyebrow">AUTHORIZED PROJECT RECORDS</p>
-          <h2>Master Sales Records</h2>
+          <h2>Commercial Records</h2>
           <p className="muted">
             Review the records your position allows you to see.
           </p>
