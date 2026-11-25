@@ -76,6 +76,15 @@ async function api<T>(path:string, method='GET', data?:unknown):Promise<T>{
   }
 
   if (!response.ok) {
+    if (response.status === 400 && Array.isArray(body)) {
+      const messages = body.filter(
+        (item): item is string =>
+          typeof item === 'string' && item.trim().length > 0
+      );
+      if (messages.length === body.length && messages.length > 0) {
+        throw new Error(messages.join(' '));
+      }
+    }
     if (body === null || typeof body !== 'object' || Array.isArray(body)) {
       throw new Error(unexpectedResponse);
     }

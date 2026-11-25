@@ -11,6 +11,18 @@ export function SigningReview({projectId,msrId,actorRole,finance,workflowIntent,
  const [adultState,setAdultState]=useState('');
  const [adultConfirmed,setAdultConfirmed]=useState(false);
  const [adultError,setAdultError]=useState('');
+ const [saveError,setSaveError]=useState('');
+ const [authorityConfirmed,setAuthorityConfirmed]=useState(false);
+ const [customerName,setCustomerName]=useState('');
+ const [customerEmail,setCustomerEmail]=useState('');
+ const [geccSigner,setGeccSigner]=useState('');
+ useEffect(()=>{
+  setCustomerName('');
+  setCustomerEmail('');
+  setGeccSigner('');
+  setAuthorityConfirmed(false);
+  setSaveError('');
+ },[projectId,msrId]);
  const [plans,setPlans]=useState<Plan[]>([]),[signers,setSigners]=useState<Signer[]>([]),[group,setGroup]=useState(workflowIntent==='completion' && finance ? `COMPLETION_${finance}` : 'COMMERCIAL'),[loadError,setLoadError]=useState('');
  useEffect(()=>{let cancelled=false;setPlans([]);setLoadError('');api<Plan[]>(`projects/${projectId}/signing-reviews/`).then(p=>{if(!cancelled)setPlans(p);}).catch(e=>{if(!cancelled)setLoadError(e.message);});return()=>{cancelled=true;};},[projectId,msrId,active,api]);
  useEffect(()=>{let cancelled=false;setSigners([]);if(approver)api<Signer[]>(`projects/${projectId}/signing-candidates/?group=${group}`).then(p=>{if(!cancelled)setSigners(p);}).catch(e=>{if(!cancelled)setLoadError(e.message);});return()=>{cancelled=true;};},[projectId,group,approver,api]);
@@ -50,18 +62,44 @@ export function SigningReview({projectId,msrId,actorRole,finance,workflowIntent,
  <p className="muted">This verifies an adult-ID review only. Customer signing authority and DocuSign evidence remain separate requirements.</p>
  </section>}
  {msrId&&active&&approver&&<form key={`${projectId}-${msrId}-${group}`} onSubmit={e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.currentTarget));
-if(group==='COMMERCIAL' && (!adultEvidence.recorded || !adultEvidence.evidence_id)) return;
+if(group==='COMMERCIAL' && (!adultEvidence.recorded || !adultEvidence.evidence_id || !authorityConfirmed)) return;
 data.authority_note=adultEvidence.recorded
  ? (adultEvidence.synthetic ? 'SYNTHETIC TEST EVIDENCE reference: ' : 'Assigned Sales Associate adult-ID attestation reference: ') + adultEvidence.evidence_id +
-   '. Customer signing authority requires separate independent approval.'
+   '. Customer signing authority is recorded separately from adult verification.'
  : 'Customer signing authority requires separate independent approval; no in-person adult attestation asserted.';
-void run(async()=>{await api(`msrs/${msrId}/signing-reviews/`,'POST',{...data,group});setPlans(await api<Plan[]>(`projects/${projectId}/signing-reviews/`));});}}><div className="grid">
- <label>Signing workflow<select aria-label="Signing workflow" value={group} onChange={e=>{setGroup(e.target.value);setLoadError('');}}><option value="COMMERCIAL">Contract and invoice — customer first</option>{finance&&<option value={`COMPLETION_${finance}`}>Completion certificate — GECC first</option>}</select></label>
- <label>Customer signer full name<input name="customer_name" maxLength={250} required/></label><label>Customer signer email<input name="customer_email" type="email" maxLength={254} required/></label>
- <label>GECC signer<select name="gecc_signer" aria-label="GECC signer" required defaultValue=""><option value="">Choose signer</option>{signers.filter(s=>s.name).map(s=><option key={s.id} value={s.id}>{s.name} · {s.role.replaceAll('_',' ')}</option>)}</select></label>
+setSaveError('');
+ void run(async()=>{
+  try {
+   await api(`msrs/${msrId}/signing-reviews/`,'POST',{
+    ...data,group,
+    customer_authority_confirmed:group==='COMMERCIAL' && authorityConfirmed
+   });
+  } catch(error) {
+   const message=error instanceof Error ? error.message : String(error);
+   setSaveError(message.includes('Exactly one approved, non-revoked customer-signer authorization is required')
+    ? 'The customer signing authority confirmation is missing or needs correction.'
+    : message);
+   return;
+  }
+  try {
+   setPlans(await api<Plan[]>(`projects/${projectId}/signing-reviews/`));
+  } catch {
+   setSaveError('Signing review was saved, but the list could not be refreshed. Reopen the project before trying again.');
+  }
+ });}}><div className="grid">
+ <label>Signing workflow<select aria-label="Signing workflow" value={group} onChange={e=>{setGroup(e.target.value);setLoadError('');setSaveError('');setGeccSigner('');setAuthorityConfirmed(false);}}><option value="COMMERCIAL">Contract and invoice — customer first</option>{finance&&<option value={`COMPLETION_${finance}`}>Completion certificate — GECC first</option>}</select></label>
+ <label>Customer signer full name<input name="customer_name" maxLength={250} value={customerName} onChange={e=>setCustomerName(e.target.value)} required/></label><label>Customer signer email<input name="customer_email" type="email" maxLength={254} value={customerEmail} onChange={e=>setCustomerEmail(e.target.value)} required/></label>
+ <label>GECC signer<select name="gecc_signer" aria-label="GECC signer" required value={geccSigner} onChange={e=>setGeccSigner(e.target.value)}><option value="">Choose signer</option>{signers.filter(s=>s.name).map(s=><option key={s.id} value={s.id}>{s.name} · {s.role.replaceAll('_',' ')}</option>)}</select></label>
 
  {group!=='COMMERCIAL'&&<label>Installation Manager unavailable — substitute reason<textarea name="substitute_reason" maxLength={2000} placeholder="Required when the Comptroller signs in place of the Installation Manager."/></label>}
- </div><p className="muted">Prepare the workflow's PDFs first. GECC signer accounts need a full name and email.{group!=='COMMERCIAL'&&' Work completion must be verified before release.'}</p><button disabled={busy || (group==='COMMERCIAL' && !adultEvidence.recorded)}>Save signing review</button></form>}
+ </div>
+ {group==='COMMERCIAL'&&<label style={{display:'flex',alignItems:'center',gap:'0.5rem',marginTop:'1rem'}}>
+  <input type="checkbox" checked={authorityConfirmed} onChange={e=>setAuthorityConfirmed(e.target.checked)} required style={{width:'auto',margin:0,flex:'0 0 auto'}}/>
+  <span>{adultEvidence.synthetic
+   ? 'Confirm fictional customer signing authority for this software test only.'
+   : 'For this ordinary residential sale, the customer has confirmed that they have authority to sign the Contract.'}</span>
+ </label>}
+ <p className="muted">Prepare the workflow's PDFs first. GECC signer accounts need a full name and email.{group!=='COMMERCIAL'&&' Work completion must be verified before release.'}</p>{saveError&&<p role="alert" className="error">{saveError}</p>}<button disabled={busy || (group==='COMMERCIAL' && (!adultEvidence.recorded || !authorityConfirmed))}>Save signing review</button></form>}
  {plans.map(plan=><details key={plan.id} className="signing-review"><summary>MSR {plan.review.msr_version}.0 · {plan.group.replaceAll('_',' ')} · {plan.release.status.replaceAll('_',' ')}</summary><ol>{[...plan.review.envelope_preview.recipients.signers].sort((a,b)=>Number(a.routingOrder)-Number(b.routingOrder)).map(s=><li key={s.routingOrder}>{s.name} — {s.email}</li>)}</ol>{plan.review.substitute_reason&&<p>GECC substitute reason: {plan.review.substitute_reason}</p>}<p>Release checks</p><ul>{plan.release.release_blockers.map(b=><li key={b}>{b}</li>)}</ul><p className="muted" role="status">Operational sending is not available yet. This signing review does not authorize customer signatures. Complete the required authentic signing evidence and independent release controls before installation. The separate sandbox signing test is for fictional software acceptance only.</p>{approver&&<ReleaseReview actorRole={actorRole} comptroller={comptroller} planId={plan.id} current={plan.release.status==='PREPARED'} actorId={actorId} busy={busy} api={api} run={run}/>}
  {approver&&<SandboxPackage planId={plan.id} current={plan.release.status==='PREPARED'} comptroller={comptroller} busy={busy} api={api} run={run}/>}</details>)}
  </div>;

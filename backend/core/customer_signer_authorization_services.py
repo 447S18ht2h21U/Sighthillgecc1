@@ -349,7 +349,10 @@ def verify_customer_signer_integrity(authorization):
             and not os.environ.get("PGHOST")
             and settings.DATABASES["default"]["ENGINE"]
             == "django.db.backends.sqlite3"
-            and project.code == "104-SA-2026-11-22"
+            and project.code in {
+                "104-SA-2026-11-22",
+                "105-SA-2026-11-23",
+            }
             and authorization.group == "COMMERCIAL"
         )
         if not allowed:

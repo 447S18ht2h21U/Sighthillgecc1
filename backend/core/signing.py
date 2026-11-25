@@ -78,6 +78,172 @@ def required_text(data, key, maximum=250):
     return value.strip()
 
 
+
+REPRESENTATION_ACTION = "customer.commercial_signer_representation_recorded"
+SYNTHETIC_REPRESENTATION_ACTION = "customer.synthetic_commercial_signer_representation"
+
+
+def require_synthetic_representation_context(project):
+    import os
+    from django.conf import settings
+
+    if not (
+        settings.DEBUG
+        and os.environ.get("GECC_DEV") == "1"
+        and os.environ.get("VERIDIAN_ENVIRONMENT") == "development"
+        and not os.environ.get("PGHOST")
+        and settings.DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3"
+        and project.code in {
+            "104-SA-2026-11-22",
+            "105-SA-2026-11-23",
+        }
+    ):
+        raise ValidationError(
+            "Fictional signing evidence is restricted to local development."
+        )
+
+
+def representation_payload(record, customer, actor_id, adult_evidence_id, synthetic):
+    return {
+        "project_id": str(record.project_id),
+        "customer_id": str(record.project.customer_id),
+        "approved_msr_id": str(record.pk),
+        "group": "COMMERCIAL",
+        "signer_name": customer["name"],
+        "signer_email": customer["email"],
+        "recorded_by_id": str(actor_id),
+        "adult_verification_evidence_id": str(adult_evidence_id),
+        "synthetic": synthetic,
+        "basis": (
+            "FICTIONAL_TEST_ONLY_NOT_REAL_CUSTOMER_AUTHORITY"
+            if synthetic else
+            "CUSTOMER_REPRESENTATION_NOT_INDEPENDENT_OWNERSHIP_VERIFICATION"
+        ),
+    }
+
+
+def record_customer_representation(actor, record, customer, adult_evidence):
+    from .models import AuditEvent
+    from .adult_customer_verification_5401 import SYNTHETIC_ACTION
+
+    project = record.project
+
+    if not actor.is_active or actor.role not in {
+        Role.SALES_MANAGER, Role.COMPTROLLER
+    }:
+        raise ValidationError(
+            "An authorized Sales Manager or Comptroller is required."
+        )
+
+    if actor.role == Role.SALES_MANAGER and project.reviewer_id != actor.pk:
+        raise ValidationError(
+            "The assigned Sales Manager must prepare this signing review."
+        )
+
+    synthetic = adult_evidence.action == SYNTHETIC_ACTION
+
+    if synthetic:
+        require_synthetic_representation_context(project)
+        if not customer["email"].lower().endswith("@example.invalid"):
+            from .synthetic_customer_signer_api_5414 import (
+                controlled_sandbox_recipient_5602,
+            )
+            controlled_sandbox_recipient_5602(
+                customer["email"].strip().lower()
+            )
+
+    action = (
+        SYNTHETIC_REPRESENTATION_ACTION
+        if synthetic else REPRESENTATION_ACTION
+    )
+
+    payload = representation_payload(
+        record, customer, actor.pk, adult_evidence.pk, synthetic
+    )
+
+    existing = AuditEvent.objects.filter(
+        action=action,
+        entity_id=project.pk,
+        actor_id=actor.pk,
+        payload=payload,
+    ).order_by("-sequence").first()
+
+    if existing:
+        return existing
+
+    return audit(actor, action, project.pk, payload)
+
+
+def validate_plan_customer_representation(plan):
+    from .models import AuditEvent
+    from .adult_customer_verification_5401 import ACTION, SYNTHETIC_ACTION
+
+    review = plan.review
+    project = plan.msr.project
+
+    if plan.group != "COMMERCIAL":
+        raise ValidationError(
+            "Customer representation is restricted to commercial signing."
+        )
+
+    customer = review.get("customer")
+
+    if not isinstance(customer, dict):
+        raise ValidationError("Customer signer information is missing.")
+
+    synthetic = review.get("adult_verification_synthetic")
+
+    if type(synthetic) is not bool:
+        raise ValidationError("Signing evidence classification is missing.")
+
+    if synthetic:
+        require_synthetic_representation_context(project)
+
+    action = (
+        SYNTHETIC_REPRESENTATION_ACTION
+        if synthetic else REPRESENTATION_ACTION
+    )
+
+    try:
+        event_id = UUID(str(review.get("customer_representation_id")))
+        adult_id = UUID(str(review.get("adult_verification_evidence_id")))
+    except (ValueError, TypeError, AttributeError):
+        raise ValidationError("Customer signing confirmation is invalid.")
+
+    adult = AuditEvent.objects.filter(
+        pk=adult_id,
+        entity_id=project.pk,
+        actor_id=project.sales_associate_id,
+        action=SYNTHETIC_ACTION if synthetic else ACTION,
+        payload__approved_msr_id=str(plan.msr_id),
+    ).first()
+
+    if adult is None:
+        raise ValidationError("Customer adult verification is missing.")
+
+    event = AuditEvent.objects.filter(
+        pk=event_id,
+        action=action,
+        entity_id=project.pk,
+        actor_id=plan.created_by_id,
+    ).first()
+
+    expected = representation_payload(
+        plan.msr, customer, plan.created_by_id, adult_id, synthetic
+    )
+
+    if (
+        event is None
+        or event.payload != expected
+        or canonical_hash(expected) != review.get("customer_representation_digest")
+    ):
+        raise ValidationError(
+            "Customer signing confirmation does not match the signing review."
+        )
+
+    return event
+
+
 @transaction.atomic
 def prepare(actor, msr_id, data):
     if not isinstance(data, dict):
@@ -116,12 +282,8 @@ def prepare(actor, msr_id, data):
     if group != 'COMMERCIAL' and signer.role == Role.COMPTROLLER:
         reason = required_text(data, 'substitute_reason', 2000)
     from .customer_signer_authorization_services import require_approved_customer_signer
-    customer_authorization = require_approved_customer_signer(
-        msr=record,
-        group=group,
-        signer_name=customer['name'],
-        signer_email=customer['email'],
-    )
+    customer_authorization = None
+    customer_representation = None
     adult_evidence = None
     if group == 'COMMERCIAL':
         from .adult_customer_verification_5401 import verified_row
@@ -131,6 +293,24 @@ def prepare(actor, msr_id, data):
                 'Commercial signing review requires the assigned Sales '
                 'Associate adult-ID verification for this approved MSR.'
             )
+    if group == 'COMMERCIAL' and data.get('customer_authority_confirmed') is True:
+        customer_representation = record_customer_representation(
+            actor, record, customer, adult_evidence
+        )
+        authority = (
+            'SYNTHETIC TEST ONLY - fictional signing authority confirmation.'
+            if adult_evidence.action == 'customer.synthetic_adult_test_evidence'
+            else 'Customer represents that they have authority to sign the Contract. '
+                 'This is not independent verification of legal ownership.'
+        )
+    else:
+        customer_authorization = require_approved_customer_signer(
+            msr=record,
+            group=group,
+            signer_name=customer['name'],
+            signer_email=customer['email'],
+        )
+
     docs = []
     for kind in GROUPS[group]:
         doc = Document.objects.filter(msr=record, kind=kind).order_by('-created_at').first()
@@ -141,7 +321,18 @@ def prepare(actor, msr_id, data):
         docs.append(doc)
     review = {'schema_version': 1, 'msr_id': str(record.id), 'msr_version': record.number,
               'snapshot_sha256': canonical_hash(record.snapshot), 'group': group,
-              'customer': customer, 'gecc': gecc, 'authority_note': authority, 'customer_authorization_id': str(customer_authorization.id), 'customer_authorization_digest': customer_authorization.digest,
+              'customer': customer, 'gecc': gecc, 'authority_note': authority,
+              **(
+                  {
+                      'customer_representation_id': str(customer_representation.pk),
+                      'customer_representation_digest': canonical_hash(customer_representation.payload),
+                  }
+                  if customer_representation else
+                  {
+                      'customer_authorization_id': str(customer_authorization.id),
+                      'customer_authorization_digest': customer_authorization.digest,
+                  }
+              ),
               'adult_verification_evidence_id': str(adult_evidence.pk) if adult_evidence else None,
               'adult_verification_synthetic': bool(
                   adult_evidence and adult_evidence.action ==
@@ -167,6 +358,9 @@ def validate_plan_customer_authorization(plan):
     review = plan.review
     if not isinstance(review, dict):
         raise ValidationError("Signing review authorization evidence is invalid.")
+
+    if "customer_representation_id" in review:
+        return validate_plan_customer_representation(plan)
 
     authorization_id = review.get("customer_authorization_id")
     authorization_digest = review.get("customer_authorization_digest")
