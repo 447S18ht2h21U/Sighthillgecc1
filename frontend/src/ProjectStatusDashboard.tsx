@@ -33,7 +33,7 @@ type DashboardResponse = {
   needs_attention?: DashboardProject[];
 };
 
-export function ProjectStatusDashboard({ onOpenProject, onReviewInstallation, onBack, backLabel }: { onOpenProject?: (id: string) => Promise<void>; onReviewInstallation?: (id: string) => void; onBack: () => void; backLabel: string }) {
+export function ProjectStatusDashboard({ onOpenProject, onReviewInstallation }: { onOpenProject?: (id: string) => Promise<void>; onReviewInstallation?: (id: string) => void; onBack: () => void; backLabel: string }) {
   const [stages, setStages] = useState<DashboardStage[]>([]);
   const [needsAttention, setNeedsAttention] = useState<DashboardProject[]>([]);
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
@@ -79,74 +79,15 @@ export function ProjectStatusDashboard({ onOpenProject, onReviewInstallation, on
           </p>
         </div>
         <div className="dashboard-navigation-actions">
-          <button
-            className="veridian-dashboard-back"
-            type="button"
-            onClick={onBack}
-          >
-            {backLabel}
-          </button>
+
           <button className="quiet" type="button" onClick={() => void refresh()} disabled={loading}>
             Refresh dashboard
           </button>
         </div>
       </div>
 
-      <div className="veridian-guide-banner veridian-guide-banner--info">
-        <strong>Project Status Dashboard - How to use this screen</strong>
-        <p><strong>Step 1 - Choose a stage.</strong> Select a stage to see the projects listed there. Select it again to close the list.</p>
-        <p><strong>Step 2 - Read the project list.</strong> Check the project number, customer name, and installation address. A project may appear in more than one stage.</p>
-        <p><strong>Step 3 - Check payments.</strong> In Payment Received, deposits, final payments, and full payments are shown separately.</p>
-        <p><strong>Step 4 - Refresh or return.</strong> Select Refresh dashboard to load updated information. Select {backLabel} to leave this screen.</p>
-      </div>      {error && <p role="alert" className="error">{error}</p>}
+      {error && <p role="alert" className="error">{error}</p>}
       {loading && <p>Loading project stages...</p>}
-
-      {!loading && !error && (
-        <section className="dashboard-attention" aria-labelledby="dashboard-attention-heading">
-          <h3 id="dashboard-attention-heading">
-            Projects Needing Attention ({needsAttention.length})
-          </h3>
-          <p className="muted">
-            These projects have not earned a Dashboard milestone yet.
-            Only projects you are authorized to see are listed here.
-          </p>
-          {needsAttention.length === 0 ? (
-            <p>No projects currently need attention in this section.</p>
-          ) : (
-            <ul className="dashboard-attention-projects">
-              {needsAttention.map(project => (
-                <li key={project.id}>
-                  <strong>{project.code}</strong>
-                  <span>{project.customer_name}</span>
-                  <span>{project.location}</span>
-                  <ProjectDocumentWorkflowStatus projectCode={project.code} evidence={project.workflow_evidence} />
-                  <CompletionPreflightReview4586 projectId={project.id} projectCode={project.code} />
-                  {onReviewInstallation && (
-                    <button className="quiet" type="button" onKeyDown={event => event.stopPropagation()} onClick={event => {
-                      event.stopPropagation();
-                      onReviewInstallation(project.id);
-                    }} aria-label={`Review installation readiness for ${project.code}`}>Review installation readiness</button>
-                  )}
-                  {onOpenProject && (
-                    <button className="quiet" type="button" onKeyDown={event => event.stopPropagation()} onClick={event => {
-                      event.stopPropagation();
-                      void onOpenProject(project.id);
-                    }} aria-label={`Open project ${project.code}`}>Open project</button>
-                  )}
-                  {project.guidance?.read_only === true && (
-                    <div className="dashboard-next-action">
-                      <strong>Suggested next step: {project.guidance.label}</strong>
-                      <span>{project.guidance.detail}</span>
-                      <small>Guidance only. This does not grant permission or confirm completion.</small>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
-
 
       {!loading && !error && (
         <>
@@ -163,7 +104,7 @@ export function ProjectStatusDashboard({ onOpenProject, onReviewInstallation, on
         </>
       )}
 
-      {/* VERIDIAN Dashboard Full-Width Layout 3999 */}
+{/* VERIDIAN Dashboard Full-Width Layout 3999 */}
       {!loading && !error && selectedStage && (
         <section
           className="dashboard-selected-projects"
@@ -222,6 +163,68 @@ export function ProjectStatusDashboard({ onOpenProject, onReviewInstallation, on
           ))}
         </section>
       )}
+
+
+<details className="dashboard-instructions-5962">
+  <summary>Instructions</summary>
+  <div className="veridian-guide-banner veridian-guide-banner--info">
+        <strong>Project Status Dashboard - How to use this screen</strong>
+        <p><strong>Step 1 - Choose a stage.</strong> Select a stage to see the projects listed there. Select it again to close the list.</p>
+        <p><strong>Step 2 - Read the project list.</strong> Check the project number, customer name, and installation address. A project may appear in more than one stage.</p>
+        <p><strong>Step 3 - Check payments.</strong> In Payment Received, deposits, final payments, and full payments are shown separately.</p>
+        <p><strong>Step 4 - Refresh or return.</strong> Select Refresh dashboard to load updated information. Select Home to return to your workspace.</p>
+      </div>
+</details>
+
+
+{!loading && !error && (
+        <section className="dashboard-attention" aria-labelledby="dashboard-attention-heading">
+          <h3 id="dashboard-attention-heading">
+            Projects Needing Attention ({needsAttention.length})
+          </h3>
+          <p className="muted">
+            These projects have not earned a Dashboard milestone yet.
+            Only projects you are authorized to see are listed here.
+          </p>
+          {needsAttention.length === 0 ? (
+            <p>No projects currently need attention in this section.</p>
+          ) : (
+            <ul className="dashboard-attention-projects">
+              {needsAttention.map(project => (
+                <li key={project.id}>
+                  <strong>{project.code}</strong>
+                  <span>{project.customer_name}</span>
+                  <span>{project.location}</span>
+                  <ProjectDocumentWorkflowStatus projectCode={project.code} evidence={project.workflow_evidence} />
+                  <CompletionPreflightReview4586 projectId={project.id} projectCode={project.code} />
+                  {onReviewInstallation && (
+                    <button className="quiet" type="button" onKeyDown={event => event.stopPropagation()} onClick={event => {
+                      event.stopPropagation();
+                      onReviewInstallation(project.id);
+                    }} aria-label={`Review installation readiness for ${project.code}`}>Review installation readiness</button>
+                  )}
+                  {onOpenProject && (
+                    <button className="quiet" type="button" onKeyDown={event => event.stopPropagation()} onClick={event => {
+                      event.stopPropagation();
+                      void onOpenProject(project.id);
+                    }} aria-label={`Open project ${project.code}`}>Open project</button>
+                  )}
+                  {project.guidance?.read_only === true && (
+                    <div className="dashboard-next-action">
+                      <strong>Suggested next step: {project.guidance.label}</strong>
+                      <span>{project.guidance.detail}</span>
+                      <small>Guidance only. This does not grant permission or confirm completion.</small>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+
+
     </section>
   );
 }

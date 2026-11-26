@@ -1,3 +1,4 @@
+import { IntegratedInstallationInspection6041 } from './IntegratedInstallationInspection6041';
 import { FictionalInstallationPractice5643 } from './FictionalInstallationPractice5643';
 import React, { useEffect, useRef, useState } from 'react';
 import { InstallationInspectionEntry4843 } from './InstallationInspectionEntry4843';
@@ -110,19 +111,29 @@ function uniqueInstallationRecords4893<T extends { id: string }>(
 }
 
 export function InstallationScheduling({
+  invoiceCsrfToken,
+
   api,
   actorId,
   actorRole,
   selectedProjectId,
   onReturnToProject,
   onProjectSelected,
+  mode = 'all',
+  onScheduleCreated,
+  assignmentContent,
 }: {
+  invoiceCsrfToken?: string;
+
   api: Api;
   actorId: string;
   actorRole: string;
   selectedProjectId?: string;
   onReturnToProject: () => void;
   onProjectSelected: (projectId: string) => void;
+  mode?: 'all' | 'readiness' | 'scheduling' | 'inspections';
+  onScheduleCreated?: (projectId: string, date: string) => void;
+  assignmentContent?: React.ReactNode;
 }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -132,6 +143,18 @@ export function InstallationScheduling({
   const [readinessLoading, setReadinessLoading] = useState(false);
   const [readinessError, setReadinessError] = useState('');
   const [managerId, setManagerId] = useState('');
+  const automaticManager =
+    actorRole === 'INSTALLATION_MANAGER' &&
+    mode === 'scheduling';
+
+  useEffect(() => {
+    if (!automaticManager) return;
+    setManagerId(
+      managers.some(manager => manager.id === actorId)
+        ? actorId
+        : ''
+    );
+  }, [automaticManager, managers, actorId]);
   const [scheduledDate, setScheduledDate] = useState('');
   const [canManage, setCanManage] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -341,6 +364,24 @@ export function InstallationScheduling({
     });
   }
 
+  const focused = mode !== 'all';
+  const showReadiness = mode === 'readiness' ||
+    (mode === 'all' && !canManage);
+  const showScheduling = mode === 'all' || mode === 'scheduling';
+  const showInspections = mode === 'all' || mode === 'inspections';
+
+  const selectableProjects = mode === 'inspections'
+    ? projects.filter(project => schedules.some(schedule =>
+        schedule.project === project.id &&
+        schedule.installation_manager === actorId &&
+        schedule.status === 'COMPLETED'
+      ))
+    : projects;
+
+  const selectedProject = projects.find(
+    project => project.id === projectId
+  );
+
   const projectNames = new Map(projects.map(project => [
     project.id, `${project.code} - ${project.customer_name}`,
   ]));
@@ -352,7 +393,15 @@ export function InstallationScheduling({
   return <section>
     <div className="title">
       <div>
-        <p className="muted">Choose a project to check whether it is ready for installation. You can also review installation schedules for projects you are allowed to see.</p>
+        <p className="muted">{
+          mode === 'readiness'
+            ? 'Check installation requirements and resolve outstanding items.'
+            : mode === 'scheduling'
+              ? 'Choose the installation date and assign the technicians.'
+              : mode === 'inspections'
+                ? 'Inspect completed work and review certification requirements.'
+                : 'Choose a project to check installation readiness and schedules.'
+        }</p>
       </div>
       <button type="button" className="quiet" disabled={busy}
         onClick={() => void perform(async () => undefined, 'Installation information refreshed.')}>Refresh installation status</button>
@@ -361,7 +410,7 @@ export function InstallationScheduling({
     {error && <p role="alert" className="error">{error}</p>}
     {message && <p role="status">{message}</p>}
 
-    {!canManage && <section
+    {showReadiness && <section
       className="installation-readiness"
       aria-label="Check installation readiness"
     >
@@ -398,6 +447,11 @@ export function InstallationScheduling({
         role="status"
         aria-live="polite"
       >
+        {selectedProject && <div className="installation-project-5971">
+          <h3>{selectedProject.customer_name}</h3>
+          <p>{selectedProject.location}</p>
+          <p className="muted">{selectedProject.code}</p>
+        </div>}
         <h4>Installation Readiness - Current Assessment</h4>
         {readinessLoading
           ? <p>Checking current project requirements...</p>
@@ -412,7 +466,7 @@ export function InstallationScheduling({
                       ? 'Current scheduling requirements satisfied'
                       : 'Requirements still outstanding'}
                   </strong></p>
-                  <ul>
+                  <ul className="installation-checklist-5971">
                     {([
                       ['approved_msr', 'Project sales record approved'],
                       ['contract_signed', 'Customer Contract signed'],
@@ -437,6 +491,35 @@ export function InstallationScheduling({
                   </>}
                 </>
               : <p>Readiness has not been established.</p>}
+        {mode === 'readiness' && readiness &&
+          readiness.project_id === projectId && <>
+          {!readiness.requirements.approved_msr &&
+            <p><strong>Next action:</strong> Authorized commercial review and approval.</p>}
+
+          {!readiness.requirements.contract_signed &&
+            <p><strong>Next action:</strong> Obtain and verify required customer signatures.</p>}
+
+          {!readiness.requirements.cancellation_complete &&
+            <p><strong>Next action:</strong> Resolve the cancellation-period evidence.</p>}
+
+          {!readiness.requirements.waiting_period_complete &&
+            <p><strong>Next action:</strong> Confirm the applicable installation waiting period.</p>}
+
+          {!readiness.requirements.deposit_verified &&
+            <p><strong>Next action:</strong> Installation Manager collects the required funds; Comptroller or CEO independently verifies them.</p>}
+
+          <div className="installation-manager-notice-5968">
+            <strong>{
+              readiness.installation_start?.installation_authorized === true
+                ? 'Installation authorization reported by server'
+                : 'Installation start is not authorized'
+            }</strong>
+
+            {readiness.installation_start?.blockers?.map(
+              (reason, index) => <p key={index}>{reason}</p>
+            )}
+          </div>
+        </>}
         <p className="muted">
           This is a read-only assessment. An authorized installation
           scheduler must separately assess a proposed date.
@@ -445,12 +528,21 @@ export function InstallationScheduling({
       </div>}
     </section>}
 
-    {canManage && <form onSubmit={event => {
+    {showScheduling && canManage && <form onSubmit={event => {
       event.preventDefault();
       void perform(async () => {
         const requestedProject = projectId;
         const requestedDate = scheduledDate;
-        const requestedManager = managerId;
+        const requestedManager = automaticManager
+          ? actorId : managerId;
+
+        if (!managers.some(manager =>
+          manager.id === requestedManager
+        )) {
+          throw new Error(
+            'The responsible Installation Manager is not eligible to schedule this project.'
+          );
+        }
         const requestId = ++readinessRequestId.current;
 
         setReadiness(null);
@@ -560,7 +652,12 @@ export function InstallationScheduling({
           installation_manager: requestedManager,
         });
 
-        if (selectedProjectRef.current === requestedProject) {
+        if (mode === 'scheduling' && onScheduleCreated) {
+          onScheduleCreated(requestedProject, requestedDate);
+        }
+
+        if (mode !== 'scheduling' &&
+            selectedProjectRef.current === requestedProject) {
           selectedProjectRef.current = '';
           readinessRequestId.current += 1;
           setProjectId('');
@@ -742,9 +839,16 @@ export function InstallationScheduling({
                         ['deposit_verified', 'Required customer payment confirmed by the bank'],
                       ] as const).map(([key, label]) =>
                         <li key={key}>
-                          {readiness.requirements[key]
-                            ? 'COMPLETE'
-                            : 'NOT COMPLETE'}: {label}
+                          <strong className={
+                            readiness.requirements[key]
+                              ? 'requirement-complete-5971'
+                              : 'requirement-pending-5971'
+                          }>
+                            {readiness.requirements[key]
+                              ? 'Complete'
+                              : 'Outstanding'}
+                          </strong>
+                          {' - '}{label}
                         </li>
                       )}
                     </ul>
@@ -762,6 +866,15 @@ export function InstallationScheduling({
           <input required type="date" value={scheduledDate}
             onChange={event => setScheduledDate(event.target.value)}/>
         </label>
+        {automaticManager ?
+          <div className="automatic-manager-5973">
+            <strong>Responsible Installation Manager</strong>
+            <p>{
+              managerNames.get(actorId) ||
+              'Manager eligibility has not been established'
+            }</p>
+          </div>
+          :
         <label>Installation Manager
           <select required value={managerId} onChange={event => setManagerId(event.target.value)}>
             <option value="">Choose manager</option>
@@ -769,7 +882,8 @@ export function InstallationScheduling({
               {managerNames.get(manager.id)}
             </option>)}
           </select>
-        </label>
+        </label>}
+
       </div>
       <button disabled={
         busy ||
@@ -796,7 +910,13 @@ export function InstallationScheduling({
       </p>
     </form>}
 
-    <h3>Installation schedules</h3>
+    {mode === 'scheduling' && assignmentContent}
+
+    {showScheduling && <>
+{mode === 'scheduling' &&
+      <h3>Installation schedule records</h3>}
+    {mode !== 'scheduling' &&
+      <h3>Installation schedules</h3>}
     {schedules.length === 0
       ? <p className="muted">No installation schedules are visible.</p>
       : <table className="installation-schedules-table">
@@ -874,6 +994,7 @@ export function InstallationScheduling({
               : '-'}</td>
           </tr>)}</tbody>
         </table>}
+    </>}
     {actorRole === 'COMPTROLLER' && Boolean(projectId) && (
       <section aria-label="Independent physical equipment review">
         <h3>Independent Physical Equipment Review</h3>
@@ -888,6 +1009,92 @@ export function InstallationScheduling({
         />
       </section>
     )}
+
+    {mode === 'inspections' && <section
+      className="installation-inspection-picker-5971">
+
+      <h3>Installations requiring certification review</h3>
+
+      <p className="muted">
+        These installations are recorded as completed and
+        assigned to you. Open a project to check its inspection
+        and certification records.
+      </p>
+
+      <div className="inspection-queue-summary-5973">
+        <strong>{selectableProjects.length}</strong>
+        <span>Completed installations available for review</span>
+      </div>
+
+      {selectableProjects.length === 0 &&
+        <p>No completed installations assigned to you are currently available.</p>}
+
+      {selectableProjects.map(project => (
+        <div className="inspection-work-row-5973"
+          key={project.id}>
+
+          <div>
+            <h3>{project.customer_name}</h3>
+            <p>{project.location}</p>
+            <p className="muted">{project.code}</p>
+            <p>
+              Work schedule recorded complete.
+              Inspection and certificate status require review.
+            </p>
+          </div>
+
+          <button type="button"
+            className={projectId === project.id ? '' : 'quiet'}
+            aria-pressed={projectId === project.id}
+            disabled={busy}
+            onClick={() => {
+              selectedProjectRef.current = project.id;
+              readinessRequestId.current += 1;
+              setProjectId(project.id);
+              setReadiness(null);
+              setReadinessError('');
+              onProjectSelected(project.id);
+            }}>
+            {projectId === project.id
+              ? 'Selected installation'
+              : 'Review inspection and certificate'}
+          </button>
+
+        </div>
+      ))}
+
+
+
+
+    </section>}
+
+    {showInspections &&
+      mode === 'inspections' &&
+      actorRole === 'INSTALLATION_MANAGER' &&
+      canManage &&
+      Boolean(actorId) &&
+      Boolean(projectId) &&
+      selectableProjects.some(
+        project => project.id === projectId
+      ) &&
+      schedules.some(
+        schedule =>
+          schedule.project === projectId &&
+          schedule.installation_manager === actorId &&
+          schedule.status === 'COMPLETED'
+      ) && (
+
+        <IntegratedInstallationInspection6041
+          key={`${actorId}-${projectId}`}
+          api={api}
+          projectId={projectId}
+          actorId={actorId}
+          actorRole={actorRole}
+          csrfToken={invoiceCsrfToken}
+        />
+      )}
+
+    {showInspections && mode !== 'inspections' && <>
     {actorRole === 'INSTALLATION_MANAGER' &&
       Boolean(projectId) &&
       schedules.some(schedule =>
@@ -984,11 +1191,12 @@ export function InstallationScheduling({
         />
       )}
 
-    {actorRole === 'INSTALLATION_MANAGER' &&
+    </>}
+    {!focused && actorRole === 'INSTALLATION_MANAGER' &&
       projectId === '5e02a9d2-1028-41ea-a3bd-624116ef3b0b' && (
         <FictionalInstallationPractice5643 />
       )}
-    {schedules.some(schedule => schedule.status === 'COMPLETED') && (
+    {!focused && schedules.some(schedule => schedule.status === 'COMPLETED') && (
       <div className="installation-completion-guidance">
         <p><strong>Installation schedule: Completed. Physical inspection, independent verification, final Receipt delivery, and project completion require separate evidence and approvals.</strong></p>
         {selectedProjectId && <button
@@ -1007,6 +1215,7 @@ export function InstallationScheduling({
       </div>
     )}
 
-    <p className="muted">Operational completion alone does not satisfy the dashboard's signed completion certificate requirement.</p>
+    {showInspections &&
+      <p className="muted">Operational completion alone does not satisfy the dashboard's signed completion certificate requirement.</p>}
   </section>;
 }

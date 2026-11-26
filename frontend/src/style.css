@@ -1068,3 +1068,1633 @@ section[aria-label="MSR equipment catalog selection"]
   justify-content: center;
   white-space: nowrap;
 }
+
+
+/* Sales Home redesign 5960C */
+
+.sales-workspace-5960b > .title > .actions {
+  display: none;
+}
+
+.sales-nav-5960b {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 0;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #D7E3E7;
+}
+
+.sales-nav-5960b button {
+  min-height: 44px;
+}
+
+.sales-more-5960b summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 10px;
+}
+
+.sales-more-5960b div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sales-home-5960b > h2 {
+  font-size: 1.5rem;
+  margin: 6px 0 24px;
+}
+
+.sales-home-grid-5960b {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.sales-home-card-5960b {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  min-height: 120px;
+  padding: 22px;
+  text-align: left;
+  white-space: normal;
+  color: #142B3B;
+  background: #FFFFFF;
+  border: 1px solid #D7E3E7;
+  border-radius: 8px;
+}
+
+.sales-home-card-5960b strong {
+  font-size: 1.2rem;
+}
+
+.sales-home-card-5960b span {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+.sales-home-card-5960b.primary {
+  background: #087F75;
+  border-color: #087F75;
+  color: #FFFFFF;
+}
+
+.sales-home-card-5960b:hover {
+  background: #EAF4F1;
+  color: #142B3B;
+}
+
+.sales-home-card-5960b.primary:hover {
+  background: #06685F;
+  color: #FFFFFF;
+}
+
+.sales-home-card-5960b:focus-visible {
+  outline: 3px solid #C39A58;
+  outline-offset: 3px;
+}
+
+.sales-recent-heading-5960b,
+.sales-recent-project-5960b {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.sales-recent-heading-5960b {
+  margin: 24px 0 12px;
+}
+
+.sales-recent-project-5960b {
+  padding: 18px 0;
+  border-top: 1px solid #D7E3E7;
+}
+
+.sales-recent-project-5960b h3 {
+  font-size: 1.15rem;
+  margin: 0 0 6px;
+}
+
+.sales-recent-project-5960b p {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+
+.sales-status-5960b {
+  font-weight: 600;
+  color: #087F75;
+}
+
+@media (max-width: 700px) {
+  .sales-home-grid-5960b {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sales-home-card-5960b {
+    min-height: 100px;
+    padding: 18px;
+  }
+}
+
+
+/* Sales layout refinements 5962 */
+
+.sales-workspace-5960b
+button.sales-home-card-5960b:not(.primary) {
+  background: #FFFFFF !important;
+  color: #142B3B !important;
+  border: 1px solid #D7E3E7 !important;
+}
+
+.sales-workspace-5960b
+button.sales-home-card-5960b:not(.primary):hover {
+  background: #EAF4F1 !important;
+  border-color: #087F75 !important;
+}
+
+.sales-workspace-5960b
+button.sales-home-card-5960b.primary {
+  background: #087F75 !important;
+  color: #FFFFFF !important;
+}
+
+.sales-workspace-5960b
+button.sales-home-card-5960b.primary:hover {
+  background: #06685F !important;
+}
+
+.sales-customer-search-5962 {
+  background: #F7F8F5;
+  border: 1px solid #D7E3E7;
+  border-left: 4px solid #087F75;
+  border-radius: 6px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.sales-customer-search-5962 h3 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.sales-customer-search-5962 p {
+  margin: 0 0 12px;
+}
+
+.sales-project-empty-5962 {
+  display: none;
+}
+
+.sales-workspace-5960b .workspace > :first-child {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dashboard-instructions-5962 {
+  margin: 16px 0;
+}
+
+.dashboard-instructions-5962 > summary {
+  display: inline-block;
+  cursor: pointer;
+  padding: 10px 14px;
+  background: #142B3B;
+  color: #FFFFFF;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.dashboard-instructions-5962[open] > summary {
+  margin-bottom: 12px;
+}
+
+.project-status-dashboard .dashboard-stage-grid {
+  margin-top: 12px;
+  margin-bottom: 16px;
+}
+
+.project-status-dashboard .dashboard-selected-projects {
+  margin-bottom: 18px;
+}
+
+.sales-workspace-5960b .workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+
+/* Sales Manager workspace 5964 */
+
+.manager-home-5964 button.sales-home-card-5960b {
+  background: #087F75 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #087F75 !important;
+}
+
+.manager-home-5964 button.sales-home-card-5960b:hover {
+  background: #06685F !important;
+  color: #FFFFFF !important;
+}
+
+.manager-home-5964 button[aria-pressed="true"] {
+  outline: 3px solid #C39A58;
+  outline-offset: 3px;
+}
+
+.manager-list-actions-5964 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.manager-instructions-5964 {
+  display: block !important;
+  max-width: 720px;
+  padding: 12px;
+}
+
+.manager-instructions-5964 p {
+  margin: 6px 0;
+}
+
+
+/* Technician workspace 5966 */
+
+.technician-home-5966 {
+  max-width: 900px;
+}
+
+.technician-home-grid-5966 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  margin: 20px 0 26px;
+}
+
+.technician-home-5966
+button.sales-home-card-5960b {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 100px;
+  padding: 20px;
+  color: #FFFFFF !important;
+  background: #087F75 !important;
+  border: 1px solid #087F75 !important;
+  text-align: left;
+}
+
+.technician-home-5966
+button.sales-home-card-5960b:hover {
+  color: #FFFFFF !important;
+  background: #06685F !important;
+}
+
+.technician-action-content-5966 {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.technician-action-content-5966 strong {
+  font-size: 1.2rem;
+}
+
+.technician-action-arrow-5966 {
+  font-size: 2rem !important;
+  flex: 0 0 auto;
+  margin-left: 10px;
+}
+
+.technician-work-guide-5966 {
+  padding: 14px;
+  border: 1px solid #D7E3E7;
+  border-radius: 6px;
+}
+
+.technician-work-guide-5966 summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.technician-work-guide-5966 li {
+  margin: 10px 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+  .technician-home-5966
+  button.sales-home-card-5960b {
+    min-height: 96px;
+    padding: 16px;
+  }
+
+  .technician-action-content-5966 strong {
+    font-size: 1.1rem;
+  }
+}
+
+
+/* Installation Manager workspace 5968 */
+
+.installation-manager-home-5968
+button.sales-home-card-5960b {
+  color: #FFFFFF !important;
+  background: #087F75 !important;
+  border: 1px solid #087F75 !important;
+}
+
+.installation-manager-home-5968
+button.sales-home-card-5960b:hover {
+  color: #FFFFFF !important;
+  background: #06685F !important;
+}
+
+.installation-manager-support-5968 {
+  max-width: 1000px;
+}
+
+.installation-manager-support-5968 li {
+  margin: 12px 0;
+  line-height: 1.5;
+}
+
+.installation-manager-support-5968 button {
+  margin: 8px 10px 8px 0;
+  min-height: 44px;
+}
+
+.installation-manager-notice-5968 {
+  padding: 16px;
+  margin: 18px 0;
+  border: 1px solid #C39A58;
+  border-radius: 6px;
+  background: #FFF6E8;
+}
+
+.installation-manager-schedule-5968 {
+  margin: 12px 0 18px;
+}
+
+.installation-manager-tabs-5968 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.installation-manager-tabs-5968 button {
+  min-height: 44px;
+}
+
+.installation-manager-tabs-5968
+button[aria-pressed="true"] {
+  outline: 2px solid #C39A58;
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .installation-manager-tabs-5968 {
+    flex-direction: column;
+  }
+
+  .installation-manager-tabs-5968 button {
+    width: 100%;
+  }
+
+  .installation-manager-support-5968 button {
+    width: 100%;
+  }
+}
+
+
+/* Focused installation workflows 5971 */
+
+.installation-project-5971 {
+  background: #F7F8F5;
+  border-left: 4px solid #087F75;
+  border-radius: 6px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.installation-project-5971 h3 {
+  margin: 0 0 8px;
+}
+
+.installation-project-5971 p {
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+}
+
+.installation-checklist-5971 {
+  padding-left: 20px;
+}
+
+.installation-checklist-5971 li {
+  margin: 12px 0;
+  line-height: 1.5;
+}
+
+.requirement-complete-5971 {
+  color: #087F75;
+}
+
+.requirement-pending-5971 {
+  color: #8A3B16;
+}
+
+.installation-inspection-picker-5971 {
+  margin-bottom: 20px;
+}
+
+.installation-certification-5971 {
+  margin-top: 24px;
+  border: 1px solid #D7E3E7;
+  border-radius: 8px;
+}
+
+.installation-assignment-5971 {
+  margin-top: 20px;
+}
+
+.installation-assignment-success-5971 {
+  padding: 14px;
+  border-left: 4px solid #087F75;
+  background: #EAF4F1;
+  font-weight: 600;
+}
+
+@media (max-width: 700px) {
+  .installation-schedules-table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .installation-inspection-picker-5971 select {
+    width: 100%;
+  }
+}
+
+
+/* Installation refinements 5973 */
+
+.automatic-manager-5973 {
+  padding: 12px 14px;
+  border-left: 3px solid #087F75;
+  background: #F7F8F5;
+  border-radius: 4px;
+}
+
+.automatic-manager-5973 p {
+  margin: 7px 0 0;
+}
+
+.inspection-queue-summary-5973 {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 360px;
+  padding: 18px;
+  border: 1px solid #D7E3E7;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.inspection-queue-summary-5973 strong {
+  color: #087F75;
+  font-size: 2rem;
+}
+
+.inspection-work-row-5973 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  border-top: 1px solid #D7E3E7;
+  padding: 18px 0;
+}
+
+.inspection-work-row-5973 h3 {
+  margin: 0 0 8px;
+}
+
+.inspection-work-row-5973 p {
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+}
+
+.inspection-work-row-5973 button {
+  min-height: 44px;
+}
+
+.installation-assignment-5971 {
+  border: 1px solid #D7E3E7;
+  border-radius: 8px;
+  padding: 18px;
+  margin: 22px 0;
+}
+
+@media (max-width: 600px) {
+  .inspection-work-row-5973 button {
+    width: 100%;
+  }
+}
+
+
+/* Unified installation scheduling 5979 */
+
+.unified-scheduling-5979 {
+  max-width: 1180px;
+}
+
+.unified-schedule-toolbar-5979 {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.unified-schedule-toolbar-5979 details {
+  flex: 1;
+}
+
+.unified-schedule-toolbar-5979 summary {
+  cursor: pointer;
+  font-weight: 600;
+  display: inline-block;
+  padding: 10px 14px;
+  border-radius: 4px;
+  background: #142B3B;
+  color: #FFFFFF;
+}
+
+.unified-scheduling-5979 fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.unified-scheduling-5979 form {
+  max-width: 850px;
+}
+
+.unified-scheduling-5979 form > fieldset > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 18px 0;
+  font-weight: 600;
+}
+
+.unified-scheduling-5979 select,
+.unified-scheduling-5979 input[type="date"] {
+  min-height: 44px;
+  width: 100%;
+}
+
+.unified-technicians-5979 {
+  border: 1px solid #D7E3E7;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 20px 0;
+}
+
+.unified-technician-option-5979 {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.unified-technician-option-5979 input {
+  width: 20px !important;
+  height: 20px !important;
+  flex: 0 0 20px;
+  margin: 0;
+}
+
+.unified-scheduling-5979 button[type="submit"] {
+  min-height: 48px;
+  margin-top: 16px;
+  padding: 12px 22px;
+}
+
+.unified-upcoming-5979 {
+  margin-top: 28px;
+}
+
+.unified-schedule-record-5979 {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.4fr;
+  gap: 18px;
+  padding: 18px 0;
+  border-top: 1px solid #D7E3E7;
+}
+
+.unified-schedule-record-5979 p {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+
+.unified-history-5979 {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid #D7E3E7;
+  border-radius: 6px;
+}
+
+.unified-history-5979 summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+@media (max-width: 700px) {
+  .unified-schedule-record-5979 {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .unified-scheduling-5979 button[type="submit"] {
+    width: 100%;
+  }
+}
+
+
+/* Installation readiness work list 5981 */
+
+.readiness-toolbar-5981,
+.readiness-list-heading-5981,
+.readiness-item-heading-5981 {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.readiness-toolbar-5981 h2,
+.readiness-item-heading-5981 h3 {
+  margin-top: 0;
+}
+
+.readiness-instructions-5981 {
+  margin: 12px 0 20px;
+}
+
+.readiness-summary-grid-5981 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0 26px;
+}
+
+button.readiness-summary-card-5981 {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  min-height: 132px;
+  padding: 20px;
+  text-align: left;
+  white-space: normal;
+  background: #FFFFFF;
+  color: #142B3B;
+  border: 1px solid #D7E3E7;
+  border-radius: 8px;
+}
+
+button.readiness-summary-card-5981:hover,
+button.readiness-summary-card-5981.selected {
+  background: #F7F8F5;
+  outline: 2px solid #087F75;
+}
+
+.readiness-summary-card-5981 strong {
+  font-size: 2.2rem;
+  line-height: 1.1;
+}
+
+.readiness-summary-card-5981 span {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.readiness-summary-card-5981 small {
+  color: #425C6C;
+}
+
+button.readiness-summary-ready-5981 {
+  border-left: 5px solid #087F75;
+}
+
+.readiness-summary-ready-5981 strong,
+.readiness-ready-5981 {
+  color: #087F75;
+}
+
+button.readiness-summary-blocked-5981 {
+  border-left: 5px solid #C39A58;
+}
+
+.readiness-summary-blocked-5981 strong,
+.readiness-outstanding-5981 {
+  color: #805A22;
+}
+
+.readiness-unavailable-5981 {
+  padding: 14px 18px;
+  border: 1px solid #C39A58;
+  border-radius: 6px;
+  margin: 16px 0;
+}
+
+.readiness-work-item-5981 {
+  padding: 22px;
+  margin: 16px 0;
+  border: 1px solid #D7E3E7;
+  border-radius: 8px;
+  background: #FFFFFF;
+  min-width: 0;
+}
+
+.readiness-work-item-5981 p {
+  margin: 6px 0 10px;
+  overflow-wrap: anywhere;
+}
+
+.readiness-actions-5981 {
+  margin: 16px 0;
+}
+
+.readiness-action-5981 {
+  padding: 12px 14px;
+  margin: 10px 0;
+  border-left: 3px solid #C39A58;
+  background: #F7F8F5;
+}
+
+.readiness-start-details-5981 {
+  margin-top: 18px;
+}
+
+.readiness-scheduled-history-5981 {
+  margin-top: 24px;
+}
+
+.readiness-history-row-5981 {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid #D7E3E7;
+}
+
+.readiness-history-row-5981 p {
+  margin: 6px 0;
+}
+
+@media (max-width: 650px) {
+  .readiness-summary-grid-5981,
+  .readiness-history-row-5981 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .readiness-work-item-5981 {
+    padding: 14px;
+  }
+}
+
+
+/* MSR customer age verification 5985 */
+
+.customer-age-verification-5985 {
+  grid-column: 1 / -1;
+  padding: 18px;
+  margin: 8px 0 14px;
+  border: 1px solid #D7E3E7;
+  border-radius: 8px;
+  background: #F7F8F5;
+}
+
+.customer-age-verification-5985 h3 {
+  margin: 0 0 10px;
+}
+
+.customer-age-option-5985 {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.customer-age-option-5985 input {
+  width: 20px !important;
+  height: 20px !important;
+  flex: 0 0 20px;
+  margin: 0;
+}
+
+.customer-age-verification-5985 p {
+  margin: 8px 0;
+}
+
+
+/* Installation readiness refinements 5988 */
+
+.installation-readiness-worklist-5981
+button.readiness-summary-card-5981 {
+  background: #087F75 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #087F75;
+}
+
+.installation-readiness-worklist-5981
+button.readiness-summary-card-5981 strong,
+
+.installation-readiness-worklist-5981
+button.readiness-summary-card-5981 span,
+
+.installation-readiness-worklist-5981
+button.readiness-summary-card-5981 small {
+  color: #FFFFFF !important;
+  opacity: 1;
+}
+
+.installation-readiness-worklist-5981
+button.readiness-summary-card-5981:hover,
+
+.installation-readiness-worklist-5981
+button.readiness-summary-card-5981.selected {
+  background: #06665E !important;
+  outline: 2px solid #142B3B;
+  outline-offset: 2px;
+}
+
+.installation-date-requirements-5988 {
+  padding: 18px;
+  margin: 14px 0;
+  border: 1px solid #D7E3E7;
+  border-left: 4px solid #C39A58;
+  border-radius: 6px;
+  background: #F7F8F5;
+}
+
+.installation-date-requirements-5988 h3 {
+  margin: 0 0 14px;
+  color: #142B3B;
+}
+
+.installation-date-facts-5988 {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(0, 1fr);
+  gap: 10px 16px;
+  margin: 12px 0;
+}
+
+.installation-date-facts-5988 dt {
+  font-weight: 600;
+}
+
+.installation-date-facts-5988 dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.earliest-installation-date-5988 {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid #D7E3E7;
+  border-radius: 6px;
+  background: #FFFFFF;
+}
+
+.earliest-installation-date-5988 span {
+  font-weight: 600;
+  color: #142B3B;
+}
+
+.earliest-installation-date-5988 strong {
+  font-size: 1.4rem;
+  color: #087F75;
+}
+
+.installation-date-options-5988 {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.installation-date-options-5988 > div {
+  padding: 14px;
+  border: 1px solid #D7E3E7;
+  border-radius: 6px;
+  background: #FFFFFF;
+}
+
+@media (max-width: 650px) {
+  .installation-date-options-5988,
+  .installation-date-facts-5988 {
+    grid-template-columns: minmax(0,1fr);
+  }
+
+  .installation-date-facts-5988 dd {
+    margin-bottom: 8px;
+  }
+
+  .installation-date-requirements-5988 {
+    padding: 12px;
+  }
+}
+
+
+/* Integrated installation inspection 5994 */
+
+.integrated-installation-inspection-5994 {
+  margin: 20px 0;
+  padding: 22px;
+  border: 1px solid #D7E3E7;
+  border-radius: 8px;
+  background: #FFFFFF;
+  min-width: 0;
+}
+
+.inspection-workspace-heading-5994 {
+  margin-bottom: 22px;
+}
+
+.inspection-workspace-heading-5994 h2 {
+  margin: 0 0 8px;
+  color: #142B3B;
+}
+
+.inspection-step-5994 {
+  margin: 22px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid #D7E3E7;
+  min-width: 0;
+}
+
+.inspection-step-heading-5994 {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 0 0 16px;
+}
+
+.inspection-step-number-5994 {
+  display: inline-flex;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  background: #087F75;
+  color: #FFFFFF;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.inspection-step-heading-5994 > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.inspection-step-heading-5994 h3 {
+  color: #142B3B;
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+}
+
+.inspection-step-heading-5994 p {
+  margin: 4px 0;
+  color: #425C6C;
+}
+
+.inspection-required-notice-5994 {
+  padding: 14px;
+  margin: 14px 0 0;
+  border-left: 4px solid #C39A58;
+  border-radius: 4px;
+  background: #F7F8F5;
+  color: #142B3B;
+}
+
+.inspection-certification-step-5994 {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid #D7E3E7;
+  border-radius: 8px;
+  background: #FFFFFF;
+}
+
+@media (max-width: 650px) {
+  .integrated-installation-inspection-5994,
+  .inspection-certification-step-5994 {
+    padding: 12px;
+  }
+
+  .inspection-step-heading-5994 {
+    gap: 10px;
+  }
+
+  .inspection-step-number-5994 {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+    font-size: 1rem;
+  }
+}
+
+/* STEP 1907P-6007: Employee distributor invoice workspace. */
+
+.invoice-workspace-6007 {
+  max-width: 1050px;
+  margin: 16px auto;
+}
+
+.invoice-workspace-6007 > * {
+  margin-bottom: 16px;
+}
+
+.invoice-project-6007 {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  background: #142B3B;
+  color: #FFFFFF;
+  border-radius: 8px;
+}
+
+.invoice-project-6007 > strong {
+  font-size: 1.2rem;
+}
+
+.invoice-summary-6007 {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 18px;
+  background: #087F75;
+  color: #FFFFFF;
+  border-radius: 8px;
+}
+
+.invoice-record-6007,
+.invoice-upload-6007 {
+  border: 1px solid #D7E3E7;
+  border-radius: 8px;
+  padding: 18px;
+  margin: 16px 0;
+  background: #FFFFFF;
+}
+
+.invoice-record-heading-6007 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.invoice-status-verified-6007 {
+  color: #087F75;
+}
+
+.invoice-status-pending-6007 {
+  color: #855719;
+}
+
+.invoice-costs-6007 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 18px;
+  padding: 12px 0;
+}
+
+.invoice-costs-6007 dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.invoice-review-6007 {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #D7E3E7;
+  border-radius: 6px;
+}
+
+.invoice-check-6007 {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.invoice-check-6007 input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  margin: 0;
+}
+
+.invoice-actions-6007 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.invoice-upload-options-6007 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.invoice-upload-options-6007 label {
+  padding: 14px;
+  border: 1px solid #D7E3E7;
+  border-radius: 6px;
+  font-weight: 700;
+  min-width: 0;
+}
+
+.invoice-upload-options-6007 input {
+  max-width: 100%;
+}
+
+.invoice-success-6007 {
+  background: #E7F4F0;
+  color: #07594F;
+  padding: 12px 16px;
+  border-radius: 6px;
+}
+
+.invoice-warning-6007 {
+  padding: 12px;
+  background: #FFF5E2;
+  color: #704A13;
+  border-radius: 6px;
+}
+
+@media (max-width: 650px) {
+  .invoice-upload-options-6007 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .invoice-record-6007,
+  .invoice-upload-6007 {
+    padding: 12px;
+  }
+
+  .invoice-actions-6007 > button {
+    width: 100%;
+  }
+}
+
+/* STEP 1907P-6008: Shared invoice workspace in inspection. */
+
+.inspection-invoices-6008 {
+  margin: 20px 0;
+  padding-top: 18px;
+  border-top: 1px solid #D7E3E7;
+}
+
+.inspection-invoices-6008 > h3 {
+  margin-top: 0;
+}
+
+.inspection-invoices-6008 .invoice-workspace-6007 {
+  max-width: none;
+  margin: 12px 0 0;
+  padding: 0;
+  border: none;
+}
+
+.inspection-invoices-6008 .invoice-workspace-6007 > h2 {
+  display: none;
+}
+
+.inspection-invoices-6008 .invoice-project-6007 {
+  background: #F7F8F5;
+  color: #142B3B;
+  border: 1px solid #D7E3E7;
+}
+
+/* STEP 1907P-6012: Approved invoice readability refinements. */
+
+.invoice-project-6007 small {
+  color: #FFFFFF;
+}
+
+.inspection-invoices-6008 .invoice-project-6007 small {
+  color: #142B3B;
+}
+
+/* STEP 1907P-6013: Automatic invoice reading feedback. */
+
+.invoice-reading-6013 {
+  padding: 12px 16px;
+  border-radius: 6px;
+  background: #E7F4F0;
+  color: #142B3B;
+  line-height: 1.5;
+}
+
+.invoice-extraction-review-6013 {
+  padding: 14px;
+  margin: 16px 0;
+  border: 1px solid #D7E3E7;
+  border-radius: 6px;
+  background: #F7F8F5;
+}
+
+.invoice-extraction-review-6013 table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.invoice-extraction-review-6013 th,
+.invoice-extraction-review-6013 td {
+  padding: 10px;
+  border-bottom: 1px solid #D7E3E7;
+  text-align: left;
+}
+
+/* STEP 1907P-6018: Editable invoice equipment review. */
+
+.invoice-equipment-6018 {
+  min-width: 630px;
+  margin-bottom: 16px;
+}
+
+.invoice-equipment-6018 th:first-child,
+.invoice-equipment-6018 td:first-child {
+  width: 85px;
+}
+
+.invoice-equipment-6018 input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.invoice-equipment-6018 td:last-child {
+  width: 90px;
+}
+
+.invoice-equipment-6018 td {
+  vertical-align: middle;
+}
+
+.invoice-extraction-review-6013 >
+.invoice-check-6007 {
+  margin-top: 18px;
+}
+
+/* STEP 1907P-6026: Approved equipment purchase comparison. */
+
+.equipment-comparison-6026 {
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid #D7E3E7;
+  border-radius: 6px;
+  background: #F7F8F5;
+  color: #142B3B;
+}
+
+.equipment-comparison-6026 h3 {
+  margin: 0 0 14px;
+}
+
+.equipment-totals-6026 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.equipment-totals-6026 > div {
+  padding: 10px;
+  border: 1px solid #D7E3E7;
+  border-radius: 5px;
+  background: #FFFFFF;
+}
+
+.equipment-totals-6026 small,
+.equipment-totals-6026 strong {
+  display: block;
+  color: #142B3B;
+}
+
+.equipment-totals-6026 strong {
+  font-size: 1.4rem;
+  margin-top: 4px;
+}
+
+.equipment-comparison-table-6026 {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 400px;
+}
+
+.equipment-comparison-table-6026 th,
+.equipment-comparison-table-6026 td {
+  border-bottom: 1px solid #D7E3E7;
+  padding: 10px 6px;
+  text-align: right;
+  vertical-align: top;
+}
+
+.equipment-comparison-table-6026 th:first-child,
+.equipment-comparison-table-6026 td:first-child {
+  text-align: left;
+}
+
+.equipment-hint-6026 {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #435866;
+  overflow-wrap: anywhere;
+}
+
+.equipment-hint-6026.matched,
+.equipment-status-6026.matched {
+  color: #087F75;
+}
+
+.equipment-hint-6026.warning {
+  color: #87520B;
+}
+
+.equipment-status-6026 {
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 14px 0 10px;
+}
+
+.equipment-review-6026 {
+  border: 1px solid #D7E3E7;
+  border-radius: 5px;
+  padding: 12px;
+  margin-top: 14px;
+  background: #FFFFFF;
+}
+
+.equipment-review-6026 > div {
+  margin-top: 10px;
+}
+
+.equipment-existing-6026 {
+  margin: 12px 0;
+}
+
+.equipment-existing-6026 summary {
+  cursor: pointer;
+}
+
+.equipment-existing-6026 p {
+  margin: 8px 0;
+}
+
+/* STEP 1907P-6041: Integrated installation inspection. */
+
+.integrated-inspection-6041 {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid #D7E3E7;
+  border-radius: 8px;
+  background: #F7F8F5;
+  color: #142B3B;
+}
+
+.integrated-inspection-6041 h2,
+.integrated-inspection-6041 h3,
+.integrated-inspection-6041 p,
+.integrated-inspection-6041 label,
+.integrated-inspection-6041 legend {
+  color: #142B3B;
+}
+
+.inspection-heading-6041 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.inspection-heading-6041 h2 {
+  margin: 0;
+}
+
+.inspection-project-6041 {
+  padding: 18px;
+  background: #142B3B;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.integrated-inspection-6041 .inspection-project-6041 h3,
+.integrated-inspection-6041 .inspection-project-6041 p {
+  color: #FFFFFF;
+  margin: 4px 0;
+}
+
+.inspection-section-6041 {
+  border-top: 1px solid #D7E3E7;
+  padding: 20px 0;
+}
+
+.inspection-section-6041 .inspection-step-heading-5994 {
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.inspection-section-6041 .inspection-step-heading-5994 h3 {
+  margin: 0;
+}
+
+.inspection-equipment-unit-6041 {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  margin: 10px 0;
+  border: 1px solid #D7E3E7;
+  border-radius: 6px;
+  background: #FFFFFF;
+  overflow-wrap: anywhere;
+}
+
+.inspection-equipment-unit-6041 p {
+  margin: 0;
+}
+
+.integrated-inspection-6041 label.inspection-check-6041 {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 10px;
+  margin: 12px 0;
+  font-weight: normal;
+  line-height: 1.5;
+}
+
+.integrated-inspection-6041 .inspection-check-6041 input {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  margin: 3px 0 0;
+  accent-color: #087F75;
+}
+
+.inspection-count-6041 {
+  font-weight: 600;
+}
+
+.inspection-purchase-6041,
+.inspection-test-notice-6041,
+.inspection-success-6041,
+.inspection-warning-6041 {
+  padding: 14px;
+  margin: 12px 0;
+  border: 1px solid #D7E3E7;
+  border-radius: 6px;
+  background: #FFFFFF;
+}
+
+.inspection-test-notice-6041 {
+  border-left: 4px solid #C39A58;
+}
+
+.inspection-success-6041 {
+  border-left: 4px solid #087F75;
+}
+
+.inspection-warning-6041 {
+  border-left: 4px solid #C39A58;
+}
+
+.inspection-verified-6041 {
+  color: #087F75;
+}
+
+.inspection-warning-text-6041 {
+  color: #87520B;
+}
+
+.inspection-instructions-6041 {
+  margin: 12px 0;
+}
+
+.integrated-inspection-6041 summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.inspection-invoice-summary-6041 {
+  border-top: 1px solid #D7E3E7;
+  padding: 12px 0;
+  margin-top: 8px;
+}
+
+.inspection-invoice-summary-6041 p {
+  margin: 4px 0;
+}
+
+.inspection-impression-6041 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 30px;
+  border: 0;
+  padding: 12px 0;
+  margin: 12px 0;
+}
+
+.inspection-impression-6041 legend {
+  font-weight: 600;
+}
+
+.inspection-notes-6041 {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.integrated-inspection-6041 textarea,
+.integrated-inspection-6041 select,
+.integrated-inspection-6041 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+  background: #FFFFFF;
+  color: #142B3B;
+  border-color: #B8C9CF;
+}
+
+.inspection-notes-6041 textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.inspection-actions-6041 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.inspection-action-help-6041 {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+
+  .integrated-inspection-6041 {
+    padding: 12px;
+  }
+
+  .inspection-actions-6041 {
+    flex-direction: column;
+  }
+
+  .inspection-actions-6041 button {
+    width: 100%;
+  }
+}

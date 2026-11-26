@@ -2726,3 +2726,411 @@ class CommercialSigningDocument(Entity):
 
     def delete(self, *args, **kwargs):
         raise ValidationError('Retained commercial signing documents cannot be deleted.')
+
+# Distributor invoice business source records -- Step 5998.
+
+class DistributorInvoice(Entity):
+    """Immutable original distributor invoice and intake metadata.
+
+    Upload does not establish verified project costs, payment,
+    installation acceptance, or authority to issue a certificate.
+    """
+
+    distributor_name = models.CharField(max_length=250)
+
+    distributor_key = models.CharField(
+        max_length=250,
+        editable=False,
+    )
+
+    invoice_number = models.CharField(max_length=150)
+
+    invoice_number_key = models.CharField(
+        max_length=150,
+        editable=False,
+    )
+
+    invoice_date = models.DateField()
+
+    currency = models.CharField(
+        max_length=3,
+        default="USD",
+    )
+
+    invoice_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    original_filename = models.CharField(max_length=250)
+
+    content_type = models.CharField(max_length=100)
+
+    content = models.BinaryField(editable=False)
+
+    content_sha256 = models.CharField(
+        max_length=64,
+        unique=True,
+        editable=False,
+    )
+
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="distributor_invoices_uploaded",
+    )
+
+    class Meta:
+        ordering = ["-invoice_date", "-created_at"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "distributor_key",
+                    "invoice_number_key",
+                ],
+                name="unique_distributor_invoice_identity",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(invoice_total__gte=0),
+                name="distributor_invoice_nonnegative_total",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        from hashlib import sha256
+
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError(
+                "Original distributor invoices are immutable."
+            )
+
+        self.distributor_name = self.distributor_name.strip()
+        self.invoice_number = self.invoice_number.strip()
+
+        if not self.distributor_name or not self.invoice_number:
+            raise ValidationError(
+                "Distributor name and invoice number are required."
+            )
+
+        self.distributor_key = " ".join(
+            self.distributor_name.casefold().split()
+        )
+
+        self.invoice_number_key = " ".join(
+            self.invoice_number.casefold().split()
+        )
+
+        if (
+            len(self.distributor_key) > 250
+            or len(self.invoice_number_key) > 150
+        ):
+            raise ValidationError(
+                "Normalized invoice identity is too long."
+            )
+
+        if self.currency != "USD":
+            raise ValidationError(
+                "Only USD distributor invoices are currently supported."
+            )
+
+        if self.content_type not in (
+            "application/pdf",
+            "image/jpeg",
+            "image/png",
+        ):
+            raise ValidationError(
+                "Upload a PDF, JPEG or PNG invoice."
+            )
+
+        content = bytes(self.content or b"")
+
+        if not content or len(content) > 15 * 1024 * 1024:
+            raise ValidationError(
+                "Invoice content must be between 1 byte and 15 MB."
+            )
+
+        signatures = {
+            "application/pdf": b"%PDF-",
+            "image/jpeg": bytes.fromhex("FFD8FF"),
+            "image/png": bytes.fromhex("89504E470D0A1A0A"),
+        }
+
+        if not content.startswith(signatures[self.content_type]):
+            raise ValidationError(
+                "Invoice content does not match its declared file type."
+            )
+
+        self.content_sha256 = sha256(content).hexdigest()
+
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError(
+            "Original distributor invoices cannot be deleted."
+        )
+
+
+class DistributorInvoiceAllocation(Entity):
+    """Project-specific invoice allocation candidate.
+
+    Amounts are retained without automatically posting costs or
+    accounts payable. Aggregate allocation controls must be
+    enforced by the authorized transactional service.
+    """
+
+    invoice = models.ForeignKey(
+        DistributorInvoice,
+        on_delete=models.PROTECT,
+        related_name="project_allocations",
+    )
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.PROTECT,
+        related_name="distributor_invoice_allocations",
+    )
+
+    msr = models.ForeignKey(
+        MSR,
+        on_delete=models.PROTECT,
+        related_name="distributor_invoice_allocations",
+    )
+
+    equipment_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+    )
+
+    material_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+    )
+
+    other_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+    )
+
+    allocation_notes = models.TextField(blank=True)
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="distributor_invoice_allocations_created",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["invoice", "msr"],
+                name="unique_distributor_invoice_msr_allocation",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(equipment_amount__gte=0)
+                    & models.Q(material_amount__gte=0)
+                    & models.Q(other_amount__gte=0)
+                ),
+                name="distributor_allocation_nonnegative",
+            ),
+        ]
+
+    @property
+    def allocated_total(self):
+        return (
+            self.equipment_amount
+            + self.material_amount
+            + self.other_amount
+        )
+
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError(
+                "Invoice allocations are immutable."
+            )
+
+        if self.msr.project_id != self.project_id:
+            raise ValidationError(
+                "Allocation project and MSR do not match."
+            )
+
+        if (
+            self.msr.status != "APPROVED"
+            or self.project.current_approved_id != self.msr_id
+            or self.project.state == "CANCELLED"
+        ):
+            raise ValidationError(
+                "Allocation requires the current approved MSR."
+            )
+
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError(
+            "Invoice allocations cannot be deleted."
+        )
+
+
+class DistributorInvoiceVerification(Entity):
+    """Immutable review of a specific invoice allocation.
+
+    A verification record does not establish vendor payment,
+    installation acceptance, or payroll authorization.
+    """
+
+    class Decision(models.TextChoices):
+        VERIFIED = "VERIFIED", "Verified"
+        REJECTED = "REJECTED", "Rejected"
+
+    allocation = models.ForeignKey(
+        DistributorInvoiceAllocation,
+        on_delete=models.PROTECT,
+        related_name="verification_records",
+    )
+
+    decision = models.CharField(
+        max_length=20,
+        choices=Decision.choices,
+    )
+
+    invoice_sha256 = models.CharField(max_length=64)
+
+    snapshot_sha256 = models.CharField(max_length=64)
+
+    review_notes = models.TextField(blank=True)
+
+    verified_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="distributor_invoice_verifications",
+    )
+
+    verified_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-verified_at", "-id"]
+
+    def save(self, *args, **kwargs):
+        if type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError(
+                "Invoice verification records are immutable."
+            )
+
+        if self.decision not in self.Decision.values:
+            raise ValidationError(
+                "An explicit verification decision is required."
+            )
+
+        if (
+            self.decision == self.Decision.REJECTED
+            and not self.review_notes.strip()
+        ):
+            raise ValidationError(
+                "Explain why the invoice cannot be verified."
+            )
+
+        if (
+            self.invoice_sha256
+            != self.allocation.invoice.content_sha256
+        ):
+            raise ValidationError(
+                "Invoice verification does not match the original file."
+            )
+
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError(
+            "Invoice verification records cannot be deleted."
+        )
+
+
+# STEP 1907P-6019: Reviewed distributor equipment evidence.
+
+class DistributorInvoiceEquipmentReview(Entity):
+    """Immutable employee review of equipment purchased for a project.
+
+    This record is not evidence of physical installation.
+    It cannot change approved MSR pricing or authorize payment.
+    """
+
+    allocation = models.OneToOneField(
+        DistributorInvoiceAllocation,
+        on_delete=models.PROTECT,
+        related_name="equipment_review",
+    )
+
+    invoice_sha256 = models.CharField(max_length=64)
+
+    snapshot_sha256 = models.CharField(max_length=64)
+
+    equipment_rows = models.JSONField(default=list)
+
+    no_equipment_on_invoice = models.BooleanField(default=False)
+
+    distributor_invoice_confirmed = models.BooleanField(default=False)
+
+    invoice_details_confirmed = models.BooleanField(default=False)
+
+    equipment_information_confirmed = models.BooleanField(default=False)
+
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="distributor_equipment_reviews",
+    )
+
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+
+        if not self._state.adding:
+            raise ValidationError(
+                "Distributor equipment reviews are immutable."
+            )
+
+        if type(self.equipment_rows) is not list:
+            raise ValidationError(
+                "Equipment rows must be a list."
+            )
+
+        if (
+            self.distributor_invoice_confirmed is not True
+            or self.invoice_details_confirmed is not True
+            or self.equipment_information_confirmed is not True
+        ):
+            raise ValidationError(
+                "Employee invoice and equipment confirmation is required."
+            )
+
+        if bool(self.equipment_rows) == self.no_equipment_on_invoice:
+            raise ValidationError(
+                "Record reviewed equipment or confirm that "
+                "the project allocation contains no equipment."
+            )
+
+        from .documents import canonical_hash
+
+        if (
+            self.invoice_sha256
+                != self.allocation.invoice.content_sha256
+            or self.snapshot_sha256
+                != canonical_hash(self.allocation.msr.snapshot)
+        ):
+            raise ValidationError(
+                "Equipment review evidence does not match its source."
+            )
+
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+
+        raise ValidationError(
+            "Distributor equipment reviews cannot be deleted."
+        )

@@ -69,7 +69,29 @@ def digest(value):
 
 @transaction.atomic
 def begin(actor, session_key, context=None):
-    authorize(actor)
+    if (
+        isinstance(context, dict)
+        and context.get('operation')
+            == 'SANDBOX_CERTIFICATE_DRAFT_6063'
+    ):
+        from .completion_certificate_provider_6063 import authorize_context
+        authorize_context(actor, context)
+    elif (
+        isinstance(context, dict)
+        and context.get('operation')
+            == 'SANDBOX_CERTIFICATE_READ_6069'
+    ):
+        from .completion_certificate_read_6069 import authorize_context
+        authorize_context(actor, context)
+    elif (
+        isinstance(context, dict)
+        and context.get('operation')
+            == 'SANDBOX_CERTIFICATE_SEND_6071'
+    ):
+        from .completion_certificate_send_6071 import authorize_context
+        authorize_context(actor, context)
+    else:
+        authorize(actor)
     config = configuration()
     if config['blockers']:
         raise ValidationError({'configuration': config['blockers']})
@@ -87,7 +109,6 @@ def begin(actor, session_key, context=None):
 
 @transaction.atomic
 def consume(actor, session_key, state):
-    authorize(actor)
     if not isinstance(state, str) or not 32 <= len(state) <= 128 or not session_key:
         raise ValidationError('Invalid or expired authorization state. Start verification again.')
     config = configuration()
@@ -96,6 +117,29 @@ def consume(actor, session_key, state):
             or challenge.actor_id != actor.id or challenge.session_digest != digest(session_key)
             or challenge.configuration_digest != configuration_digest(config) or config['blockers']):
         raise ValidationError('Invalid or expired authorization state. Start verification again.')
+    if (
+        isinstance(challenge.context, dict)
+        and challenge.context.get('operation')
+            == 'SANDBOX_CERTIFICATE_DRAFT_6063'
+    ):
+        from .completion_certificate_provider_6063 import authorize_context
+        authorize_context(actor, challenge.context)
+    elif (
+        isinstance(challenge.context, dict)
+        and challenge.context.get('operation')
+            == 'SANDBOX_CERTIFICATE_READ_6069'
+    ):
+        from .completion_certificate_read_6069 import authorize_context
+        authorize_context(actor, challenge.context)
+    elif (
+        isinstance(challenge.context, dict)
+        and challenge.context.get('operation')
+            == 'SANDBOX_CERTIFICATE_SEND_6071'
+    ):
+        from .completion_certificate_send_6071 import authorize_context
+        authorize_context(actor, challenge.context)
+    else:
+        authorize(actor)
     challenge.consumed_at = timezone.now()
     challenge.save(update_fields=['consumed_at'])
     return challenge, config
@@ -198,6 +242,15 @@ def finish(actor, session_key, state, code, error=None):
     with transaction.atomic():
         proof = DocusignVerification.objects.create(actor=actor, challenge=challenge, identity=identity, digest=canonical_hash(identity))
         audit(actor, 'docusign.account_verified', actor.id, {'verification_id': str(proof.id), 'identity': identity, 'digest': proof.digest})
+    if challenge.context.get('operation') == 'SANDBOX_CERTIFICATE_SEND_6071':
+        from .completion_certificate_send_6071 import finish as finish_certificate_send
+        return finish_certificate_send(actor, challenge, config, token)
+    if challenge.context.get('operation') == 'SANDBOX_CERTIFICATE_READ_6069':
+        from .completion_certificate_read_6069 import finish as finish_certificate_read
+        return finish_certificate_read(actor, challenge, config, token)
+    if challenge.context.get('operation') == 'SANDBOX_CERTIFICATE_DRAFT_6063':
+        from .completion_certificate_provider_6063 import finish as finish_certificate_draft
+        return finish_certificate_draft(actor, challenge, config, token)
     if challenge.context.get('operation') in {'SANDBOX_SIGNING_SEND','SANDBOX_SIGNING_READ'}:
         from .signing_test import finish as finish_test
         return finish_test(actor, challenge, config, token)

@@ -48,12 +48,20 @@ def next_code(initials):
 
 from .msr_document_source import msr_other_details
 from .equipment_catalog_policy import validate_equipment_details
+from .msr_age_verification_5985 import (
+    AGE_FIELDS,
+    prepare_age_edit,
+    validate_age_fields,
+    require_age_verification,
+    clear_age_verification,
+)
 
-SNAPSHOT_FIELDS = {'customer', 'contact', 'billing_address', 'project_location', 'scope', 'equipment', 'materials', 'base_price', 'discount', 'tax', 'total_price', 'payment_option', 'payment_terms', 'commercial_notes', 'financing_type', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip', 'other', 'marketing_promotion'}
+SNAPSHOT_FIELDS = {'customer', 'contact', 'billing_address', 'project_location', 'scope', 'equipment', 'materials', 'base_price', 'discount', 'tax', 'total_price', 'payment_option', 'payment_terms', 'commercial_notes', 'financing_type', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip', 'other', 'marketing_promotion'} | AGE_FIELDS
 def validate_snapshot(data, complete=False):
     if not isinstance(data, dict) or set(data) - SNAPSHOT_FIELDS:
         raise ValidationError('Invalid or unknown commercial fields.')
     result = copy.deepcopy(data)
+    validate_age_fields(result)
     if 'marketing_promotion' in result and type(result['marketing_promotion']) is not bool:
         raise ValidationError({
             'marketing_promotion': 'Must be a checked or unchecked checkbox.'
@@ -140,7 +148,7 @@ def validate_snapshot(data, complete=False):
                 'Other terms require a separate approved authorization workflow before submission.'
         })
     if complete:
-        required = SNAPSHOT_FIELDS - {'commercial_notes', 'contact', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip', 'other', 'marketing_promotion'}
+        required = SNAPSHOT_FIELDS - AGE_FIELDS - {'commercial_notes', 'contact', 'customer_phone', 'customer_email', 'project_city', 'project_state', 'project_zip', 'other', 'marketing_promotion'}
         missing = [key for key in required if key not in result or (isinstance(result[key], str) and not result[key].strip())]
         if missing:
             raise ValidationError({'required': sorted(missing)})
@@ -227,6 +235,13 @@ def transition(actor, msr_id, action, expected_sequence, snapshot=None, reason='
                 'Only drafts or rejected records can be edited.'
             )
 
+        snapshot = prepare_age_edit(
+            actor=actor,
+            project=project,
+            previous=record.snapshot,
+            incoming=snapshot,
+        )
+
         if manager_correction:
             from .msr_catalog_selection_guard_4558 import verify_new_equipment_selections
 
@@ -237,6 +252,8 @@ def transition(actor, msr_id, action, expected_sequence, snapshot=None, reason='
             corrected_snapshot = validate_snapshot(
                 checked_snapshot, complete=True
             )
+
+            require_age_verification(corrected_snapshot)
 
             if corrected_snapshot == before_snapshot:
                 raise ValidationError({
@@ -309,6 +326,7 @@ def transition(actor, msr_id, action, expected_sequence, snapshot=None, reason='
         if record.status not in {'DRAFT', 'REJECTED'}:
             raise ValidationError('Only a draft or rejected record can be submitted.')
         record.snapshot = validate_snapshot(record.snapshot, complete=True)
+        require_age_verification(record.snapshot)
         record.status = project.state = 'SUBMITTED'
         record.submitted_at = timezone.now()
     elif action in {'approve', 'reject'}:
@@ -320,6 +338,7 @@ def transition(actor, msr_id, action, expected_sequence, snapshot=None, reason='
             raise ValidationError('A rejection reason is required.')
         record.status = project.state = 'APPROVED' if action == 'approve' else 'REJECTED'
         if action == 'approve':
+            require_age_verification(record.snapshot)
             record.approved_at, record.approved_by = timezone.now(), actor
             project.current_approved, project.pending = record, None
     else:
@@ -370,7 +389,7 @@ def revise(actor, project_id, reason, expected_approved_id):
     if str(project.current_approved_id) != expected_approved_id:
         raise ValidationError({'conflict': 'The approved version changed. Refresh first.'})
     number = (project.versions.aggregate(n=Max('number'))['n'] or 0) + 1
-    draft = MSR.objects.create(project=project, number=number, source=project.current_approved, revision_reason=reason, created_by=actor, prepared_by=actor, snapshot=copy.deepcopy(project.current_approved.snapshot))
+    draft = MSR.objects.create(project=project, number=number, source=project.current_approved, revision_reason=reason, created_by=actor, prepared_by=actor, snapshot=clear_age_verification(copy.deepcopy(project.current_approved.snapshot)))
     project.pending, project.state = draft, 'REVISED'
     project.save()
     audit(actor, 'msr.revised', project.id, {'msr_id': str(draft.id), 'source': str(draft.source_id), 'version': number, 'reason': reason})

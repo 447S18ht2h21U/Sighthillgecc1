@@ -15,6 +15,11 @@ from .rules import EASTERN
 from .commercial_signature_trust_5512 import require_authenticated_commercial_signature
 
 
+from .maryland_installation_date_5987 import (
+    assess_maryland_installation_date,
+)
+
+
 def installation_readiness(project):
     result = {
         "eligible": False,
@@ -26,6 +31,8 @@ def installation_readiness(project):
             "deposit_verified": False,
         },
         "blocking_reasons": [],
+        "installation_date_requirements":
+            assess_maryland_installation_date(project),
     }
 
     msr = project.current_approved
@@ -107,8 +114,16 @@ def installation_readiness(project):
         else:
             result["blocking_reasons"].append(payment["explanation"])
 
+    date_requirements = result["installation_date_requirements"]
+
+    if date_requirements["status"] != "ESTABLISHED":
+        for reason in date_requirements["blocking_reasons"]:
+            if reason not in result["blocking_reasons"]:
+                result["blocking_reasons"].append(reason)
+
     result["eligible"] = (
-        all(result["requirements"].values())
+        date_requirements["status"] == "ESTABLISHED"
+        and all(result["requirements"].values())
         and not result["blocking_reasons"]
     )
 

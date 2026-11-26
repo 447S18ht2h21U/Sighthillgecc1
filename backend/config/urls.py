@@ -1,3 +1,4 @@
+from core import combined_installation_schedule_5976
 from core import customer_duplicate_lookup_5668
 from core import commercial_signing_api_5577
 from core import commercial_read_oauth_5576
@@ -38,6 +39,7 @@ from core import approved_msr_source_api_4530
 from core import equipment_catalog_selection_api_4534
 from core import equipment_catalog_management_api_4542
 urlpatterns = [
+    path('api/schedule-and-assign/', combined_installation_schedule_5976.create),
     path('api/customer-duplicate-lookup/', customer_duplicate_lookup_5668.lookup),
 
     path('api/projects/<uuid:project_id>/adult-verification/', adult_customer_verification_5401.adult_verification),
@@ -153,3 +155,128 @@ urlpatterns.append(
         name="msr-draft-restore-5704",
     )
 )
+
+
+# STEP 1907P-5926: isolated fictional acceptance payment exception.
+from core import fictional_payment_exception_api_5926
+
+urlpatterns += [
+    path(
+        "api/fictional-payment-exceptions/<uuid:project_id>/",
+        fictional_payment_exception_api_5926.payment_exception,
+        name="fictional-payment-exception-5926",
+    ),
+]
+
+# STEP 1907P-6006: Authorized distributor invoice workspace.
+from core import distributor_invoice_api_6006
+
+urlpatterns += [
+    path(
+        "api/distributor-invoices/<uuid:project_id>/",
+        distributor_invoice_api_6006.project_invoices,
+        name="distributor-invoices-6006",
+    ),
+    path(
+        "api/distributor-invoices/<uuid:project_id>/<uuid:allocation_id>/original/",
+        distributor_invoice_api_6006.original_document,
+        name="distributor-invoice-original-6006",
+    ),
+    path(
+        "api/distributor-invoices/<uuid:project_id>/<uuid:allocation_id>/review/",
+        distributor_invoice_api_6006.review_invoice,
+        name="distributor-invoice-review-6006",
+    ),
+    path(
+        "api/distributor-invoices/<uuid:project_id>/allocate/<uuid:invoice_id>/",
+        distributor_invoice_api_6006.allocate_invoice,
+        name="distributor-invoice-allocation-6006",
+    ),
+]
+
+# STEP 1907P-6013: Local invoice extraction preview.
+
+urlpatterns.append(
+    path(
+        "api/distributor-invoices/<uuid:project_id>/extract/",
+        distributor_invoice_api_6006.extract_invoice,
+        name="distributor-invoice-extract-6013",
+    )
+)
+
+# STEP 1907P-6040: Integrated installation inspection.
+from django.urls import path as inspection_path_6040
+from core.installation_inspection_api_6040 import (
+    integrated_installation_inspection,
+)
+
+urlpatterns += [
+    inspection_path_6040(
+        "api/integrated-installation-inspections/<uuid:project_id>/",
+        integrated_installation_inspection,
+        name="integrated-installation-inspection-6040",
+    ),
+]
+
+# STEP 1907P-6049: Read-only fictional certificate preview.
+from django.urls import path as certificate_path_6049
+from core.completion_certificate_preview_api_6049 import (
+    completion_certificate_preview,
+)
+
+urlpatterns += [
+    certificate_path_6049(
+        "api/completion-certificate-preview/<uuid:project_id>/",
+        completion_certificate_preview,
+        name="completion-certificate-preview-6049",
+    ),
+]
+
+
+# Development-only Completion Certificate sandbox preparation.
+from core.completion_certificate_sandbox_api_6057 import (
+    completion_certificate_sandbox,
+)
+
+urlpatterns += [
+    path(
+        "api/completion-certificate-sandbox/<uuid:project_id>/",
+        completion_certificate_sandbox,
+        name="completion-certificate-sandbox-6057",
+    ),
+]
+
+# Fictional Completion Certificate provider draft creation and status.
+from core.completion_certificate_provider_api_6064 import (
+    completion_certificate_provider,
+)
+
+urlpatterns += [
+    path(
+        "api/completion-certificate-provider/<uuid:project_id>/",
+        completion_certificate_provider,
+        name="completion-certificate-provider-6064",
+    ),
+]
+
+# Explicitly authorized fictional certificate transmission.
+from core.completion_certificate_send_api_6071 import certificate_send
+
+urlpatterns += [
+    path(
+        "api/completion-certificate-send/<uuid:project_id>/",
+        certificate_send,
+        name="completion-certificate-send-6071",
+    ),
+]
+
+# Read-only fictional Completion Certificate retrieval.
+from core.completion_certificate_read_api_6072 import certificate_read
+
+urlpatterns += [
+    path(
+        "api/completion-certificate-read/<uuid:project_id>/",
+        certificate_read,
+        name="completion-certificate-read-6072",
+    ),
+]

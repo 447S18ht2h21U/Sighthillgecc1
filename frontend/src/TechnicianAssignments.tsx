@@ -50,14 +50,22 @@ function technicianLabel(assignment: Assignment): string {
     : assignment.technician_username;
 }
 
-export function TechnicianAssignments({ api }: { api: Api }) {
+export function TechnicianAssignments({
+  api,
+  initialProjectId = '',
+  initialEffectiveDate = '',
+}: {
+  api: Api;
+  initialProjectId?: string;
+  initialEffectiveDate?: string;
+}) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [techniciansLoading, setTechniciansLoading] = useState(false);
   const [techniciansError, setTechniciansError] = useState('');
-  const [projectId, setProjectId] = useState('');
+  const [projectId, setProjectId] = useState(initialProjectId);
   const [technicianId, setTechnicianId] = useState('');
-  const [effectiveDate, setEffectiveDate] = useState('');
+  const [effectiveDate, setEffectiveDate] = useState(initialEffectiveDate);
   const [assignmentBusy, setAssignmentBusy] = useState(false);
   const assignmentRequestInFlight = useRef(false);
   const [historyRevision, setHistoryRevision] = useState(0);
@@ -267,7 +275,7 @@ export function TechnicianAssignments({ api }: { api: Api }) {
 
       setAssignmentConfirmed(false);
       setTechnicianId('');
-      setEffectiveDate('');
+      setEffectiveDate(initialEffectiveDate);
       setAssignmentMessage(
         'Technician assignment saved. Checking the updated history.'
       );

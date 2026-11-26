@@ -1,3 +1,9 @@
+import { InstallationReadinessWorklist5981 } from './InstallationReadinessWorklist5981';
+import { UnifiedInstallationSchedule5979 } from './UnifiedInstallationSchedule5979';
+import { InstallationManagerHome5968, InstallationManagerSupport5968 } from './InstallationManagerHome5968';
+import { DistributorInvoiceWorkspace6007 } from './DistributorInvoiceWorkspace6007';
+import { TechnicianHome5966 } from './TechnicianHome5966';
+import { SalesManagerHome5964 } from './SalesManagerHome5964';
 import { SalesPricing5762 } from './SalesPricing5762';
 import DraftHistory5697L, { type DraftHistoryResponse5697L } from './DraftHistory5697L';
 import { FictionalFinalReceipt5647 } from './FictionalFinalReceipt5647';
@@ -12,6 +18,7 @@ import { ScopeWorkBuilder, inferPrimaryWorkCategory } from './ScopeWorkBuilder';
 import { MaterialsChecklist5333 } from './MaterialsChecklist5333';
 import './style.css';
 import { SigningReview } from './SigningReview';
+import { FictionalPaymentException5928 } from './FictionalPaymentException5928';
 import { SyntheticSignerAuthorization5415 } from './SyntheticSignerAuthorization5415';
 import { DocusignSetup } from './DocusignSetup';
 import { CompletionEnvelopeInspection } from './CompletionEnvelopeInspection';
@@ -49,7 +56,7 @@ function employeeLabel(person: Person): string {
 }
 type Customer = {id:string;legal_name:string;billing_address:string;archived:boolean;primary_contact?:{id:string;name:string}|null};
 type Line = {description:string;quantity:string};
-type Snapshot = {customer:string;contact:string;billing_address:string;project_location:string;scope:string;equipment:EquipmentLine[];materials:Line[];base_price:string;discount:string;tax:string;total_price:string;payment_option:string;payment_terms:string;commercial_notes:string;marketing_promotion?:boolean;financing_type?:string;customer_phone?:string;customer_email?:string;project_city?:string;project_state?:string;project_zip?:string};
+type Snapshot = {customer:string;contact:string;billing_address:string;project_location:string;scope:string;equipment:EquipmentLine[];materials:Line[];base_price:string;discount:string;tax:string;total_price:string;payment_option:string;payment_terms:string;commercial_notes:string;marketing_promotion?:boolean;financing_type?:string;customer_phone?:string;customer_email?:string;customer_age_category?:'ADULT_UNDER_65'|'AGE_65_OR_OLDER';customer_age_verified_by?:string;customer_age_verified_at?:string;confirm_customer_age?:boolean;project_city?:string;project_state?:string;project_zip?:string};
 type MSR = {source:string|null;created_at:string;created_by_name:string;created_by:string;prepared_by:string;id:string;number:number;status:string;snapshot:Snapshot;edit_sequence:number;revision_reason:string};
 type Project = {id:string;code:string;location:string;state:string;customer:string;sales_associate:string;reviewer:string;current_approved:MSR|null;pending:MSR|null};
 const FIELD_LABELS = {customer:'Customer name',contact:'Customer Contact',billing_address:'Billing address',project_location:'Installation address',scope:'Scope of work',base_price:'Base price ($)',discount:'Discount ($)',tax:'Tax ($)',total_price:'Total price ($)',payment_terms:'Payment terms',commercial_notes:'Special Customer Arrangements / Notes',customer_phone:'Customer phone',customer_email:'Customer email',project_city:'Installation city',project_state:'Installation state',project_zip:'Installation ZIP'};
@@ -155,7 +162,14 @@ function App(){
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null), [reason,setReason]=useState(''), [history,setHistory]=useState<MSR[]>([]);
  const [documents,setDocuments]=useState<PreparedDocument[]>([]);
  const [primaryWorkCategory,setPrimaryWorkCategory]=useState('');
- const [panel,setPanel]=useState<'salesWorkspace'|'projects'|'dashboard'|'installation'|'customer'|'project'|'accounts'|'customers'|'audit'|'completionInspection'|'technicianAssignments'|'contractorDirectory'|'marketingMsrs'|'visibleMsrs' | 'productCatalog' | 'customerPayments'|'salesHistory'|'financialReports'|'payrollPreview'>('projects');
+ const [panel,setPanel]=useState<'installationManagerHome'|'managerPayments'|'managerEquipment'|'technicianHome'|'managerHome'|'salesWorkspace'|'projects'|'dashboard'|'installation'|'customer'|'project'|'accounts'|'customers'|'audit'|'completionInspection'|'technicianAssignments'|'contractorDirectory'|'marketingMsrs'|'visibleMsrs' | 'productCatalog' | 'customerPayments'|'salesHistory'|'financialReports'|'payrollPreview'>('projects');
+  const [installationTask5968,setInstallationTask5968]=
+    useState<'readiness'|'scheduling'|'inspections'>('readiness');
+  const [scheduleTab5968,setScheduleTab5968]=
+    useState<'dates'|'assignments'>('dates');
+  const [assignmentProject5971,setAssignmentProject5971]=useState('');
+  const [assignmentDate5971,setAssignmentDate5971]=useState('');
+
   const [projectCustomerId,setProjectCustomerId]=useState('');
 
   const [projectStreet5676,setProjectStreet5676]=useState('');
@@ -208,7 +222,12 @@ function App(){
   const d=await api<Person[]>('directory/');
   setCustomers(c);setPeople(d);setProjectRefresh(n=>n+1);
  }
- useEffect(()=>{void (async()=>{await csrf();try{const actor=await api<Person>('me/');if(['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(actor.role)){await load();setPanel(actor.role==='SALES_ASSOCIATE'?'salesWorkspace':'projects');}else if(actor.role==='MARKETING'){setPanel('marketingMsrs');}else{setPanel('dashboard');}setUser(actor);}catch{/* A signed-out browser opens the login form. */}finally{setReady(true);}})();},[]);
+ useEffect(()=>{void (async()=>{await csrf();try{const actor=await api<Person>('me/');if(['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(actor.role)){await load();setPanel(actor.role==='SALES_ASSOCIATE'
+      ?'salesWorkspace'
+      :actor.role==='SALES_MANAGER'?'managerHome':'projects');}else if(actor.role==='MARKETING'){setPanel('marketingMsrs');}else{setPanel(
+      actor.role==='INSTALLATION_MANAGER'?'installationManagerHome':
+      actor.role==='TECHNICIAN'?'technicianHome':'dashboard'
+    );}setUser(actor);}catch{/* A signed-out browser opens the login form. */}finally{setReady(true);}})();},[]);
  useEffect(()=>{
   if(!user)return;
   let last=0;
@@ -344,6 +363,7 @@ function App(){
   );
 }
   function reviewDashboardInstallation(id:string) {
+    setInstallationTask5968('readiness');
     setInstallationFocusId(id);
     setPanel('installation');
   }
@@ -372,8 +392,11 @@ function App(){
       )) return;
 
    const destination: typeof panel =
+     user?.role==='INSTALLATION_MANAGER' ? 'installationManagerHome' :
+     user?.role==='TECHNICIAN' ? 'technicianHome' :
      user?.role==='SALES_ASSOCIATE' ? 'salesWorkspace' :
-     user?.role==='SALES_MANAGER' ||
+     user?.role==='SALES_MANAGER' ? 'managerHome' :
+
      user?.role==='COMPTROLLER' ? 'projects' :
      user?.role==='MARKETING' ? 'marketingMsrs' :
      'dashboard';
@@ -387,7 +410,12 @@ function App(){
  }
 
  if(!ready)return <main><p>Opening workspace...</p></main>;
- if(!user)return <main className="login"><div className="gecc-login-identity"><strong><span className="gecc-login-line">Green Energy</span><span className="gecc-login-line">Contracting Corporation</span></strong><span>Business Operations &amp; Management System</span></div><h1>Sign in</h1><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void run(async()=>{await csrf();await api('dev-login/','POST',Object.fromEntries(f));await csrf();const actor=await api<Person>('me/');if(['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(actor.role)){await load();setPanel(actor.role==='SALES_ASSOCIATE'?'salesWorkspace':'projects');}else if(actor.role==='MARKETING'){setPanel('marketingMsrs');}else{setPanel('dashboard');}setUser(actor);});}}><label>Username<input name="username" autoComplete="username" required/></label><label>Password<input name="password" type="password" autoComplete="current-password" required/></label><button disabled={busy}>Sign in</button></form>{error&&<p role="alert" className="error">{error}</p>}<div className="login-bottom"><div className="login-product-brand">VERIDIAN</div><p className="login-platform-tagline">Integrated Business Platform</p><p className="login-environment">Local Development Environment</p><div className="login-credit-bar"><BrandedFooter versionLabel={APP_VERSION_LABEL} /></div></div></main>;
+ if(!user)return <main className="login"><div className="gecc-login-identity"><strong><span className="gecc-login-line">Green Energy</span><span className="gecc-login-line">Contracting Corporation</span></strong><span>Business Operations &amp; Management System</span></div><h1>Sign in</h1><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void run(async()=>{await csrf();await api('dev-login/','POST',Object.fromEntries(f));await csrf();const actor=await api<Person>('me/');if(['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(actor.role)){await load();setPanel(actor.role==='SALES_ASSOCIATE'
+      ?'salesWorkspace'
+      :actor.role==='SALES_MANAGER'?'managerHome':'projects');}else if(actor.role==='MARKETING'){setPanel('marketingMsrs');}else{setPanel(
+      actor.role==='INSTALLATION_MANAGER'?'installationManagerHome':
+      actor.role==='TECHNICIAN'?'technicianHome':'dashboard'
+    );}setUser(actor);});}}><label>Username<input name="username" autoComplete="username" required/></label><label>Password<input name="password" type="password" autoComplete="current-password" required/></label><button disabled={busy}>Sign in</button></form>{error&&<p role="alert" className="error">{error}</p>}<div className="login-bottom"><div className="login-product-brand">VERIDIAN</div><p className="login-platform-tagline">Integrated Business Platform</p><p className="login-environment">Local Development Environment</p><div className="login-credit-bar"><BrandedFooter versionLabel={APP_VERSION_LABEL} /></div></div></main>;
  const managerCanCorrect=Boolean(
     selected?.pending?.status==='SUBMITTED' &&
     (user.role==='COMPTROLLER' ||
@@ -398,31 +426,264 @@ function App(){
     (['DRAFT','REJECTED'].includes(selected.pending.status) ||
      managerCanCorrect);
  const approver=['SALES_MANAGER','COMPTROLLER'].includes(user.role);
- const submitPaymentReady = Boolean(
+   const ageVerificationReady = Boolean(
+    snapshot &&
+    (
+      snapshot.customer_age_category==='ADULT_UNDER_65' ||
+      snapshot.customer_age_category==='AGE_65_OR_OLDER'
+    ) &&
+    (
+      snapshot.confirm_customer_age===true ||
+      (
+        snapshot.customer_age_verified_by &&
+        snapshot.customer_age_verified_at
+      )
+    )
+  );
+
+  const submitPaymentReady = Boolean(
    snapshot?.financing_type &&
    ['50_PERCENT_DEPOSIT', '100_PERCENT_COMPLETION'].includes(
      snapshot.payment_option
    ) &&
    snapshot.payment_terms.trim()
  );
- return <><header><div className="brand">VERIDIAN <span>Business Operations &amp; Management System</span></div><div>{user.username} <span className="badge">{user.role.replaceAll('_',' ')}</span><button className="quiet" onClick={()=>void run(async()=>{await api('logout/','POST',{});setUser(null);setSelected(null);setInstallationFocusId(null);setPanel('projects');})}>Sign out</button></div></header><main>
- <div className="title"><div>{panel==='contractorDirectory'?<p className="eyebrow">VERIDIAN / CONTRACTOR COMPENSATION</p>:panel==='technicianAssignments'||panel==='installation'||panel==='dashboard'?<p className="eyebrow">VERIDIAN / OPERATIONS</p>:null}<h1>{panel==='salesWorkspace'?'Sales Workspace':panel==='payrollPreview'?'Payroll - Design Preview':panel==='financialReports'?'Corporate Financial Reports':panel==='customerPayments'?'Customer Payments':panel==='productCatalog'?'Product Catalog':panel==='contractorDirectory'?'Contractor Directory':panel==='technicianAssignments'?'Technician Assignments':panel==='installation'?'Installation Scheduling':panel==='dashboard'?'Project Status Dashboard':panel==='visibleMsrs'?'Commercial Records':panel==='salesHistory'?'Sales Opportunity History':'Customers & projects'}</h1></div><div className="actions">{panel!=='salesWorkspace'&&panel!=='contractorDirectory'&&panel!=='visibleMsrs'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<button className="quiet" onClick={()=>void run(()=>refresh(selected?.id))} disabled={busy}>Refresh</button>}{panel!=='salesWorkspace'&&panel!=='contractorDirectory'&&panel!=='visibleMsrs'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<><button onClick={()=>setPanel('customer')}>Add customer</button><button disabled={busy} onClick={()=>void run(async()=>{await load();setProjectCustomerId('');setPanel('project');})}>Create project</button></>}</div></div>
+ return <><header><div className="brand">VERIDIAN <span>Business Operations &amp; Management System</span></div><div>{user.username} <span className="badge">{user.role.replaceAll('_',' ')}</span><button className="quiet" onClick={()=>void run(async()=>{await api('logout/','POST',{});setUser(null);setSelected(null);setInstallationFocusId(null);setPanel('projects');})}>Sign out</button></div></header><main className={
+      ['SALES_ASSOCIATE','SALES_MANAGER','TECHNICIAN','INSTALLATION_MANAGER'].includes(user.role)
+      ?'sales-workspace-5960b':''
+    }>
+ <div className="title"><div>{panel==='contractorDirectory'?<p className="eyebrow">VERIDIAN / CONTRACTOR COMPENSATION</p>:panel==='technicianAssignments'||panel==='installation'||panel==='dashboard'?<p className="eyebrow">VERIDIAN / OPERATIONS</p>:null}<h1>{user.role==='INSTALLATION_MANAGER'?
+      panel==='installationManagerHome'?'Installation Manager Home':
+      panel==='managerPayments'?'Customer payments':
+      panel==='managerEquipment'?'Equipment and materials':
+      panel==='installation'?
+        installationTask5968==='scheduling'?'Schedule and assign work':
+        installationTask5968==='inspections'?'Inspections and certification':
+        'Installation readiness':
+      panel==='technicianAssignments'?'Technician assignments':
+      panel==='dashboard'?'Project Status Dashboard':
+      panel==='productCatalog'?'Manage Equipment Catalog':
+      panel==='payrollPreview'?'Payroll - Preview':
+      panel==='visibleMsrs'?'Commercial records':
+      'Installation management'
+      :user.role==='TECHNICIAN'?
+      panel==='technicianHome'?'Technician Home':
+      panel==='dashboard'?'My assigned jobs':
+      panel==='installation'?'Installation and work completion':
+      panel==='payrollPreview'?'My payroll - Preview':
+      panel==='visibleMsrs'?'Commercial records':
+      'Technician workspace'
+      :user.role==='SALES_MANAGER'?
+      panel==='managerHome'?'Sales Manager Home':
+      panel==='projects'?(selected?'Review sale':'Manage sales'):
+      panel==='customer'?'Add customer':
+      panel==='project'?'New project':
+      panel==='customers'?'Manage customers':
+      panel==='dashboard'?'Project Status Dashboard':
+      panel==='productCatalog'?'Manage Equipment Catalog':
+      panel==='payrollPreview'?'Payroll - Preview':
+      panel==='salesHistory'?'Sales history':
+      panel==='visibleMsrs'?'Commercial records':
+      panel==='installation'?'Installation Scheduling':'Sales management'
+      :user.role==='SALES_ASSOCIATE'?
+      panel==='salesWorkspace'?'Sales Home':
+      panel==='customer'?'Start new sale':
+      panel==='project'?'New project':
+      panel==='projects'?(selected?'Your sale':'My projects'):
+      panel==='customers'?'Manage customers':
+      panel==='dashboard'?'Project Status Dashboard':
+      panel==='payrollPreview'?'My payroll - Preview':
+      panel==='salesHistory'?'Sales history':
+      panel==='visibleMsrs'?'Commercial records':
+      panel==='installation'?'Installation Scheduling':'Sales'
+      :panel==='salesWorkspace'?'Sales Home':panel==='payrollPreview'?'Payroll - Design Preview':panel==='financialReports'?'Corporate Financial Reports':panel==='customerPayments'?'Customer Payments':panel==='productCatalog'?'Product Catalog':panel==='contractorDirectory'?'Contractor Directory':panel==='technicianAssignments'?'Technician Assignments':panel==='installation'?'Installation Scheduling':panel==='dashboard'?'Project Status Dashboard':panel==='visibleMsrs'?'Commercial Records':panel==='salesHistory'?'Sales Opportunity History':'Customers & projects'}</h1></div><div className="actions">{panel!=='salesWorkspace'&&panel!=='contractorDirectory'&&panel!=='visibleMsrs'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<button className="quiet" onClick={()=>void run(()=>refresh(selected?.id))} disabled={busy}>Refresh</button>}{panel!=='salesWorkspace'&&panel!=='contractorDirectory'&&panel!=='visibleMsrs'&&panel!=='productCatalog'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<><button onClick={()=>setPanel('customer')}>Add customer</button><button disabled={busy} onClick={()=>void run(async()=>{await load();setProjectCustomerId('');setPanel('project');})}>Create project</button></>}</div></div>
  {error&&<div role="alert" className="error">{error}</div>}
-   <div className="veridian-navigation-row" style={{display:"flex",flexWrap:"nowrap",overflowX:"auto",gap:"8px",alignItems:"center",whiteSpace:"nowrap",paddingBottom:"6px"}}><button type="button" disabled={busy} onClick={returnHome5726} aria-label="Home" style={{background:"#087F75",color:"#FFFFFF",border:"1px solid #087F75",borderRadius:4,padding:"10px 14px",fontWeight:700,display:"inline-flex",alignItems:"center",gap:8,cursor:busy?"not-allowed":"pointer"}}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 10 9-7 9 7"/><path d="M5 9v12h14V9"/><path d="M9 21v-7h6v7"/></svg>Home</button><button className="quiet" type="button" onClick={()=>setPanel('dashboard')}>Project Status Dashboard</button><button className="quiet" type="button" onClick={()=>setPanel('salesHistory')}>Sales Opportunity History</button><button className="quiet" type="button" onClick={()=>{setInstallationFocusId(null);setPanel('installation');}}>Installation Scheduling</button>{['INSTALLATION_MANAGER','CEO','COMPTROLLER'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('technicianAssignments')}>Technician Assignments</button>}{['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('payrollPreview')}>Payroll</button>}{user.role==='COMPTROLLER'&&<button className="quiet" type="button" onClick={()=>setPanel('financialReports')}>Corporate Financial Reports</button>}{user.role==='COMPTROLLER'&&<button className="quiet" type="button" onClick={()=>setPanel('customerPayments')}>Customer Payments</button>}{['customers','accounts','audit','completionInspection','installation','technicianAssignments','contractorDirectory','visibleMsrs','productCatalog','salesHistory'].includes(panel)&&<button className="quiet veridian-return-button" type="button" onClick={()=>setPanel('projects')}>Return to Customers &amp; Projects</button>}{['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<button className="quiet veridian-secondary-nav-button" type="button" onClick={()=>setPanel('visibleMsrs')}>Commercial Records</button>}{panel!=='contractorDirectory'&&panel!=='productCatalog'&&panel!=='salesHistory'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<button className="quiet veridian-secondary-nav-button" onClick={()=>setPanel('customers')}>Manage customers</button>}
+
+{user.role==='INSTALLATION_MANAGER'?
+  <nav className="sales-nav-5960b"
+    aria-label="Installation Manager navigation">
+
+    <button type="button" disabled={busy}
+      onClick={returnHome5726}>Home</button>
+
+    {panel==='installationManagerHome'&&<>
+      <details className="sales-more-5960b">
+        <summary>Instructions</summary>
+        <div className="manager-instructions-5964">
+          <p>Check installation readiness and customer collections.</p>
+          <p>Schedule installations and assign technicians.</p>
+          <p>Verify equipment purchases and inspect completed work.</p>
+          <p>Follow the required financial and installation controls.</p>
+        </div>
+      </details>
+
+      <details className="sales-more-5960b">
+        <summary>More options</summary>
+        <div>
+          <button type="button" className="quiet"
+            onClick={()=>setPanel('productCatalog')}>
+            Manage Equipment Catalog
+          </button>
+          <button type="button" className="quiet"
+            onClick={()=>setPanel('dashboard')}>
+            Project Status Dashboard
+          </button>
+          <button type="button" className="quiet"
+            onClick={()=>setPanel('visibleMsrs')}>
+            Commercial records
+          </button>
+        </div>
+      </details>
+    </>}
+
+  </nav>
+  :user.role==='TECHNICIAN'?
+  <nav className="sales-nav-5960b"
+    aria-label="Technician navigation">
+
+    <button type="button" disabled={busy}
+      onClick={returnHome5726}>Home</button>
+
+    {panel==='technicianHome'&&<>
+      <details className="sales-more-5960b">
+        <summary>Instructions</summary>
+        <div className="manager-instructions-5964">
+          <p>Start with My assigned jobs.</p>
+          <p>Confirm the correct project and installation address.</p>
+          <p>Use the available installation controls to review your work.</p>
+          <p>Follow all required safety and installation authorization checks.</p>
+          <p>Use Home to return to this screen.</p>
+        </div>
+      </details>
+
+      <details className="sales-more-5960b">
+        <summary>More options</summary>
+        <div>
+          <button type="button" className="quiet"
+            onClick={()=>setPanel('visibleMsrs')}>
+            Commercial records
+          </button>
+        </div>
+      </details>
+    </>}
+  </nav>
+  :user.role==='SALES_MANAGER'?
+  <nav className="sales-nav-5960b"
+    aria-label="Sales Manager navigation">
+
+    <button type="button" disabled={busy}
+      onClick={returnHome5726}>Home</button>
+
+    {panel==='managerHome'&&<>
+      <details className="sales-more-5960b">
+        <summary>Instructions</summary>
+        <div className="manager-instructions-5964">
+          <p>Review submitted sales first.</p>
+          <p>Check customer details, equipment, price and payment terms.</p>
+          <p>Use Project status to check outstanding work.</p>
+          <p>Document review and sending remain subject to existing authorization checks.</p>
+        </div>
+      </details>
+
+      <details className="sales-more-5960b">
+        <summary>More options</summary>
+        <div>
+          <button type="button" className="quiet"
+            onClick={()=>setPanel('productCatalog')}>Manage Equipment Catalog</button>
+          <button type="button" className="quiet"
+            onClick={()=>setPanel('salesHistory')}>Sales history</button>
+          <button type="button" className="quiet"
+            onClick={()=>setPanel('visibleMsrs')}>Commercial records</button>
+          <button type="button" className="quiet"
+            onClick={()=>{
+              setInstallationFocusId(null);
+              setPanel('installation');
+            }}>Installation scheduling</button>
+        </div>
+      </details>
+    </>}
+
+    {panel==='projects'&&!selected&&<>
+      <button type="button" className="quiet"
+        disabled={busy}
+        onClick={()=>setPanel('customer')}>Add customer</button>
+      <button type="button" className="quiet"
+        disabled={busy}
+        onClick={()=>void run(async()=>{
+          await load();
+          setProjectCustomerId('');
+          setPanel('project');
+        })}>Create project</button>
+    </>}
+
+    {panel==='projects'&&selected&&
+      <button type="button" className="quiet"
+        disabled={busy}
+        onClick={()=>{
+          if(snapshot&&
+            JSON.stringify(snapshot)!==msrSavedBaseline5696D&&
+            !window.confirm('You have unsaved changes. Leave this project?'))return;
+          setSelected(null);
+          setPanel('projects');
+        }}>Back to Manage sales</button>}
+
+    {panel==='customers'&&
+      <button type="button" className="quiet"
+        disabled={busy}
+        onClick={()=>setPanel('customer')}>Add customer</button>}
+
+  </nav>
+  :user.role==='SALES_ASSOCIATE'?
+  <nav className="sales-nav-5960b" aria-label="Sales navigation">
+    <button type="button" disabled={busy}
+      onClick={returnHome5726}>Home</button>
+
+    {panel==='salesWorkspace'&&<>
+      <button type="button" className="quiet"
+        aria-expanded={showSalesInstructions5723}
+        onClick={()=>setShowSalesInstructions5723(v=>!v)}>
+        {showSalesInstructions5723?'Hide instructions':'Instructions'}
+      </button>
+
+      <details className="sales-more-5960b">
+        <summary>More options</summary>
+        <div>
+          <button type="button" className="quiet"
+            onClick={()=>setPanel('salesHistory')}>Sales history</button>
+          <button type="button" className="quiet"
+            onClick={()=>setPanel('visibleMsrs')}>Commercial records</button>
+          <button type="button" className="quiet"
+            onClick={()=>{
+              setInstallationFocusId(null);
+              setPanel('installation');
+            }}>Installation scheduling</button>
+        </div>
+      </details>
+    </>}
+
+    {panel==='customers'&&
+      <button type="button" className="quiet"
+        disabled={busy}
+        onClick={()=>{
+          setCustomerPath('new');
+          setPanel('customer');
+        }}>Add customer</button>}
+  </nav>
+  :
+<div className="veridian-navigation-row" style={{display:"flex",flexWrap:"nowrap",overflowX:"auto",gap:"8px",alignItems:"center",whiteSpace:"nowrap",paddingBottom:"6px"}}><button type="button" disabled={busy} onClick={returnHome5726} aria-label="Home" style={{background:"#087F75",color:"#FFFFFF",border:"1px solid #087F75",borderRadius:4,padding:"10px 14px",fontWeight:700,display:"inline-flex",alignItems:"center",gap:8,cursor:busy?"not-allowed":"pointer"}}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 10 9-7 9 7"/><path d="M5 9v12h14V9"/><path d="M9 21v-7h6v7"/></svg>Home</button><button className="quiet" type="button" onClick={()=>setPanel('dashboard')}>Project Status Dashboard</button><button className="quiet" type="button" onClick={()=>setPanel('salesHistory')}>Sales Opportunity History</button><button className="quiet" type="button" onClick={()=>{setInstallationFocusId(null);setPanel('installation');}}>Installation Scheduling</button>{['INSTALLATION_MANAGER','CEO','COMPTROLLER'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('technicianAssignments')}>Technician Assignments</button>}{['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<button className="quiet" type="button" onClick={()=>setPanel('payrollPreview')}>Payroll</button>}{user.role==='COMPTROLLER'&&<button className="quiet" type="button" onClick={()=>setPanel('financialReports')}>Corporate Financial Reports</button>}{user.role==='COMPTROLLER'&&<button className="quiet" type="button" onClick={()=>setPanel('customerPayments')}>Customer Payments</button>}{['customers','accounts','audit','completionInspection','installation','technicianAssignments','contractorDirectory','visibleMsrs','productCatalog','salesHistory'].includes(panel)&&<button className="quiet veridian-return-button" type="button" onClick={()=>setPanel('projects')}>Return to Customers &amp; Projects</button>}{['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<button className="quiet veridian-secondary-nav-button" type="button" onClick={()=>setPanel('visibleMsrs')}>Commercial Records</button>}{panel!=='contractorDirectory'&&panel!=='productCatalog'&&panel!=='salesHistory'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<button className="quiet veridian-secondary-nav-button" onClick={()=>setPanel('customers')}>Manage customers</button>}
     {panel==='salesWorkspace'&&
       <button className="quiet" type="button"
         aria-expanded={showSalesInstructions5723}
         onClick={()=>setShowSalesInstructions5723(value=>!value)}>
         {showSalesInstructions5723?'Close instructions':'Instructions'}
       </button>}
-    </div>
-
+    </div>}
 
 {panel==='salesWorkspace'&&showSalesInstructions5723&&
-  <section aria-label="Sales Workspace instructions"
+  <section aria-label="Sales Home instructions"
     style={{border:'1px solid #D7E3E7',borderRadius:8,
       padding:'16px 20px',margin:'12px 0 18px'}}>
-    <h2>Sales Workspace instructions</h2>
+    <h2>Sales Home instructions</h2>
     <p className="muted">
       Choose the action that matches the work you need to do.
     </p>
@@ -458,7 +719,7 @@ function App(){
 
 {user.role==='MARKETING'&&<button className="quiet" type="button" onClick={()=>setPanel('marketingMsrs')}>Master Sales Records</button>}
 
-{['SALES_MANAGER','INSTALLATION_MANAGER'].includes(user.role)&&<button className="quiet veridian-secondary-nav-button" type="button" onClick={()=>setPanel('productCatalog')}>Manage Product Catalog</button>}
+
   {panel==='productCatalog'&&['SALES_MANAGER','INSTALLATION_MANAGER'].includes(user.role)&&<NamedProductCatalog4547 api={api}/>}
   {panel==='customerPayments'&&user.role==='COMPTROLLER'&&
     <div className="installation-evidence-nav-actions">
@@ -475,6 +736,7 @@ function App(){
 {panel==='payrollPreview'&&['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<PayrollWorkspacePreview4325 role={user.role as PayrollRole4325} weeklyRegister={user.role==='COMPTROLLER'?<OperationalWeeklyPayroll5465/>:undefined}/>} {panel==='financialReports'&&user.role==='COMPTROLLER'&&<FictionalScenarioWorkspace5482 workspace='financial' />}
 {panel==='financialReports'&&user.role==='COMPTROLLER'&&<CorporateFinancialReports5457 api={api}/>} {panel==='marketingMsrs'&&user.role==='MARKETING'&&<MarketingMSRDirectory api={api}/>}
   {panel==='salesHistory'&&<CustomerSalesHistory5005 projectId={selected?.id??''} actorRole={user.role} onRecordStatus={async (id, status, reason) => {await api(`projects/${id}/sales-status/`, 'POST', {sales_status: status, reason});}} />}{panel==='visibleMsrs'&&['CEO','COMPTROLLER','SALES_MANAGER','INSTALLATION_MANAGER','SALES_ASSOCIATE','TECHNICIAN'].includes(user.role)&&<VisibleMSRDirectory api={api}/>}
+{panel==='dashboard' && user.role==='CEO' && <FictionalPaymentException5928 key={user.id} api={api} actorRole={user.role}/>}
 {panel==='dashboard'&&<ProjectStatusDashboard onOpenProject={['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role) ? openDashboardProject : undefined} onReviewInstallation={reviewDashboardInstallation} onBack={()=>setPanel(['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)?'projects':'installation')} backLabel={['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)?'Back to Customers & Projects':'Back to Installation Scheduling'}/>}
   {panel==='technicianAssignments'&&['INSTALLATION_MANAGER','CEO','COMPTROLLER'].includes(user.role)&&<TechnicianAssignments api={api}/>}
   {panel==='contractorDirectory'&&['CEO','COMPTROLLER'].includes(user.role)&&<ContractorDirectory api={api} onBack={()=>setPanel(user.role==='CEO'?'dashboard':'projects')} returnLabel={user.role==='CEO'?'Return to Project Status Dashboard':'Return to Customers & Projects'}/>}
@@ -511,7 +773,86 @@ function App(){
         before recording any attestation.
       </p>
     </section>}
-    {panel==='installation'&&<InstallationScheduling
+  {panel==='installation'&&
+    user.role==='INSTALLATION_MANAGER'&&
+    installationTask5968==='scheduling'&&
+    <UnifiedInstallationSchedule5979
+      api={api}
+      actorId={user.id}
+      actorName={employeeLabel(user)}
+      initialProjectId={installationFocusId ?? ''}
+      onReadiness={id=>{
+        setInstallationTask5968('readiness');
+        setInstallationFocusId(id);
+      }}
+      onExistingAssignments={()=>{
+        setPanel('technicianAssignments');
+      }}
+    />}
+
+  {panel==='installation'&&
+    user.role==='INSTALLATION_MANAGER'&&
+    installationTask5968==='readiness'&&
+    <InstallationReadinessWorklist5981
+      api={api}
+      initialProjectId={installationFocusId ?? ''}
+      onSchedule={id=>{
+        setInstallationFocusId(id);
+        setInstallationTask5968('scheduling');
+      }}
+    />}
+
+  {panel==='installation'&&
+    !(user.role==='INSTALLATION_MANAGER'&&
+      ['scheduling','readiness'].includes(installationTask5968))&&
+    <InstallationScheduling
+    invoiceCsrfToken={token}
+    key={user.role==='INSTALLATION_MANAGER'
+      ?installationTask5968:'all'}
+    mode={user.role==='INSTALLATION_MANAGER'
+      ?installationTask5968:'all'}
+
+    assignmentContent={
+      user.role==='INSTALLATION_MANAGER' &&
+      installationTask5968==='scheduling'
+      ? <section className="installation-assignment-5971">
+          <h3>Assign technicians</h3>
+
+          {assignmentProject5971 ?
+            <>
+              <p role="status"
+                className="installation-assignment-success-5971">
+                Installation schedule saved.
+                Assign technicians to this project.
+              </p>
+              <TechnicianAssignments
+                key={`${assignmentProject5971}-${assignmentDate5971}`}
+                api={api}
+                initialProjectId={assignmentProject5971}
+                initialEffectiveDate={assignmentDate5971}
+              />
+            </>:
+            <details>
+              <summary>
+                Manage assignments for an existing project
+              </summary>
+              <TechnicianAssignments api={api}/>
+            </details>
+          }
+
+          {!assignmentProject5971 &&
+            <p className="muted">
+              For a new installation, create its schedule above.
+              The project and date will then carry forward here.
+            </p>}
+        </section>
+      : undefined
+    }
+    onScheduleCreated={(id,date)=>{
+      setAssignmentProject5971(id);
+      setAssignmentDate5971(date);
+      setScheduleTab5968('assignments');
+    }}
     api={api}
     actorId={user.id}
     actorRole={user.role}
@@ -519,6 +860,13 @@ function App(){
     onProjectSelected={(id) => {
       setInstallationFocusId(null);
       setEvidenceProjectId(id);
+
+      if(user.role==='INSTALLATION_MANAGER'&&
+         installationTask5968==='scheduling'){
+        setAssignmentProject5971('');
+        setAssignmentDate5971('');
+        setScheduleTab5968('dates');
+      }
       if (!['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)) return;
       void run(async () => {
         const project = await api<Project>(`projects/${id}/`);
@@ -530,9 +878,11 @@ function App(){
       setWorkflowIntent('completion');
       setPanel('projects');
     }}
-/>} 
+/>}
 
- {panel==='customers'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<CustomerManagement api={api} onChanged={load} onBack={()=>setPanel('projects')} onCreateProject={id=>{setProjectCustomerId(id);setPanel('project');}}/>}
+
+
+{panel==='customers'&&['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&<CustomerManagement api={api} onChanged={load} onBack={()=>setPanel('projects')} onCreateProject={id=>{setProjectCustomerId(id);setPanel('project');}}/>}
  {panel!=='contractorDirectory'&&panel!=='salesHistory'&&user.role==='COMPTROLLER'&&<button className="quiet veridian-secondary-nav-button" onClick={()=>setPanel('accounts')}>User management</button>}
  {panel!=='contractorDirectory'&&panel!=='salesHistory'&&user.role==='COMPTROLLER'&&<button className="quiet veridian-secondary-nav-button" onClick={()=>setPanel('audit')}>Audit history</button>}
   {panel!=='contractorDirectory'&&panel!=='salesHistory'&&user.role==='COMPTROLLER'&&<button className="quiet veridian-secondary-nav-button" onClick={()=>setPanel('completionInspection')}>Completion Envelope Inspection</button>}
@@ -540,7 +890,78 @@ function App(){
   {user.role==='COMPTROLLER'&&panel==='completionInspection'&&<CompletionEnvelopeInspection api={api}/>}
  {user.role==='COMPTROLLER'&&panel==='accounts'&&<AccountManagement actorId={user.id} api={api} onChanged={load} onBack={()=>setPanel('projects')}/>}
  {user.role==='COMPTROLLER'&&!['accounts','customers','audit','dashboard','installation','completionInspection','technicianAssignments','contractorDirectory','visibleMsrs','salesHistory'].includes(panel)&&<DocusignSetup api={api} run={run} busy={busy}/>}
- {panel==='salesWorkspace'&&user.role==='SALES_ASSOCIATE'&&
+ {panel==='installationManagerHome'&&
+    user.role==='INSTALLATION_MANAGER'&&
+    <InstallationManagerHome5968
+      onChoose={activity=>{
+        if(activity==='payments'){
+          setPanel('managerPayments');
+        }else if(activity==='equipment'){
+          setPanel('managerEquipment');
+        }else if(activity==='payroll'){
+          setPanel('payrollPreview');
+        }else{
+          setInstallationTask5968(activity);
+          setAssignmentProject5971('');
+          setAssignmentDate5971('');
+          setScheduleTab5968('dates');
+          setInstallationFocusId(null);
+          setPanel('installation');
+        }
+      }}
+    />}
+
+  {user.role==='INSTALLATION_MANAGER'&&
+    panel==='managerEquipment'&&
+    <DistributorInvoiceWorkspace6007
+      key={user.id}
+      api={api}
+      csrfToken={token}
+      actorId={user.id}
+      actorRole={user.role}
+    />}
+
+  {user.role==='INSTALLATION_MANAGER'&&
+    panel==='managerPayments'&&
+    <InstallationManagerSupport5968
+      activity='payments'
+      onReadiness={()=>{
+        setInstallationTask5968('readiness');
+        setInstallationFocusId(null);
+        setPanel('installation');
+      }}
+      onCatalog={()=>setPanel('productCatalog')}
+    />}
+
+  {panel==='technicianHome'&&user.role==='TECHNICIAN'&&
+    <TechnicianHome5966
+      onAssignedJobs={()=>setPanel('dashboard')}
+      onInstallation={()=>{
+        setInstallationFocusId(null);
+        setPanel('installation');
+      }}
+      onPayroll={()=>setPanel('payrollPreview')}
+    />}
+
+  {panel==='managerHome'&&user.role==='SALES_MANAGER'&&
+    <SalesManagerHome5964
+      api={api}
+      actorId={user.id}
+      customerNames={Object.fromEntries(
+        customers.map(c=>[c.id,c.legal_name])
+      )}
+      onManageSales={()=>{
+        setSelected(null);
+        setPanel('projects');
+      }}
+      onProjectStatus={()=>setPanel('dashboard')}
+      onCustomers={()=>setPanel('customers')}
+
+      onPayroll={()=>setPanel('payrollPreview')}
+      onOpenProject={id=>void run(()=>openProjectDetail(id))}
+    />}
+
+  {panel==='salesWorkspace'&&user.role==='SALES_ASSOCIATE'&&
     <SalesWorkspace5690
       api={api}
       customerNames={Object.fromEntries(customers.map(c => [c.id, c.legal_name]))}
@@ -553,8 +974,21 @@ function App(){
         setPanel('projects');
       }}
       onOpenProject={id=>void run(()=>openProjectDetail(id))}
+      onCustomers={()=>setPanel('customers')}
+      onProjectStatus={()=>setPanel('dashboard')}
+      onPayroll={()=>setPanel('payrollPreview')}
     />}
-  {panel==='customer'&&<section><h2>New customer</h2><details className="veridian-customer-instructions"><summary style={{display:"inline-block",cursor:"pointer",padding:"10px 14px",background:"#142B3B",color:"#FFFFFF",borderRadius:"4px",fontWeight:600,marginBottom:"12px"}}>Instructions</summary><div className="veridian-guide-banner veridian-guide-banner--info"><strong>Step 1 - Enter customer information</strong><p>Enter the customer's legal name and billing address. Add their email and phone number if available. Check the information before saving.</p></div><div className="veridian-guide-banner veridian-guide-banner--info"><strong>Step 2 - Check for an existing customer</strong><p>Before creating a new customer, select Manage customers and check whether the customer is already listed. Look for the customer's legal name and billing address. If the customer already exists, use that record instead of making another one. If a separate record is needed, explain why in the box labeled Why do you need another customer record?</p></div><p className="muted"><strong>Before leaving this screen:</strong> Select Save customer to save your information or Close to exit without saving.</p></details><fieldset style={{border:"1px solid #D7E3E7",borderRadius:"6px",padding:"14px",marginBottom:"16px"}}><legend style={{fontWeight:700}}>Customer type</legend><div style={{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:"14px"}}><label style={{display:"inline-flex",alignItems:"center",gap:"12px",width:"auto",cursor:"pointer"}}><input type="radio" name="customer_path_105" value="new" style={{width:"18px",height:"18px",flex:"0 0 auto",margin:0}} checked={customerPath==="new"} onChange={()=>setCustomerPath("new")}/><strong style={{fontSize:"1.125rem",whiteSpace:"nowrap"}}>New customer</strong></label><label style={{display:"inline-flex",alignItems:"center",gap:"12px",width:"auto",cursor:"pointer"}}><input type="radio" name="customer_path_105" value="existing" style={{width:"18px",height:"18px",flex:"0 0 auto",margin:0}} checked={customerPath==="existing"} onChange={()=>setCustomerPath("existing")}/><strong style={{fontSize:"1.125rem",whiteSpace:"nowrap"}}>Existing customer with new project</strong></label></div></fieldset>{customerPath==="new"?<form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void run(async()=>{const created=await api<Customer>('customers/','POST',Object.fromEntries(f));await load();setProjectCustomerId(created.id);setPanel('project');});}}><div className="grid"><label>Legal name<input name="legal_name" required value={customerDraftName5669} onChange={e=>{setCustomerDraftName5669(e.target.value);setCustomerDuplicateReason5669('');}}/></label>
+  {panel==='customer'&&<section><h2>Customer information</h2>
+      {['SALES_ASSOCIATE','SALES_MANAGER'].includes(user.role)&&
+        <div className="sales-customer-search-5962">
+          <h3>Search existing customers first</h3>
+          <p>Check the customer name and address before creating a new customer record.</p>
+          <button type="button" className="quiet"
+            disabled={busy}
+            onClick={()=>setPanel('customers')}>
+            Search existing customers
+          </button>
+        </div>}<details className="veridian-customer-instructions"><summary style={{display:"inline-block",cursor:"pointer",padding:"10px 14px",background:"#142B3B",color:"#FFFFFF",borderRadius:"4px",fontWeight:600,marginBottom:"12px"}}>Instructions</summary><div className="veridian-guide-banner veridian-guide-banner--info"><strong>Step 1 - Enter customer information</strong><p>Enter the customer's legal name and billing address. Add their email and phone number if available. Check the information before saving.</p></div><div className="veridian-guide-banner veridian-guide-banner--info"><strong>Step 2 - Check for an existing customer</strong><p>Before creating a new customer, select Manage customers and check whether the customer is already listed. Look for the customer's legal name and billing address. If the customer already exists, use that record instead of making another one. If a separate record is needed, explain why in the box labeled Why do you need another customer record?</p></div><p className="muted"><strong>Before leaving this screen:</strong> Select Save customer to save your information or Close to exit without saving.</p></details><fieldset style={{border:"1px solid #D7E3E7",borderRadius:"6px",padding:"14px",marginBottom:"16px"}}><legend style={{fontWeight:700}}>Customer type</legend><div style={{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:"14px"}}><label style={{display:"inline-flex",alignItems:"center",gap:"12px",width:"auto",cursor:"pointer"}}><input type="radio" name="customer_path_105" value="new" style={{width:"18px",height:"18px",flex:"0 0 auto",margin:0}} checked={customerPath==="new"} onChange={()=>setCustomerPath("new")}/><strong style={{fontSize:"1.125rem",whiteSpace:"nowrap"}}>New customer</strong></label><label style={{display:"inline-flex",alignItems:"center",gap:"12px",width:"auto",cursor:"pointer"}}><input type="radio" name="customer_path_105" value="existing" style={{width:"18px",height:"18px",flex:"0 0 auto",margin:0}} checked={customerPath==="existing"} onChange={()=>setCustomerPath("existing")}/><strong style={{fontSize:"1.125rem",whiteSpace:"nowrap"}}>Existing customer with new project</strong></label></div></fieldset>{customerPath==="new"?<form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void run(async()=>{const created=await api<Customer>('customers/','POST',Object.fromEntries(f));await load();setProjectCustomerId(created.id);setPanel('project');});}}><div className="grid"><label>Legal name<input name="legal_name" required value={customerDraftName5669} onChange={e=>{setCustomerDraftName5669(e.target.value);setCustomerDuplicateReason5669('');}}/></label>
 <div style={{gridColumn:"1 / -1"}}>
   {customerDraftName5669.trim().length>=2&&
    !customerDuplicateReady5669&&
@@ -682,13 +1116,16 @@ function App(){
    </div>
  )}
 </div><button disabled={busy||projectHistoryLoading5664||Boolean(projectHistoryError5664)||!projectCustomerId||projectHistoryChecked5664!==projectCustomerId}>Create draft</button><button type="button" className="quiet" onClick={()=>setPanel('projects')}>Close</button></form></section>}
- {['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&!['customer','project','accounts','customers','audit','dashboard','installation','completionInspection','technicianAssignments','contractorDirectory','visibleMsrs','productCatalog','salesHistory','salesWorkspace'].includes(panel)&&<div className="workspace"
-      style={user.role==='SALES_ASSOCIATE'&&selected
+ {['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role)&&!['customer','project','accounts','customers','audit','dashboard','installation','completionInspection','technicianAssignments','contractorDirectory','visibleMsrs','productCatalog','salesHistory','salesWorkspace','managerHome','payrollPreview','financialReports'].includes(panel)&&<div className="workspace"
+      style={user.role==='SALES_ASSOCIATE'
         ?{gridTemplateColumns:'minmax(0,1fr)'}
         :undefined}>
-      {(user.role!=='SALES_ASSOCIATE'||!selected)&&
+      {(!['SALES_ASSOCIATE','SALES_MANAGER'].includes(user.role)||!selected)&&
       <ProjectBrowser<Project> api={api} selectedId={selected?.id} refreshKey={projectRefresh} onChoose={project=>{void run(()=>openProjectDetail(project.id));}}/>}
- <article>
+ <article className={
+      ['SALES_ASSOCIATE','SALES_MANAGER'].includes(user.role)&&!selected
+        ?'sales-project-empty-5962':''
+    }>
     {user.role==='SALES_ASSOCIATE'&&selected&&
       <button type="button" className="quiet"
         style={{marginBottom:14}}
@@ -898,7 +1335,87 @@ function App(){
   msrStep5696D==='pricing')&&
   (user.role!=='SALES_ASSOCIATE'||
   msrStep5696D!=='pricing')&&
-  <label style={key==='scope'?{gridColumn:'1 / -1'}:undefined}>{key==='scope'?'Final Scope of Work - Review before submitting':FIELD_LABELS[key]}{['scope','payment_terms','commercial_notes'].includes(key)?<textarea aria-label={key==='scope'?'Final Scope of Work - Review before submitting':FIELD_LABELS[key]} rows={key==='scope'?8:undefined} style={key==='scope'?{width:'100%',minHeight:'180px',resize:'vertical'}:undefined} value={snapshot[key]??''} onChange={e=>setSnapshot({...snapshot,[key]:e.target.value})}/>:<input aria-label={FIELD_LABELS[key]} value={snapshot[key]??''} onChange={e=>setSnapshot({...snapshot,[key]:e.target.value})}/>}</label>}
+  <label style={key==='scope'?{gridColumn:'1 / -1'}:undefined}>{key==='scope'?'Final Scope of Work - Review before submitting':FIELD_LABELS[key]}{['scope','payment_terms','commercial_notes'].includes(key)?<textarea aria-label={key==='scope'?'Final Scope of Work - Review before submitting':FIELD_LABELS[key]} rows={key==='scope'?8:undefined} style={key==='scope'?{width:'100%',minHeight:'180px',resize:'vertical'}:undefined} value={snapshot[key]??''} onChange={e=>setSnapshot({...snapshot,[key]:e.target.value})}/>:<input aria-label={FIELD_LABELS[key]} value={snapshot[key]??''} onChange={e=>{
+      const next={...snapshot,[key]:e.target.value};
+      if (
+        ['customer','contact','customer_email'].includes(key) &&
+        e.target.value!==snapshot[key]
+      ) {
+        delete next.customer_age_category;
+        delete next.customer_age_verified_by;
+        delete next.customer_age_verified_at;
+        delete next.confirm_customer_age;
+      }
+      setSnapshot(next);
+    }}/>}</label>}
+
+
+{key==='customer_email'&&
+  <div className="customer-age-verification-5985">
+
+    <h3>Customer age verification</h3>
+
+    <p>
+      Confirm the customer's age by reviewing their
+      driver's license or other acceptable identification.
+    </p>
+
+    {([
+      ['ADULT_UNDER_65','Customer is 18-64 years old'],
+      ['AGE_65_OR_OLDER','Customer is 65 years of age or older'],
+    ] as const).map(([value,label])=>
+      <label className="customer-age-option-5985" key={value}>
+        <input
+          type="radio"
+          name="customer-age-category"
+          checked={snapshot.customer_age_category===value}
+          disabled={
+            !editable || busy ||
+            user.role!=='SALES_ASSOCIATE' ||
+            selected.sales_associate!==user.id
+          }
+          onChange={()=>setSnapshot({
+            ...snapshot,
+            customer_age_category:value,
+            customer_age_verified_by:undefined,
+            customer_age_verified_at:undefined,
+            confirm_customer_age:true,
+          })}
+        />
+        <span>{label}</span>
+      </label>
+    )}
+
+    {!ageVerificationReady&&
+      <p className="muted">
+        Required before submitting the MSR for approval.
+      </p>}
+
+    {snapshot.confirm_customer_age&&
+      <p className="muted">
+        Your verification will be recorded when you save.
+      </p>}
+
+    {snapshot.customer_age_verified_at&&
+      !snapshot.confirm_customer_age&&
+      <p className="muted">
+        Age verification recorded {
+          new Date(
+            snapshot.customer_age_verified_at
+          ).toLocaleString('en-US',{
+            timeZone:'America/New_York',
+            dateStyle:'medium',
+            timeStyle:'short',
+          })
+        } ET.
+      </p>}
+
+    {user.role!=='SALES_ASSOCIATE'&&
+      <p className="muted">
+        Customer age must be verified by the assigned Sales Associate.
+      </p>}
+
+  </div>}
 
 {key==='project_location'&&
   <div style={{gridColumn:'1 / -1',marginBottom:8}}>
@@ -937,7 +1454,11 @@ function App(){
     <button type="button" className="quiet"
       disabled={!editable||busy||!snapshot.customer.trim()}
       onClick={()=>setSnapshot({
-        ...snapshot,contact:snapshot.customer
+        ...snapshot,contact:snapshot.customer,
+         customer_age_category:undefined,
+         customer_age_verified_by:undefined,
+         customer_age_verified_at:undefined,
+         confirm_customer_age:undefined
       })}>
       Use customer name as contact
     </button>
@@ -947,7 +1468,13 @@ function App(){
           const contact=customers.find(
             c=>c.id===selected.customer
           )?.primary_contact?.name;
-          if(contact)setSnapshot({...snapshot,contact});
+          if(contact)setSnapshot({
+             ...snapshot,contact,
+             customer_age_category:undefined,
+             customer_age_verified_by:undefined,
+             customer_age_verified_at:undefined,
+             confirm_customer_age:undefined,
+           });
         }}>
         Use primary contact
       </button>}
@@ -1045,6 +1572,21 @@ function App(){
       Review the information below before submitting it for approval.
     </p>
   <p><strong>Customer:</strong> {snapshot.customer}</p>
+   <p><strong>Customer age:</strong> {
+     snapshot.customer_age_category==='ADULT_UNDER_65'
+       ? '18-64 years old'
+       : snapshot.customer_age_category==='AGE_65_OR_OLDER'
+         ? '65 years of age or older'
+         : 'Verification required'
+   }</p>
+   {!ageVerificationReady&&
+     <div role="alert">
+       <p>Verify the customer's age before submitting.</p>
+       <button type="button" className="quiet"
+         onClick={()=>setMsrStep5696D('customer')}>
+         Return to customer information
+       </button>
+     </div>}
   <p><strong>Installation:</strong> {snapshot.project_location}</p>
   <p><strong>Scope of Work:</strong></p>
   <p style={{whiteSpace:'pre-wrap'}}>
@@ -1072,7 +1614,7 @@ function App(){
       <button disabled={busy} onClick={()=>void run(()=>change('edit'))}>
         Save draft
       </button>}{(user.role!=='SALES_ASSOCIATE'||
- msrStep5696D==='review')&&<div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:18,gridColumn:"1 / -1",margin:"12px 0"}}><button disabled={busy||!submitPaymentReady||!(Number(snapshot.total_price)>0)} title={!submitPaymentReady?'Choose financing and an authorized payment arrangement before submitting.':undefined} onClick={()=>void run(async()=>{setMsrFeedback('');if(!submitPaymentReady)throw new Error('Choose financing and an authorized payment arrangement before submitting.');if(!(Number(snapshot.total_price)>0))throw new Error('Enter a total project price greater than $0 before submitting.');await api(`msrs/${selected.pending!.id}/transition/`,'POST',{action:'edit',expected_sequence:selected.pending!.edit_sequence,snapshot});const p=await api<Project>(`projects/${selected.id}/`);choose(p);await api(`msrs/${p.pending!.id}/transition/`,'POST',{action:'submit',expected_sequence:p.pending!.edit_sequence});await refresh(selected.id);setMsrFeedback('Master Sales Record submitted for review. Approval is still required.');})}>Submit for approval</button><div style={{flex:"1 1 270px",maxWidth:680}}><div style={{fontSize:"1.15rem",fontWeight:800,lineHeight:1.35,color:"#142B3B"}}>No documents are sent to the customer at this stage.</div><div style={{fontSize:"0.95rem",fontWeight:600,lineHeight:1.5,marginTop:5}}>Manager approval and required checks must be completed before documents are sent.</div></div></div>}</>}{managerCanCorrect&&editable&&
+ msrStep5696D==='review')&&<div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:18,gridColumn:"1 / -1",margin:"12px 0"}}><button disabled={busy||!ageVerificationReady||!submitPaymentReady||!(Number(snapshot.total_price)>0)} title={!submitPaymentReady?'Choose financing and an authorized payment arrangement before submitting.':undefined} onClick={()=>void run(async()=>{setMsrFeedback('');if(!ageVerificationReady)throw new Error('Verify customer age before submitting.');if(!submitPaymentReady)throw new Error('Choose financing and an authorized payment arrangement before submitting.');if(!(Number(snapshot.total_price)>0))throw new Error('Enter a total project price greater than $0 before submitting.');await api(`msrs/${selected.pending!.id}/transition/`,'POST',{action:'edit',expected_sequence:selected.pending!.edit_sequence,snapshot});const p=await api<Project>(`projects/${selected.id}/`);choose(p);await api(`msrs/${p.pending!.id}/transition/`,'POST',{action:'submit',expected_sequence:p.pending!.edit_sequence});await refresh(selected.id);setMsrFeedback('Master Sales Record submitted for review. Approval is still required.');})}>Submit for approval</button><div style={{flex:"1 1 270px",maxWidth:680}}><div style={{fontSize:"1.15rem",fontWeight:800,lineHeight:1.35,color:"#142B3B"}}>No documents are sent to the customer at this stage.</div><div style={{fontSize:"0.95rem",fontWeight:600,lineHeight:1.5,marginTop:5}}>Manager approval and required checks must be completed before documents are sent.</div></div></div>}</>}{managerCanCorrect&&editable&&
       <button
         disabled={busy||!reason.trim()}
         onClick={()=>void run(async()=>{
@@ -1097,7 +1639,7 @@ function App(){
         onClick={()=>void run(()=>change('approve'))}>
         Approve version
       </button><button disabled={busy||!reason.trim()||selected.pending.prepared_by===user.id||selected.pending.created_by===user.id} className="quiet" onClick={()=>void run(()=>change('reject'))}>Reject with reason</button></>}</div></>:<p className="muted">The approved record is locked. Create a revision to change any commercial field.</p>}{msrFeedback&&<p role="status" aria-live="polite" style={{color:"#087F75",fontWeight:700}}>{msrFeedback}</p>}{error&&<p role="alert" className="error">{error}</p>}
- {(user.role!=='SALES_ASSOCIATE'||msrStep5696D==='review')&&<label>Review note / revision reason<textarea aria-label="Review note / revision reason" value={reason} onChange={e=>setReason(e.target.value)}/></label>}{selected.state!=='CANCELLED'&&selected.current_approved&&!selected.pending&&<button disabled={busy||!reason.trim()} onClick={()=>void run(async()=>{await api(`projects/${selected.id}/revision/`,'POST',{reason,expected_approved_id:selected.current_approved!.id});await refresh(selected.id);})}>Create revision</button>}
+ {(user.role!=='SALES_ASSOCIATE'||msrStep5696D==='review'||(!selected.pending&&selected.current_approved))&&<label>Review note / revision reason<textarea aria-label="Review note / revision reason" value={reason} onChange={e=>setReason(e.target.value)}/></label>}{selected.state!=='CANCELLED'&&selected.current_approved&&!selected.pending&&<button disabled={busy||!reason.trim()} onClick={()=>void run(async()=>{await api(`projects/${selected.id}/revision/`,'POST',{reason,expected_approved_id:selected.current_approved!.id});await refresh(selected.id);})}>Create revision</button>}
  {(user.role!=='SALES_ASSOCIATE'||
        msrStep5696D==='documents')&&<>
   {selected.code==='104-SA-2026-11-22' && <FictionalProjectJourney5519 key={`${selected.id}-${selected.current_approved?.id ?? 'pending'}`} projectId={selected.id}
@@ -1248,6 +1790,7 @@ function App(){
     api={api}
     run={run}
   />}
+{selected.id==='f8a385b5-8e46-4c0c-886a-f8b6d2fc8d05' && selected.current_approved?.id==='f555e52f-ae97-4342-982f-dbd42fb0fa62' && selected.state!=='CANCELLED' && ['SALES_ASSOCIATE','SALES_MANAGER','COMPTROLLER'].includes(user.role) && <FictionalPaymentException5928 key={user.id} api={api} actorRole={user.role}/>}
 <div id="journey-signing-5519"><SigningReview key={`${selected.id}-${selected.current_approved?.id}`} projectId={selected.id} msrId={selected.current_approved?.id} actorRole={user.role} workflowIntent={workflowIntent} finance={selected.current_approved?.snapshot.financing_type} active={selected.state!=='CANCELLED'} approver={approver} comptroller={user.role==='COMPTROLLER'} actorId={user.id} busy={busy} api={api} run={run}/></div>
   </>}
  {approver&&<button className="quiet" disabled={busy||!reason.trim()} onClick={()=>void run(async()=>{await api(`projects/${selected.id}/state/`,'POST',{action:selected.state==='CANCELLED'?'reopen':'cancel',reason,expected_state:selected.state});await refresh(selected.id);})}>{selected.state==='CANCELLED'?'Reopen project':'Cancel project'}</button>}
